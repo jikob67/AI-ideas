@@ -1,100 +1,80 @@
-
-import { GoogleGenAI, GenerateContentResponse, Type, Modality, FunctionDeclaration } from '@google/genai';
+import { Type, Modality } from '@google/genai';
 import { Project, ProjectFile, ProjectSection, ProjectType, DesignConfig, MarketingSuggestion, MarketingAsset, Message, SectionType, User, ProjectIdea } from '../types';
 import { SECTION_DEFINITIONS, getInitialSectionsForProjectType, PLAN_SECTIONS } from '../constants';
-
-// --- Gemini API Initialization ---
-// The API key is sourced from process.env.GEMINI_API_KEY or process.env.API_KEY as per the guidelines.
-const getClient = () => new GoogleGenAI({ 
-    apiKey: process.env.GEMINI_API_KEY || process.env.API_KEY,
-    httpOptions: {
-        headers: {
-            'User-Agent': 'aistudio-build',
-        }
-    }
-});
-
 
 // A helper function to simulate network delay
 const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
-class GeminiService {
+export class GeminiService {
+    private static instance: GeminiService;
 
-    // --- Resilience Helpers ---
+    private constructor() {}
 
-    private async executeWithRetryAndFallback<T>(
-        operation: (model: string) => Promise<T>,
-        primaryModel: string,
-        fallbackModel: string = 'gemini-3-flash-preview',
-        maxRetries: number = 2
-    ): Promise<T> {
-        let lastError: any;
-        
-        // Try Primary Model
-        for (let attempt = 0; attempt <= maxRetries; attempt++) {
-            try {
-                return await operation(primaryModel);
-            } catch (e: any) {
-                lastError = e;
-                const isQuotaError = e?.status === 'RESOURCE_EXHAUSTED' || 
-                                     e?.message?.includes('429') || 
-                                     e?.message?.toLowerCase()?.includes('quota exceeded');
-                
-                if (isQuotaError && attempt < maxRetries) {
-                    const retryDelay = (attempt + 1) * 3000;
-                    console.warn(`[GeminiService] Quota hit for ${primaryModel}. Retrying in ${retryDelay/1000}s... (Attempt ${attempt + 1})`);
-                    await delay(retryDelay);
-                    continue;
-                }
-                
-                if (isQuotaError) {
-                    console.warn(`[GeminiService] Quota exhausted for ${primaryModel}. Falling back to ${fallbackModel}.`);
-                    break; // Exit retry loop and go to fallback
-                }
-                
-                throw e; // Non-quota error, throw immediately
-            }
+    public static getInstance(): GeminiService {
+        if (!GeminiService.instance) {
+            GeminiService.instance = new GeminiService();
         }
+        return GeminiService.instance;
+    }
 
-        // Try Fallback Model
-        try {
-            return await operation(fallbackModel);
-        } catch (fallbackError: any) {
-            console.error(`[GeminiService] Fallback to ${fallbackModel} also failed:`, fallbackError);
-            throw lastError; // Throw the original error which is usually more descriptive of the root cause if fallback also fails
+    private sanitizeBase64(base64: string): string {
+        if (!base64) return "";
+        return base64.split(',')[1] || base64;
+    }
+
+    private async callGenerate(model: string, contents: any, config?: any) {
+        const response = await fetch('/api/gemini/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model, contents, config })
+        });
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.error || 'Failed to generate content');
+        }
+        return await response.json();
+    }
+
+    private async *callStream(model: string, contents: any, config?: any) {
+        const response = await fetch('/api/gemini/stream', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model, contents, config })
+        });
+
+        if (!response.ok) throw new Error('Streaming failed');
+        if (!response.body) return;
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    yield JSON.parse(line.slice(6));
+                }
+            }
         }
     }
 
     // --- Core Generation Methods ---
 
-    async generateContent(prompt: string, model: string = 'gemini-3-flash-preview', config?: any): Promise<GenerateContentResponse> {
-        return this.executeWithRetryAndFallback(
-            async (m) => {
-                const ai = getClient();
-                const response: GenerateContentResponse = await ai.models.generateContent({
-                    model: m,
-                    contents: prompt,
-                    config,
-                });
-                return response;
-            },
-            model
-        );
+    async generateContent(prompt: string, model: string = 'gemini-flash-latest', config?: any): Promise<any> {
+        const contents = [{ role: 'user', parts: [{ text: prompt }] }];
+        return this.callGenerate(model, contents, config);
     }
 
-    async generateText(prompt: string, model: string = 'gemini-3-flash-preview', config?: any): Promise<string> {
-        return this.executeWithRetryAndFallback(
-            async (m) => {
-                const ai = getClient();
-                const response: GenerateContentResponse = await ai.models.generateContent({
-                    model: m,
-                    contents: prompt,
-                    config,
-                });
-                return response.text;
-            },
-            model
-        );
+    async generateText(prompt: string, model: string = 'gemini-flash-latest', config?: any): Promise<string> {
+        const result = await this.generateContent(prompt, model, config);
+        return result.response.candidates[0].content.parts[0].text;
     }
 
     async generateTextStream({ prompt, model, systemInstruction, config, onChunk, onComplete }: {
@@ -106,18 +86,15 @@ class GeminiService {
         onComplete: () => void;
     }) {
         try {
-            const ai = getClient();
-            const response = await ai.models.generateContentStream({
-                model,
-                contents: prompt,
-                config: {
-                    ...config,
-                    ...(systemInstruction && { systemInstruction }),
-                },
+            const stream = this.callStream(model, [{ role: 'user', parts: [{ text: prompt }] }], {
+                ...config,
+                ...(systemInstruction && { systemInstruction }),
             });
 
-            for await (const chunk of response) {
-                onChunk(chunk.text);
+            for await (const chunk of stream) {
+                if (chunk.response?.candidates?.[0]?.content?.parts?.[0]?.text) {
+                    onChunk(chunk.response.candidates[0].content.parts[0].text);
+                }
             }
         } catch (e) {
             console.error(`[GeminiService] Error in generateTextStream for model ${model}:`, e);
@@ -129,10 +106,8 @@ class GeminiService {
     
     // --- Specific Use Case Methods ---
 
-    async getSupportResponseWithContext(query: string, project: Project | null, images: { base64: string; mimeType: string }[]): Promise<GenerateContentResponse> {
-        const ai = getClient();
-        
-        const escalateToEmailSupport: FunctionDeclaration = {
+    async getSupportResponseWithContext(query: string, project: Project | null, images: { base64: string; mimeType: string }[]): Promise<any> {
+        const escalateToEmailSupport = {
             name: 'escalateToEmailSupport',
             description: 'تستخدم هذه الدالة عندما لا تتمكن من حل مشكلة المستخدم وتحتاج إلى تصعيدها إلى فريق دعم بشري.',
             parameters: {
@@ -162,33 +137,18 @@ class GeminiService {
         const parts: any[] = [{ text: query }];
 
         if (project) {
-            const projectContext = { id: project.id, name: project.name, type: project.type, description: project.description, files: (project as any).files.map((f: any) => f.name) };
+            const projectContext = { id: project.id, name: project.name, type: project.type, description: project.description, files: (project as any).files?.map((f: any) => f.name) || [] };
             parts.push({ text: `\n\n--- سياق المشروع ---\n${JSON.stringify(projectContext, null, 2)}` });
         }
 
         images.forEach(image => {
-            parts.push({ inlineData: { data: image.base64, mimeType: image.mimeType } });
+            parts.push({ inlineData: { data: this.sanitizeBase64(image.base64), mimeType: image.mimeType } });
         });
 
-        try {
-            const response = await this.executeWithRetryAndFallback(
-                async (m) => {
-                    return await ai.models.generateContent({
-                        model: m,
-                        contents: { parts },
-                        config: {
-                            systemInstruction,
-                            tools: [{ functionDeclarations: [escalateToEmailSupport] }],
-                        },
-                    });
-                },
-                'gemini-3-flash-preview'
-            );
-            return response;
-        } catch (e) {
-            console.error('[GeminiService] Error in getSupportResponseWithContext:', e);
-            throw e;
-        }
+        return this.callGenerate('gemini-flash-latest', [{ role: 'user', parts }], {
+            systemInstruction,
+            tools: [{ functionDeclarations: [escalateToEmailSupport] }],
+        });
     }
 
     async sendSupportEmail(payload: any): Promise<{ success: boolean }> {
@@ -204,42 +164,22 @@ class GeminiService {
 
      async refinePrompt(prompt: string): Promise<string> {
         const systemInstruction = `You are an expert prompt engineer. Rephrase the following user request to be clearer, more detailed, and better structured for a code generation AI. Do not change the core meaning or add new features. The response must be only the refined prompt text in Arabic, with no extra explanations.`;
-        return this.generateText(prompt, 'gemini-3-flash-preview', { systemInstruction });
+        return this.generateText(prompt, 'gemini-flash-latest', { systemInstruction });
     }
 
     async generateProjectIcon(name: string, description: string): Promise<string> {
         const prompt = `Minimalist, modern, flat vector icon for a digital project. Project name: "${name}". Description: "${description}". The icon should be simple, clean, symbolic, and suitable for a mobile app or website favicon. No text. Centered on a plain, solid-color background.`;
         try {
-            const ai = getClient();
-            const response = await this.executeWithRetryAndFallback(
-                async (m) => {
-                    return await ai.models.generateContent({
-                        model: m,
-                        contents: {
-                            parts: [{ text: prompt }]
-                        },
-                        config: {
-                            ...(m.includes('image') && {
-                                imageConfig: {
-                                    aspectRatio: '1:1'
-                                },
-                                responseModalities: [Modality.IMAGE]
-                            })
-                        }
-                    });
-                },
-                'gemini-2.5-flash-image', // Correct model for image generation
-                'gemini-3.1-flash-image-preview' // Fallback to another image-capable model
-            );
+            const result = await this.callGenerate('gemini-2.5-flash-image', [{ role: 'user', parts: [{ text: prompt }] }], {
+                imageConfig: { aspectRatio: '1:1' },
+                responseModalities: ['image']
+            });
 
-            const imagePart = response.candidates?.[0]?.content?.parts?.find(part => part.inlineData);
+            const imagePart = result.response.candidates?.[0]?.content?.parts?.find((part: any) => part.inlineData);
             if (imagePart?.inlineData) {
                 return imagePart.inlineData.data;
             }
-            
-            // If image generation failed to return bytes, logs the response for debugging
-            console.warn('[GeminiService] API response text for generateProjectIcon:', response.text);
-            throw new Error('No icon was generated by the API.');
+            throw new Error('No icon was generated.');
         } catch (e) {
             console.error('[GeminiService] Error in generateProjectIcon:', e);
             throw e;
@@ -248,38 +188,21 @@ class GeminiService {
 
     async generateSupportResponse(query: string): Promise<string> {
         const systemInstruction = `You are a helpful and friendly customer support agent for a platform called "AI ideas". Your goal is to assist users with their questions about the platform. Be concise and clear. The platform helps users build web apps, mobile apps, and generate marketing content using AI.`;
-        return this.generateText(query, 'gemini-3-flash-preview', { systemInstruction });
+        return this.generateText(query, 'gemini-flash-latest', { systemInstruction });
     }
 
     async generateImage(prompt: string, aspectRatio: string): Promise<string> {
         try {
-            const ai = getClient();
-            const response = await this.executeWithRetryAndFallback(
-                async (m) => {
-                    return await ai.models.generateContent({
-                        model: m,
-                        contents: {
-                            parts: [{ text: prompt }]
-                        },
-                        config: {
-                            ...(m.includes('image') && {
-                                imageConfig: {
-                                    aspectRatio: aspectRatio as any
-                                },
-                                responseModalities: [Modality.IMAGE]
-                            })
-                        }
-                    });
-                },
-                'gemini-2.5-flash-image',
-                'gemini-3.1-flash-image-preview'
-            );
+            const result = await this.callGenerate('gemini-2.5-flash-image', [{ role: 'user', parts: [{ text: prompt }] }], {
+                imageConfig: { aspectRatio: aspectRatio as any },
+                responseModalities: ['image']
+            });
 
-            const imagePart = response.candidates?.[0]?.content?.parts?.find(part => part.inlineData);
+            const imagePart = result.response.candidates?.[0]?.content?.parts?.find((part: any) => part.inlineData);
             if (imagePart?.inlineData) {
                 return imagePart.inlineData.data;
             }
-            throw new Error('No image was generated by the API.');
+            throw new Error('No image was generated.');
         } catch (e) {
             console.error('[GeminiService] Error in generateImage:', e);
             throw e;
@@ -292,29 +215,17 @@ class GeminiService {
     
     async editImageWithText(base64Data: string, prompt: string, mimeType: string = 'image/png'): Promise<string> {
         try {
-            const ai = getClient();
-            const response = await this.executeWithRetryAndFallback(
-                async (m) => {
-                    return await ai.models.generateContent({
-                        model: m,
-                        contents: {
-                            parts: [
-                                { inlineData: { data: base64Data, mimeType } },
-                                { text: prompt },
-                            ],
-                        },
-                        config: {
-                            ...(m.includes('image') && {
-                                responseModalities: [Modality.IMAGE],
-                            }),
-                        },
-                    });
-                },
-                'gemini-2.5-flash-image',
-                'gemini-3.1-flash-image-preview'
-            );
+            const result = await this.callGenerate('gemini-2.5-flash-image', [{ 
+                role: 'user', 
+                parts: [
+                    { inlineData: { data: this.sanitizeBase64(base64Data), mimeType: mimeType } },
+                    { text: prompt },
+                ],
+            }], {
+                responseModalities: ['image']
+            });
 
-            const imagePart = response.candidates?.[0]?.content?.parts?.find(part => part.inlineData);
+            const imagePart = result.response.candidates?.[0]?.content?.parts?.find((part: any) => part.inlineData);
             if (imagePart?.inlineData) {
                 return imagePart.inlineData.data;
             }
@@ -327,22 +238,14 @@ class GeminiService {
 
     async analyzeImage(base64Data: string, mimeType: string, prompt: string): Promise<string> {
         try {
-            const ai = getClient();
-            const response = await this.executeWithRetryAndFallback(
-                async (m) => {
-                    return await ai.models.generateContent({
-                        model: m,
-                        contents: {
-                            parts: [
-                                { inlineData: { data: base64Data, mimeType } },
-                                { text: prompt },
-                            ]
-                        }
-                    });
-                },
-                'gemini-3-flash-preview'
-            );
-            return response.text;
+            const result = await this.callGenerate('gemini-flash-latest', [{ 
+                role: 'user', 
+                parts: [
+                    { inlineData: { data: this.sanitizeBase64(base64Data), mimeType: mimeType } },
+                    { text: prompt },
+                ]
+            }]);
+            return result.response.candidates[0].content.parts[0].text;
         } catch (e) {
             console.error('[GeminiService] Error in analyzeImage:', e);
             throw e;
@@ -350,7 +253,6 @@ class GeminiService {
     }
 
     async analyzeAndCategorizeUI(base64Data: string, mimeType: string): Promise<{ name: string; type: ProjectType; description: string; }> {
-        const ai = getClient();
         const projectTypes = Object.values(ProjectType).filter(t => ![
             ProjectType.AI_CHAT_MESSAGE, ProjectType.OTHER_FILE, ProjectType.PROJECT_BOOST, ProjectType.MARKETING_GENERATION,
             ProjectType.DIGITAL_DRAWING, ProjectType.TTS, ProjectType.AUDIO_TRANSCRIPTION, ProjectType.UPLOAD_IMAGE_CONTEXT,
@@ -373,21 +275,15 @@ class GeminiService {
         };
 
         try {
-            const response = await this.executeWithRetryAndFallback(
-                async (m) => {
-                    return await ai.models.generateContent({
-                        model: m,
-                        contents: { parts: [{ inlineData: { data: base64Data, mimeType: mimeType } }] },
-                        config: {
-                            systemInstruction,
-                            responseMimeType: 'application/json',
-                            responseSchema,
-                        }
-                    });
-                },
-                'gemini-3-flash-preview'
-            );
-            const jsonText = response.text.trim();
+            const result = await this.callGenerate('gemini-flash-latest', [{ 
+                role: 'user', 
+                parts: [{ inlineData: { data: this.sanitizeBase64(base64Data), mimeType: mimeType } }] 
+            }], {
+                systemInstruction,
+                responseMimeType: 'application/json',
+                responseSchema,
+            });
+            const jsonText = result.response.candidates[0].content.parts[0].text;
             return JSON.parse(jsonText);
         } catch (e) {
             console.error('[GeminiService] Error in analyzeAndCategorizeUI:', e);
@@ -401,31 +297,19 @@ class GeminiService {
             'Use the style of the second image to redraw the first image.';
 
         const parts: any[] = [
-            { inlineData: { data: imageBase64.split(',')[1] || imageBase64, mimeType: 'image/png' } },
+            { inlineData: { data: this.sanitizeBase64(imageBase64), mimeType: 'image/png' } },
             { text: prompt },
         ];
         
         if(typeof style !== 'string' && style.imageBase64) {
-            parts.push({ inlineData: { data: style.imageBase64.split(',')[1] || style.imageBase64, mimeType: 'image/png' } });
+            parts.push({ inlineData: { data: this.sanitizeBase64(style.imageBase64), mimeType: 'image/png' } });
         }
         
         try {
-            const ai = getClient();
-            const response = await this.executeWithRetryAndFallback(
-                async (m) => {
-                    return await ai.models.generateContent({
-                        model: m,
-                        contents: { parts },
-                        config: {
-                            ...(m.includes('image') && {
-                                responseModalities: [Modality.IMAGE],
-                            }),
-                        },
-                    });
-                },
-                'gemini-2.5-flash-image'
-            );
-            const imagePart = response.candidates?.[0]?.content?.parts?.find(part => part.inlineData);
+            const result = await this.callGenerate('gemini-2.5-flash-image', [{ role: 'user', parts }], {
+                responseModalities: ['image']
+            });
+            const imagePart = result.response.candidates?.[0]?.content?.parts?.find((part: any) => part.inlineData);
             if (imagePart?.inlineData) {
                 return imagePart.inlineData.data;
             }
@@ -440,27 +324,15 @@ class GeminiService {
         const prompt = `You are an expert artist. Complete and finish the following artistic drawing or sketch. ${instruction}. Maintain the original subject and composition but add details, professional finishing, shading, and a suitable background to make it a complete masterpiece.`;
 
         const parts: any[] = [
-            { inlineData: { data: imageBase64.split(',')[1] || imageBase64, mimeType: 'image/png' } },
+            { inlineData: { data: this.sanitizeBase64(imageBase64), mimeType: 'image/png' } },
             { text: prompt },
         ];
         
         try {
-            const ai = getClient();
-            const response = await this.executeWithRetryAndFallback(
-                async (m) => {
-                    return await ai.models.generateContent({
-                        model: m,
-                        contents: { parts },
-                        config: {
-                            ...(m.includes('image') && {
-                                responseModalities: [Modality.IMAGE],
-                            }),
-                        },
-                    });
-                },
-                'gemini-2.5-flash-image'
-            );
-            const imagePart = response.candidates?.[0]?.content?.parts?.find(part => part.inlineData);
+            const result = await this.callGenerate('gemini-2.5-flash-image', [{ role: 'user', parts }], {
+                responseModalities: ['image']
+            });
+            const imagePart = result.response.candidates?.[0]?.content?.parts?.find((part: any) => part.inlineData);
             if (imagePart?.inlineData) {
                 return imagePart.inlineData.data;
             }
@@ -471,44 +343,32 @@ class GeminiService {
         }
     }
 
-    async generateVideo(apiKey: string | undefined, prompt: string, image: { base64: string; mimeType: string } | null, resolution: '720p' | '1080p', aspectRatio: '16:9' | '9:16', onProgress: (log: string) => void): Promise<string> {
-        if (!apiKey) {
-            throw new Error("API Key is missing for video generation.");
-        }
-        
-        const ai = getClient();
+    async generateVideo(prompt: string, image: { base64: string; mimeType: string } | null, resolution: '720p' | '1080p', aspectRatio: '16:9' | '9:16', onProgress: (log: string) => void): Promise<string> {
         onProgress('Starting video generation request...');
-
-        let operation = await ai.models.generateVideos({
-            model: 'veo-3.1-lite-generate-preview',
-            prompt: prompt || 'Animate this image.',
-            ...(image && { image: { imageBytes: image.base64, mimeType: image.mimeType } }),
-            config: {
-                numberOfVideos: 1,
-                resolution,
-                aspectRatio,
-            }
+        const startRes = await fetch('/api/gemini/generate-video', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt, image, config: { resolution, aspectRatio } })
         });
+        const { operationName } = await startRes.json();
 
         onProgress('Video generation in progress... this may take several minutes.');
         let checks = 0;
-        while (!operation.done) {
-            await new Promise(resolve => setTimeout(resolve, 10000)); // Poll every 10 seconds
-            operation = await ai.operations.getVideosOperation({operation: operation});
+        while (true) {
+            await new Promise(resolve => setTimeout(resolve, 10000));
+            const statusRes = await fetch('/api/gemini/video-status', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ operationName })
+            });
+            const status = await statusRes.json();
+            if (status.done) break;
             checks++;
             onProgress(`Checking status (${checks})... still processing.`);
         }
 
-        onProgress('Video generation complete. Fetching download link...');
-        const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
-
-        if (!downloadLink) {
-            throw new Error("Video generation finished but no download link was provided.");
-        }
-
-        onProgress('Fetching video...');
-        // The component will fetch the blob, we just return the signed URL
-        return `${downloadLink}&key=${apiKey}`;
+        onProgress('Video generation complete.');
+        return `/api/gemini/video-download?operationName=${encodeURIComponent(operationName)}`;
     }
 
     // Mock for video analysis as it's not directly supported in the same way
@@ -519,38 +379,26 @@ class GeminiService {
 
     // Mock
     async transcribeAudio(base64Audio: string, mimeType: string): Promise<string> {
-        await delay(2500);
-        return "هذا نص تجريبي تم إنشاؤه من الملف الصوتي. في تطبيق حقيقي، سيتم هنا عرض النص الفعلي الذي تم تحويله من الصوت. شكرًا لاستخدامك ميزة تحويل الصوت إلى نص.";
+        const result = await this.callGenerate('gemini-flash-latest', [{
+            role: 'user',
+            parts: [
+                { inlineData: { data: this.sanitizeBase64(base64Audio), mimeType: mimeType } },
+                { text: 'Transcribe this audio. Return ONLY the transcribed text in Arabic.' }
+            ]
+        }]);
+        return result.response.candidates[0].content.parts[0].text;
     }
 
     async generateSpeech(text: string): Promise<string> {
-        try {
-            const ai = getClient();
-            const response = await this.executeWithRetryAndFallback(
-                async (m) => {
-                    return await ai.models.generateContent({
-                        model: m,
-                        contents: [{ parts: [{ text }] }],
-                        config: {
-                            ...(m.includes('tts') && {
-                                responseModalities: [Modality.AUDIO],
-                                speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } },
-                            }),
-                        }
-                    });
-                },
-                'gemini-3-flash-preview'
-            );
-
-            const audioPart = response.candidates?.[0]?.content?.parts?.[0]?.inlineData;
-            if (audioPart) {
-                return audioPart.data;
-            }
-            throw new Error("API did not return audio data.");
-        } catch (e) {
-            console.error('[GeminiService] Error in generateSpeech:', e);
-            throw e;
+        const result = await this.callGenerate('gemini-3.1-flash-tts-preview', [{ role: 'user', parts: [{ text }] }], {
+            responseModalities: ['audio'],
+            speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Aoide' } } }
+        });
+        const audioPart = result.response.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+        if (audioPart) {
+            return audioPart.data;
         }
+        throw new Error("API did not return audio data.");
     }
 
     // --- Complex Application-Specific Methods (Mocks) ---
@@ -606,7 +454,6 @@ class GeminiService {
     }
 
     async generateProjectFromDescription(projectName: string, projectDesc: string, projectType: ProjectType, plan: 'free' | 'pro' | 'premium'): Promise<ProjectSection[]> {
-        const ai = getClient();
         const availableSectionTypes = PLAN_SECTIONS[plan];
         const systemInstruction = `You are a software architect. Your task is to plan the sections for a new digital project based on user input.
         Based on the project name, description, and type, you must suggest an array of sections.
@@ -620,46 +467,37 @@ class GeminiService {
         const prompt = `Project Name: ${projectName}\nProject Type: ${projectType}\nProject Description: ${projectDesc}`;
 
         const responseSchema = {
-        type: Type.OBJECT,
-        properties: {
-            sections: {
-            type: Type.ARRAY,
-            items: {
-                type: Type.OBJECT,
-                properties: {
-                type: { type: Type.STRING, enum: availableSectionTypes as any[] },
-                title: { type: Type.STRING },
-                config: {
-                    type: Type.OBJECT,
-                    properties: {
-                    htmlContent: { type: Type.STRING }
+            type: Type.OBJECT,
+            properties: {
+                sections: {
+                    type: Type.ARRAY,
+                    items: {
+                        type: Type.OBJECT,
+                        properties: {
+                            type: { type: Type.STRING, enum: availableSectionTypes as any[] },
+                            title: { type: Type.STRING },
+                            config: {
+                                type: Type.OBJECT,
+                                properties: {
+                                    htmlContent: { type: Type.STRING }
+                                }
+                            }
+                        },
+                        required: ['type', 'title']
                     }
                 }
-                },
-                required: ['type', 'title']
-            }
-            }
-        },
-        required: ['sections']
+            },
+            required: ['sections']
         };
 
         try {
-            const response = await this.executeWithRetryAndFallback(
-                async (m) => {
-                    return await ai.models.generateContent({
-                        model: m,
-                        contents: prompt,
-                        config: {
-                            systemInstruction,
-                            responseMimeType: 'application/json',
-                            responseSchema,
-                        }
-                    });
-                },
-                'gemini-3-flash-preview'
-            );
+            const result = await this.callGenerate('gemini-flash-latest', [{ role: 'user', parts: [{ text: prompt }] }], {
+                systemInstruction,
+                responseMimeType: 'application/json',
+                responseSchema,
+            });
 
-            const jsonText = response.text.trim();
+            const jsonText = result.response.candidates[0].content.parts[0].text;
             const parsed = JSON.parse(jsonText);
             
             const designSection: ProjectSection = { 
@@ -696,7 +534,6 @@ class GeminiService {
     }
     
     async modifyProjectWithAI(project: Project, prompt: string, images?: { base64: string; mimeType: string }[]): Promise<{ updatedProject: Project, aiResponse: string }> {
-        const ai = getClient();
         const systemInstruction = `You are an AI assistant and expert developer, the 'Intelligent Project Engineer', helping a user modify an existing web project.
         
         **CRITICAL DEVELOPMENT RULES (AI Ideas Core):**
@@ -722,7 +559,7 @@ class GeminiService {
 
         if (images && images.length > 0) {
             images.forEach(image => {
-                parts.push({ inlineData: { data: image.base64, mimeType: image.mimeType } });
+                parts.push({ inlineData: { data: this.sanitizeBase64(image.base64), mimeType: image.mimeType } });
             });
         }
 
@@ -747,22 +584,13 @@ class GeminiService {
         };
 
         try {
-            const response = await this.executeWithRetryAndFallback(
-                async (m) => {
-                    return await ai.models.generateContent({
-                        model: m,
-                        contents: { parts },
-                        config: {
-                            systemInstruction,
-                            responseMimeType: 'application/json',
-                            responseSchema
-                        }
-                    });
-                },
-                'gemini-3.1-pro-preview' // This is still pro, but the fallback will handle it
-            );
+            const result = await this.callGenerate('gemini-3.1-pro-preview', [{ role: 'user', parts }], {
+                systemInstruction,
+                responseMimeType: 'application/json',
+                responseSchema
+            });
 
-            const jsonText = response.text.trim();
+            const jsonText = result.response.candidates[0].content.parts[0].text;
             const parsed = JSON.parse(jsonText) as { aiResponse: string, files: { name: string, content: string }[] };
             
             const updatedProject = { ...project } as any;
@@ -798,8 +626,6 @@ class GeminiService {
         await delay(1000);
         onLog("Analyzing project specifications...");
         
-        const ai = getClient();
-
         const ipProtectionInstruction = `
         IMPORTANT INTELLECTUAL PROPERTY NOTICE: The user is providing a reference screenshot. You MUST NOT create a direct copy. You are legally and ethically required to make significant modifications to the design, layout, color scheme, and branding to create a new, inspired work. This is to protect the intellectual property of the original source. You must also add a subtle, non-intrusive credit to "AI ideas" in the HTML footer or as a comment in the code (e.g., <!-- Generated by AI ideas -->). The goal is to create a new, functional project inspired by the reference, not a replica.
         `;
@@ -850,7 +676,7 @@ class GeminiService {
         if (files && files.length > 0) {
             onLog(`Processing ${files.length} image(s)...`);
             files.forEach(file => {
-                contentParts.push({ inlineData: { data: file.base64, mimeType: file.mimeType } });
+                contentParts.push({ inlineData: { data: this.sanitizeBase64(file.base64), mimeType: file.mimeType } });
             });
         }
         
@@ -875,27 +701,13 @@ class GeminiService {
         
         try {
             onLog("Generating code with Gemini Pro...");
-            const response = await this.executeWithRetryAndFallback(
-                async (m) => {
-                    const res = await ai.models.generateContent({
-                        model: m,
-                        contents: { parts: contentParts },
-                        config: {
-                            systemInstruction,
-                            responseMimeType: 'application/json',
-                            responseSchema,
-                        }
-                    });
-                    if (m.includes('flash')) {
-                        onLog("Using Flash model due to high demand...");
-                    }
-                    return res;
-                },
-                'gemini-3.1-pro-preview',
-                'gemini-3-flash-preview'
-            );
+            const result = await this.callGenerate('gemini-3.1-pro-preview', [{ role: 'user', parts: contentParts }], {
+                systemInstruction,
+                responseMimeType: 'application/json',
+                responseSchema,
+            });
 
-            const jsonText = response.text.trim();
+            const jsonText = result.response.candidates[0].content.parts[0].text;
             const parsed = JSON.parse(jsonText) as { files: ProjectFile[] };
 
             // Ensure Trinity of files exists
@@ -967,7 +779,6 @@ class GeminiService {
     
     async convertProjectFiles(files: ProjectFile[], prompt: string, onLog: (log: string) => void): Promise<ProjectFile[]> {
         onLog("Initializing AI software engineer...");
-        const ai = getClient();
     
         const systemInstruction = `You are a world-class senior software engineer specializing in code transformation, refactoring, and migration. Your task is to modify a given set of project files based on the user's instructions.
         
@@ -1012,29 +823,24 @@ class GeminiService {
             },
             required: ["files"]
         };
-        
-        onLog("AI is processing the conversion...");
-        const response = await this.executeWithRetryAndFallback(
-            async (m) => {
-                return await ai.models.generateContent({
-                    model: m,
-                    contents: { parts },
-                    config: {
-                        systemInstruction,
-                        responseMimeType: 'application/json',
-                        responseSchema
-                    }
-                });
-            },
-            'gemini-3.1-pro-preview'
-        );
     
-        onLog("Parsing AI response...");
-        const jsonText = response.text.trim();
-        const parsed = JSON.parse(jsonText) as { files: ProjectFile[] };
-        
-        onLog("Code conversion complete.");
-        return parsed.files;
+        try {
+            onLog("Connecting to Gemini Pro...");
+            const result = await this.callGenerate('gemini-3.1-pro-preview', [{ role: 'user', parts }], {
+                systemInstruction,
+                responseMimeType: 'application/json',
+                responseSchema
+            });
+
+            const jsonText = result.response.candidates[0].content.parts[0].text;
+            const parsed = JSON.parse(jsonText) as { files: ProjectFile[] };
+            onLog("Conversion complete!");
+            return parsed.files;
+        } catch(e) {
+            console.error("Error in convertProjectFiles:", e);
+            onLog(`فشل: ${e instanceof Error ? e.message : "An unknown error occurred during conversion."}`);
+            throw new Error("فشل الذكاء الاصطناعي في تحويل الملفات.");
+        }
     }
     
     async generateMarketingSuggestions(project: Project): Promise<MarketingSuggestion[]> {
@@ -1057,7 +863,6 @@ class GeminiService {
     }
 
     async analyzeUrlForMarketing(url: string): Promise<{ name: string; description: string; iconUrl: string | null }> {
-        const ai = getClient();
         const systemInstruction = `You are a web page analyzer. Based on your knowledge of the web, analyze the content of the provided URL.
         1. Extract the project, company, or website name.
         2. Extract a concise, one-sentence description or tagline from the meta description, og:description, or main heading.
@@ -1077,21 +882,12 @@ class GeminiService {
         };
     
         try {
-            const response = await this.executeWithRetryAndFallback(
-                async (m) => {
-                    return await ai.models.generateContent({
-                        model: m,
-                        contents: prompt,
-                        config: {
-                            systemInstruction,
-                            responseMimeType: 'application/json',
-                            responseSchema,
-                        }
-                    });
-                },
-                'gemini-3-flash-preview'
-            );
-            const jsonText = response.text.trim();
+            const result = await this.callGenerate('gemini-flash-latest', [{ role: 'user', parts: [{ text: prompt }] }], {
+                systemInstruction,
+                responseMimeType: 'application/json',
+                responseSchema,
+            });
+            const jsonText = result.response.candidates[0].content.parts[0].text;
             return JSON.parse(jsonText);
         } catch (e) {
             console.error('[GeminiService] Error in analyzeUrlForMarketing:', e);
@@ -1152,7 +948,6 @@ class GeminiService {
     }
     
     async generateProfessionalTemplate(project: Project, theme: any, templateCategory: string, fontPair: { heading: string; body: string }): Promise<{ html: string; css: string; js: string }> {
-        const ai = getClient();
         const googleFontLink = `https://fonts.googleapis.com/css2?family=${fontPair.heading.replace(' ', '+')}:wght@700&family=${fontPair.body.replace(' ', '+')}:wght@400;700&display=swap`;
     
         const systemInstruction = `You are an expert front-end developer and UI/UX designer. Your task is to generate a beautiful, modern, and responsive template for a project with interactive elements.
@@ -1204,21 +999,12 @@ class GeminiService {
         };
     
         try {
-            const response = await this.executeWithRetryAndFallback(
-                async (m) => {
-                    return await ai.models.generateContent({
-                        model: m,
-                        contents: `Generate the template for "${project.name}".`,
-                        config: {
-                            systemInstruction,
-                            responseMimeType: 'application/json',
-                            responseSchema
-                        }
-                    });
-                },
-                'gemini-3.1-pro-preview'
-            );
-            const jsonText = response.text.trim();
+            const result = await this.callGenerate('gemini-3.1-pro-preview', [{ role: 'user', parts: [{ text: `Generate the template for "${project.name}".` }] }], {
+                systemInstruction,
+                responseMimeType: 'application/json',
+                responseSchema
+            });
+            const jsonText = result.response.candidates[0].content.parts[0].text;
             return JSON.parse(jsonText);
         } catch (e) {
             console.error("Error in generateProfessionalTemplate:", e);
@@ -1227,7 +1013,6 @@ class GeminiService {
     }
 
     async getTemplateThemeSuggestion(): Promise<{ primary: string; secondary: string; background: string; text: string; fontPair: { heading: string, body: string } }> {
-        const ai = getClient();
         const systemInstruction = `You are a UI/UX design expert. Generate a harmonious and modern theme for a web template.
         Your output MUST be a valid JSON object containing:
         1. A color palette with keys: "primary", "secondary", "background", and "text". Use hex codes. Ensure good contrast.
@@ -1255,25 +1040,15 @@ class GeminiService {
         };
         
         try {
-            const response = await this.executeWithRetryAndFallback(
-                async (m) => {
-                    return await ai.models.generateContent({
-                        model: m,
-                        contents: "Generate a new theme.",
-                        config: {
-                            systemInstruction,
-                            responseMimeType: 'application/json',
-                            responseSchema,
-                        }
-                    });
-                },
-                'gemini-3-flash-preview'
-            );
-            const jsonText = response.text.trim();
+            const result = await this.callGenerate('gemini-flash-latest', [{ role: 'user', parts: [{ text: "Generate a new theme." }] }], {
+                systemInstruction,
+                responseMimeType: 'application/json',
+                responseSchema,
+            });
+            const jsonText = result.response.candidates[0].content.parts[0].text;
             return JSON.parse(jsonText);
         } catch(e) {
             console.error("AI theme suggestion failed, falling back to default.", e);
-            // Fallback to a predefined theme if AI fails
             return { 
                 primary: '#818cf8', 
                 secondary: '#c084fc', 
@@ -1313,7 +1088,6 @@ class GeminiService {
     }
 
     async generateProjectIdeas(category: string): Promise<{ name: string; description: string; type: ProjectType; suggestedFeatures: string[] }[]> {
-        const ai = getClient();
         const projectTypes = Object.values(ProjectType).filter(t => !t.includes(' '));
         const systemInstruction = `You are a creative startup incubator and project planner. Your task is to generate 5 innovative and practical project ideas based on a given category.
         - For each idea, provide a creative name, a concise one-sentence description in Arabic, a suitable project type, an array of 3-5 key features for the project.
@@ -1347,21 +1121,12 @@ class GeminiService {
         };
 
         try {
-            const response = await this.executeWithRetryAndFallback(
-                async (m) => {
-                    return await ai.models.generateContent({
-                        model: m,
-                        contents: prompt,
-                        config: {
-                            systemInstruction,
-                            responseMimeType: 'application/json',
-                            responseSchema,
-                        }
-                    });
-                },
-                'gemini-3-flash-preview'
-            );
-            const jsonText = response.text.trim();
+            const result = await this.callGenerate('gemini-flash-latest', [{ role: 'user', parts: [{ text: prompt }] }], {
+                systemInstruction,
+                responseMimeType: 'application/json',
+                responseSchema,
+            });
+            const jsonText = result.response.candidates[0].content.parts[0].text;
             const parsed = JSON.parse(jsonText) as { ideas: { name: string; description: string; type: ProjectType; suggestedFeatures: string[] }[] };
             return parsed.ideas;
         } catch (e) {
@@ -1371,7 +1136,6 @@ class GeminiService {
     }
 
     async refineProjectIdea(idea: ProjectIdea, refinementRequest: string): Promise<Omit<ProjectIdea, 'type'>> {
-        const ai = getClient();
         const systemInstruction = `You are a creative project planner. A user has an initial project idea and wants to refine it based on their request.
         Your task is to update the idea's name, description, and key features based on the user's input.
         - If the user suggests a new name, use it. Otherwise, keep the original or slightly tweak it if appropriate.
@@ -1396,21 +1160,12 @@ class GeminiService {
         };
     
         try {
-            const response = await this.executeWithRetryAndFallback(
-                async (m) => {
-                    return await ai.models.generateContent({
-                        model: m,
-                        contents: prompt,
-                        config: {
-                            systemInstruction,
-                            responseMimeType: 'application/json',
-                            responseSchema,
-                        }
-                    });
-                },
-                'gemini-3-flash-preview'
-            );
-            const jsonText = response.text.trim();
+            const result = await this.callGenerate('gemini-flash-latest', [{ role: 'user', parts: [{ text: prompt }] }], {
+                systemInstruction,
+                responseMimeType: 'application/json',
+                responseSchema,
+            });
+            const jsonText = result.response.candidates[0].content.parts[0].text;
             return JSON.parse(jsonText);
         } catch (e) {
             console.error("AI idea refinement failed.", e);
@@ -1419,7 +1174,6 @@ class GeminiService {
     }
 
     async suggestMoreFeatures(idea: ProjectIdea): Promise<string[]> {
-        const ai = getClient();
         const systemInstruction = `You are a creative product manager. Based on the provided project idea, suggest 3 to 5 new, relevant features that would enhance the project.
         - Your output MUST be a valid JSON object with a single key "features", which is an array of strings.
         - The features should be in Arabic.
@@ -1443,21 +1197,12 @@ class GeminiService {
         };
 
         try {
-            const response = await this.executeWithRetryAndFallback(
-                async (m) => {
-                    return await ai.models.generateContent({
-                        model: m,
-                        contents: prompt,
-                        config: {
-                            systemInstruction,
-                            responseMimeType: 'application/json',
-                            responseSchema,
-                        }
-                    });
-                },
-                'gemini-3-flash-preview'
-            );
-            const jsonText = response.text.trim();
+            const result = await this.callGenerate('gemini-flash-latest', [{ role: 'user', parts: [{ text: prompt }] }], {
+                systemInstruction,
+                responseMimeType: 'application/json',
+                responseSchema,
+            });
+            const jsonText = result.response.candidates[0].content.parts[0].text;
             const parsed = JSON.parse(jsonText) as { features: string[] };
             return parsed.features;
         } catch (e) {
@@ -1467,7 +1212,6 @@ class GeminiService {
     }
 
     async analyzeApiEndpoints(files: ProjectFile[]): Promise<{ method: string; path: string; description: string; mockResponse: string; }[]> {
-        const ai = getClient();
         const systemInstruction = `You are an API analyst. Analyze the provided project files (especially JavaScript files) and extract all API endpoints. For each endpoint, provide the HTTP method, path, a brief description in Arabic, and a realistic JSON mock response as a string. Your output MUST be a valid JSON array of objects, with no other text.`;
 
         const parts: any[] = [{ text: "Analyze these files to find API endpoints:" }];
@@ -1490,21 +1234,12 @@ class GeminiService {
         };
 
         try {
-            const response = await this.executeWithRetryAndFallback(
-                async (m) => {
-                    return await ai.models.generateContent({
-                        model: m,
-                        contents: { parts },
-                        config: {
-                            systemInstruction,
-                            responseMimeType: 'application/json',
-                            responseSchema
-                        }
-                    });
-                },
-                'gemini-3-flash-preview'
-            );
-            const jsonText = response.text.trim();
+            const result = await this.callGenerate('gemini-flash-latest', [{ role: 'user', parts }], {
+                systemInstruction,
+                responseMimeType: 'application/json',
+                responseSchema
+            });
+            const jsonText = result.response.candidates[0].content.parts[0].text;
             return JSON.parse(jsonText);
         } catch (e) {
             console.error("Error in analyzeApiEndpoints:", e);
@@ -1514,7 +1249,6 @@ class GeminiService {
     }
 
     async generateComponentTree(files: ProjectFile[]): Promise<any> {
-        const ai = getClient();
         const systemInstruction = `You are a UI architect. Analyze the provided front-end code (HTML/JS) and generate a hierarchical component tree representing the UI structure. The root node should represent the body or main app container. Your output must be a valid JSON object representing the root node, following the specified schema.`;
         
         const parts: any[] = [{ text: "Analyze this code to create a component tree:" }];
@@ -1543,21 +1277,12 @@ class GeminiService {
         };
 
         try {
-            const response = await this.executeWithRetryAndFallback(
-                async (m) => {
-                    return await ai.models.generateContent({
-                        model: m,
-                        contents: { parts },
-                        config: {
-                            systemInstruction,
-                            responseMimeType: 'application/json',
-                            responseSchema
-                        }
-                    });
-                },
-                'gemini-3-flash-preview'
-            );
-            const jsonText = response.text.trim();
+            const result = await this.callGenerate('gemini-flash-latest', [{ role: 'user', parts }], {
+                systemInstruction,
+                responseMimeType: 'application/json',
+                responseSchema
+            });
+            const jsonText = result.response.candidates[0].content.parts[0].text;
             return JSON.parse(jsonText);
         } catch (e) {
             console.error("Error in generateComponentTree:", e);
@@ -1566,7 +1291,6 @@ class GeminiService {
     }
 
     async getMonetizationStrategy(project: Project): Promise<{ summary: string; recommendations: { method: string; reason: string; implementationSteps: string[] }[] }> {
-        const ai = getClient();
         const systemInstruction = `You are a business strategy expert for digital products. Analyze the provided project details and recommend the top 3 monetization strategies.
         
         For each recommendation, provide:
@@ -1599,21 +1323,12 @@ class GeminiService {
         };
     
         try {
-            const response = await this.executeWithRetryAndFallback(
-                async (m) => {
-                    return await ai.models.generateContent({
-                        model: m,
-                        contents: prompt,
-                        config: {
-                            systemInstruction,
-                            responseMimeType: 'application/json',
-                            responseSchema,
-                        }
-                    });
-                },
-                'gemini-3-flash-preview'
-            );
-            const jsonText = response.text.trim();
+            const result = await this.callGenerate('gemini-flash-latest', [{ role: 'user', parts: [{ text: prompt }] }], {
+                systemInstruction,
+                responseMimeType: 'application/json',
+                responseSchema,
+            });
+            const jsonText = result.response.candidates[0].content.parts[0].text;
             return JSON.parse(jsonText);
         } catch (e) {
             console.error("Error in getMonetizationStrategy:", e);
@@ -1623,4 +1338,4 @@ class GeminiService {
 }
 
 
-export const geminiService = new GeminiService();
+export const geminiService = GeminiService.getInstance();

@@ -75,11 +75,15 @@ service cloud.firestore {
 
       allow create: if isOwner(userId) && isValidUser(incoming());
       allow update: if isOwner(userId) && isValidUser(incoming()) && (
-        incoming().diff(existing()).affectedKeys().hasOnly([
-            'uid', 'name', 'username', 'profilePictureUrl', 'walletAddress', 'selectedWalletType',
-            'referralCode', 'referralCodeUsed', 'points', 'freeMarketingContentUsed',
-            'warnings', 'isBanned', 'isNewUser', 'uniqueLoginCode', 'plan', 'timestamp', 'email'
-        ])
+        // Action: General Info Update
+        (incoming().diff(existing()).affectedKeys().hasOnly(['name', 'username', 'profilePictureUrl', 'walletAddress', 'selectedWalletType', 'uniqueLoginCode', 'timestamp', 'email'])) ||
+        // Action: New User Onboarding Completion
+        (incoming().diff(existing()).affectedKeys().hasOnly(['isNewUser']) && existing().isNewUser == true) ||
+        // Action: Point Awarding (Harden this: only increments, max 100 at a time)
+        (incoming().diff(existing()).affectedKeys().hasOnly(['points']) && incoming().points > existing().points && (incoming().points - existing().points) <= 100)
+      ) && (
+        // Immutable & System Fields Safety
+        !incoming().diff(existing()).affectedKeys().hasAny(['plan', 'isBanned', 'warnings', 'referralCodeUsed', 'freeMarketingContentUsed', 'referralCode'])
       );
     }
 

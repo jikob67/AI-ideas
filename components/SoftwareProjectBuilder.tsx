@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Project, ProjectFile, View, Message, ProjectType, SectionType, ComponentTreeNode } from '../types';
+import DevicePreview from './DevicePreview';
 import { persistenceService } from '../services/persistenceService';
 import { geminiService } from '../services/geminiService';
 import {
@@ -39,6 +40,7 @@ import {
   PencilSquareIcon,
   InformationCircleIcon,
   ShieldCheckIcon as ShieldIcon,
+  CommandLineIcon,
   TypeIcon,
   FileTextIcon,
   ImageIcon,
@@ -211,6 +213,9 @@ export const SoftwareProjectBuilder: React.FC<{
     const [isConvertMenuOpen, setIsConvertMenuOpen] = useState(false);
     const convertMenuRef = useRef<HTMLDivElement>(null);
     const [isVisualEditMode, setIsVisualEditMode] = useState(false);
+    const [commandBarState, setCommandBarState] = useState<{ top: number, left: number, width: number, selector: string, tagName: string } | null>(null);
+    const [visualEditCommand, setVisualEditCommand] = useState('');
+    const [isProcessingVisualEdit, setIsProcessingVisualEdit] = useState(false);
     const [isSavingSnapshot, setIsSavingSnapshot] = useState(false);
 
 
@@ -619,11 +624,44 @@ export const SoftwareProjectBuilder: React.FC<{
         const handleMessage = (event: MessageEvent) => {
             if (event.data === 'repair-project') {
                 handleRepairProject();
+            } else if (event.data.type === 'VISUAL_EDITOR_ELEMENT_CLICKED' && isVisualEditMode) {
+                const { rect, selector, tagName } = event.data.payload;
+                if (selector) {
+                    // Coordinates relative to the preview container
+                    setCommandBarState({ 
+                        top: rect.top + rect.height, 
+                        left: rect.left, 
+                        width: Math.max(280, rect.width), 
+                        selector, 
+                        tagName 
+                    });
+                    setVisualEditCommand('');
+                }
             }
         };
         window.addEventListener('message', handleMessage);
         return () => window.removeEventListener('message', handleMessage);
-    }, [projectFiles, project]);
+    }, [projectFiles, project, isVisualEditMode]);
+
+    const handleVisualEditSubmit = async () => {
+        if (!commandBarState || !visualEditCommand || !project) return;
+        setIsProcessingVisualEdit(true);
+        onLog(`جاري تنفيذ التعديل المرئي على: <${commandBarState.tagName.toLowerCase()}>...`);
+        try {
+            const { updatedProject, aiResponse } = await geminiService.modifyProjectWithAI(project, `Visual Edit for ${commandBarState.selector} (${commandBarState.tagName}): ${visualEditCommand}`);
+            
+            setProject(updatedProject);
+            setProjectFiles((updatedProject as any).files);
+            setMessages((updatedProject as any).builderChat || []);
+            onLog(aiResponse);
+        } catch (error) {
+            console.error("Visual edit failed:", error);
+            setError(`فشل التعديل المرئي: ${error instanceof Error ? error.message : String(error)}`);
+        } finally {
+            setIsProcessingVisualEdit(false);
+            setCommandBarState(null);
+        }
+    };
 
     const handleRepairProject = async () => {
         if (!project) return;
@@ -2067,6 +2105,16 @@ export const SoftwareProjectBuilder: React.FC<{
                     <button onClick={() => setIsAnalysisModalOpen(true)} title="تحليل الجودة" className="p-2 rounded-full hover:bg-slate-700">
                         <ShieldCheckIcon className="w-5 h-5"/>
                     </button>
+                    <button 
+                        onClick={() => {
+                            setIsVisualEditMode(!isVisualEditMode);
+                            setCommandBarState(null);
+                        }} 
+                        title="المحرر المرئي" 
+                        className={`p-2 rounded-full transition-all ${isVisualEditMode ? 'bg-indigo-600 text-white animate-pulse' : 'hover:bg-slate-700 text-slate-300'}`}
+                    >
+                        <CommandLineIcon className="w-5 h-5"/>
+                    </button>
                     <button onClick={handleSaveSnapshot} disabled={isSavingSnapshot} title="حفظ نسخة احتياطية (Snapshot)" className="p-2 rounded-full hover:bg-slate-700 text-amber-400">
                         {isSavingSnapshot ? <SpinnerIcon className="w-5 h-5 animate-spin" /> : <CameraIcon className="w-5 h-5"/>}
                     </button>
@@ -2210,8 +2258,36 @@ export const SoftwareProjectBuilder: React.FC<{
                             </div>
                         </div>
                         <div className={`flex-grow flex items-center justify-center p-3 relative ${device === 'mobile' ? 'bg-slate-900/20' : ''}`}>
-                            <div className={`transition-all duration-500 shadow-2xl overflow-hidden ${device === 'mobile' ? 'w-[320px] h-[580px] border-8 border-slate-800 rounded-[35px] relative' : 'w-full h-full rounded-xl border border-slate-800 bg-white'}`}>
-                                <iframe title="Preview" srcDoc={srcDoc} className="w-full h-full border-0 bg-white" sandbox="allow-scripts"/>
+                            <div className={`transition-all duration-500 shadow-2xl overflow-hidden ${device === 'mobile' ? 'w-[320px] h-[580px] border-8 border-slate-800 rounded-[35px] relative' : 'w-full h-full rounded-xl border border-slate-800 bg-white relative'}`}>
+                                <DevicePreview 
+                                    srcDoc={srcDoc} 
+                                    device={device} 
+                                    isVisualEditMode={isVisualEditMode} 
+                                />
+                                {isVisualEditMode && commandBarState && (
+                                    <div
+                                        className="absolute bg-slate-900 border border-slate-700 rounded-lg p-2 shadow-2xl flex items-center gap-2 animate-fade-in z-50 border-t-indigo-500"
+                                        style={{ 
+                                            top: Math.min(commandBarState.top + 5, 500), // Constraint it to stay in view
+                                            left: Math.max(10, Math.min(commandBarState.left, device === 'mobile' ? 20 : 500)), 
+                                            width: Math.min(commandBarState.width, device === 'mobile' ? 300 : 400)
+                                        }}
+                                    >
+                                        <span className="text-[10px] font-mono bg-slate-800 px-2 py-1 rounded text-indigo-400 border border-slate-700"><span className="text-slate-500">&lt;</span>{commandBarState.tagName.toLowerCase()}<span className="text-slate-500">&gt;</span></span>
+                                        <input
+                                            type="text"
+                                            value={visualEditCommand}
+                                            onChange={e => setVisualEditCommand(e.target.value)}
+                                            placeholder={`اطلب تعديلاً لهذا العنصر...`}
+                                            className="flex-1 bg-slate-800 border border-slate-700 rounded-md p-1.5 text-white text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+                                            autoFocus
+                                            onKeyPress={e => e.key === 'Enter' && handleVisualEditSubmit()}
+                                        />
+                                        <button onClick={handleVisualEditSubmit} disabled={isProcessingVisualEdit || !visualEditCommand} className="p-1.5 bg-indigo-600 rounded-md disabled:bg-slate-700 hover:bg-indigo-500 transition-colors shadow-lg shadow-indigo-500/20">
+                                            {isProcessingVisualEdit ? <SpinnerIcon className="w-4 h-4 animate-spin" /> : <SparklesIcon className="w-4 h-4" />}
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>

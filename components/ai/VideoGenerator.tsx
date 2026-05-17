@@ -105,7 +105,6 @@ const VideoGenerator: React.FC = () => {
 
         try {
             const url = await geminiService.generateVideo(
-                process.env.API_KEY, // Pass the key from the environment
                 prompt,
                 image ? { base64: image.base64, mimeType: image.file.type } : null,
                 videoResolution,

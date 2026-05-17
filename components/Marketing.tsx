@@ -265,7 +265,7 @@ const Marketing: React.FC<MarketingProps> = ({ context, navigate }) => {
                 };
             } else if (activeTab === 'video') {
                 if (!hasSelectedApiKey) { await handleSelectKey(); return; }
-                const url = await geminiService.generateVideo(process.env.API_KEY, assetPrompt, null, '720p', '16:9', (log) => console.log(log));
+                const url = await geminiService.generateVideo(assetPrompt, null, '720p', '16:9', (log) => console.log(log));
                 newAsset = { id: `asset-vid-${Date.now()}`, type: 'video', dataUrl: url, timestamp: Date.now(), title: assetPrompt.substring(0, 50) + '...' };
             } else if (activeTab === 'text') {
                 const textContent = await geminiService.generateText(assetPrompt, 'gemini-2.5-flash');
