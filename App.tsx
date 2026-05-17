@@ -27,9 +27,9 @@ import AiContentDetector from './components/AiContentDetector';
 import Changelog from './components/Changelog';
 import LiveConversation from './components/LiveConversation';
 import FileConverter from './components/FileConverter';
-import { ProjectWizard } from './ProjectWizard';
-import { UrlToCode } from './UrlToCode';
-import { LinkWizard } from './LinkWizard';
+import { SeoOptimizer } from './components/SeoOptimizer';
+import { Showroom } from './components/Showroom';
+import { AssetStudio } from './components/AssetStudio';
 import { useAuth } from './hooks/useAuth';
 import LandingPage from './components/LandingPage';
 import AppealPage from './components/AppealPage';
@@ -214,9 +214,9 @@ const App: React.FC = () => {
       case 'fileConverter':
         return <FileConverter navigate={navigate} />;
       case 'projectWizard':
-        return <ProjectWizard navigate={navigate} />;
+        return <SoftwareProjectBuilder navigate={navigate} mode="wizard" context={navigationContext} />;
       case 'linkWizard':
-        return <LinkWizard navigate={navigate} />;
+        return <SoftwareProjectBuilder navigate={navigate} mode="url" context={navigationContext} />;
       case 'trash':
         return <Trash navigate={navigate} />;
       case 'dataAnalysis':
@@ -228,13 +228,19 @@ const App: React.FC = () => {
       case 'live':
         return <LiveConversation />;
       case 'urlToCode':
-        return <UrlToCode navigate={navigate} context={navigationContext} />;
+        return <SoftwareProjectBuilder navigate={navigate} mode="url" context={navigationContext} />;
+      case 'seoOptimizer':
+        return <SeoOptimizer />;
+      case 'showroom':
+        return <Showroom />;
+      case 'assetStudio':
+        return <AssetStudio />;
       default:
         return <SoftwareProjectBuilder navigate={navigate} mode="idea" context={navigationContext} />;
     }
   };
 
-  const fullScreenViews: View[] = ['editApp', 'aiAssistant', 'support', 'ideaToCode', 'textToCode', 'screenToCode', 'uiRecognizer', 'drawToCode', 'dataAnalysis', 'aiContentDetector', 'changelog', 'live', 'fileConverter', 'privacy', 'terms', 'projectWizard', 'linkWizard', 'urlToCode'];
+  const fullScreenViews: View[] = ['editApp', 'aiAssistant', 'support', 'ideaToCode', 'textToCode', 'screenToCode', 'uiRecognizer', 'drawToCode', 'dataAnalysis', 'aiContentDetector', 'changelog', 'live', 'fileConverter', 'privacy', 'terms', 'projectWizard', 'linkWizard', 'urlToCode', 'seoOptimizer', 'showroom', 'assetStudio'];
   const isFullScreen = fullScreenViews.includes(activeView);
 
   return (

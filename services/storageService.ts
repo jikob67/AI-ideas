@@ -47,6 +47,16 @@ class StorageService {
             await deleteObject(storageRef);
         } catch (e) {}
     }
+
+    async downloadText(url: string): Promise<string> {
+        try {
+            const response = await fetch(url);
+            return await response.text();
+        } catch (e) {
+            console.error('[StorageService] Error downloading text:', e);
+            return '';
+        }
+    }
 }
 
 export const storageService = new StorageService();

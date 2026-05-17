@@ -102,18 +102,18 @@ class PersistenceService {
         const messageData = {
             ...message,
             projectId,
-            timestamp: Date.now()
+            timestamp: message.timestamp || Date.now()
         };
 
         this.checkSize(messageData, msgPath);
 
         try {
-            const docRef = await addDoc(collection(db, 'projects', projectId, 'messages'), messageData);
+            await setDoc(doc(db, 'projects', projectId, 'messages', message.id), messageData);
             await updateDoc(doc(db, 'projects', projectId), {
                 messageCount: increment(1),
                 updatedAt: Date.now()
             });
-            return docRef.id;
+            return message.id;
         } catch (error) {
             handleFirestoreError(error, OperationType.WRITE, msgPath);
             return '';
@@ -124,7 +124,18 @@ class PersistenceService {
         try {
             const q = query(collection(db, 'projects', projectId, 'files'));
             const snapshot = await getDocs(q);
-            return snapshot.docs.map(doc => doc.data() as ProjectFile);
+            const files = snapshot.docs.map(doc => doc.data() as ProjectFile);
+            
+            // Resolve files stored in Cloud Storage
+            const resolvedFiles = await Promise.all(files.map(async (file: any) => {
+                if (file.storageUrl && !file.content) {
+                    const content = await storageService.downloadText(file.storageUrl);
+                    return { ...file, content };
+                }
+                return file;
+            }));
+
+            return resolvedFiles;
         } catch (error) {
             handleFirestoreError(error, OperationType.GET, `projects/${projectId}/files`);
             return [];
@@ -135,7 +146,8 @@ class PersistenceService {
         try {
             const q = query(collection(db, 'projects', projectId, 'messages'));
             const snapshot = await getDocs(q);
-            return snapshot.docs.map(doc => doc.data() as Message);
+            const messages = snapshot.docs.map(doc => doc.data() as Message);
+            return messages.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
         } catch (error) {
             handleFirestoreError(error, OperationType.GET, `projects/${projectId}/messages`);
             return [];

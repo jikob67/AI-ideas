@@ -28,7 +28,11 @@ import {
   ListBulletIcon,
   Share2Icon,
   ArrowDownTrayIcon,
-  GlobeIcon
+  GlobeIcon,
+  MagnifyingGlassIcon,
+  TrophyIcon,
+  SquaresPlusIcon,
+  ShieldCheckIcon
 } from './Icons';
 import { View } from '../types';
 import { useAuth } from '../hooks/useAuth';
@@ -267,6 +271,12 @@ const FeedbackModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
     );
 };
 
+const NavHeader: React.FC<{ label: string }> = ({ label }) => (
+  <div className="px-3 pt-4 pb-2 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">
+    {label}
+  </div>
+);
+
 const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, openOnboarding }) => {
   const { currentUser } = useAuth();
   const [isUpgradeModalOpen, setUpgradeModalOpen] = useState(false);
@@ -280,7 +290,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, op
             <span className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">AI ideas</span>
           </div>
         </div>
-        <nav className="flex flex-col gap-2 flex-grow overflow-y-auto no-scrollbar">
+        <nav className="flex flex-col gap-1 flex-grow overflow-y-auto custom-scrollbar pr-1">
+          
+          <NavHeader label="تطوير واجهات وأكواد" />
           <NavButton
             label="بناء مشروع جديد"
             icon={<RocketLaunchIcon className="w-6 h-6 text-indigo-400" />}
@@ -298,6 +310,18 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, op
             icon={<LightBulbIcon className="w-6 h-6" />}
             isActive={activeView === 'ideaToCode'}
             onClick={() => setActiveView('ideaToCode')}
+          />
+          <NavButton
+            label="استوديو الأصول"
+            icon={<SquaresPlusIcon className="w-6 h-6 text-pink-400" />}
+            isActive={activeView === 'assetStudio'}
+            onClick={() => setActiveView('assetStudio')}
+          />
+          <NavButton
+            label="محلل SEO الذكي"
+            icon={<MagnifyingGlassIcon className="w-6 h-6 text-emerald-400" />}
+            isActive={activeView === 'seoOptimizer'}
+            onClick={() => setActiveView('seoOptimizer')}
           />
           <NavButton
             label="نص إلى كود"
@@ -323,23 +347,31 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, op
             isActive={activeView === 'uiRecognizer'}
             onClick={() => setActiveView('uiRecognizer')}
           />
+
+          <NavHeader label="ذكاء اصطناعي ومحتوى" />
           <NavButton
-            label="تحليل البيانات"
-            icon={<ChartPieIcon className="w-6 h-6" />}
-            isActive={activeView === 'dataAnalysis'}
-            onClick={() => setActiveView('dataAnalysis')}
+            label="مساعد AI الشامل"
+            icon={<ChatBubbleLeftRightIcon className="w-6 h-6 text-purple-400" />}
+            isActive={activeView === 'aiAssistant'}
+            onClick={() => setActiveView('aiAssistant')}
+          />
+          <NavButton
+            label="محول الفنون"
+            icon={<PaintBrushIcon className="w-6 h-6 text-pink-400" />}
+            isActive={activeView === 'artConverter'}
+            onClick={() => setActiveView('artConverter')}
+          />
+          <NavButton
+            label="المحتوى التسويقي"
+            icon={<FireIcon className="w-6 h-6 text-orange-400" />}
+            isActive={activeView === 'marketing'}
+            onClick={() => setActiveView('marketing')}
           />
           <NavButton
             label="كاشف المحتوى الذكي"
-            icon={<BeakerIcon className="w-6 h-6" />}
+            icon={<ShieldCheckIcon className="w-6 h-6 text-blue-400" />}
             isActive={activeView === 'aiContentDetector'}
             onClick={() => setActiveView('aiContentDetector')}
-          />
-           <NavButton
-            label="مساعد AI الشامل"
-            icon={<ChatBubbleLeftRightIcon className="w-6 h-6" />}
-            isActive={activeView === 'aiAssistant'}
-            onClick={() => setActiveView('aiAssistant')}
           />
           <NavButton
             label="محادثة مباشرة"
@@ -347,29 +379,25 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, op
             isActive={activeView === 'live'}
             onClick={() => setActiveView('live')}
           />
-           <NavButton
-            label="معزز المشاريع"
-            icon={<RocketLaunchIcon className="w-6 h-6" />}
-            isActive={activeView === 'projectBooster'}
-            onClick={() => setActiveView('projectBooster')}
+
+          <NavHeader label="إدارة ومعرض" />
+          <NavButton
+            label="معرض المجتمع"
+            icon={<TrophyIcon className="w-6 h-6 text-yellow-500" />}
+            isActive={activeView === 'showroom'}
+            onClick={() => setActiveView('showroom')}
           />
           <NavButton
-            label="المحتوى التسويقي"
-            icon={<FireIcon className="w-6 h-6" />}
-            isActive={activeView === 'marketing'}
-            onClick={() => setActiveView('marketing')}
+            label="تحليل البيانات"
+            icon={<ChartPieIcon className="w-6 h-6" />}
+            isActive={activeView === 'dataAnalysis'}
+            onClick={() => setActiveView('dataAnalysis')}
           />
-           <NavButton
+          <NavButton
             label="مصدر ربح"
-            icon={<DollarSignIcon className="w-6 h-6" />}
+            icon={<DollarSignIcon className="w-6 h-6 text-green-400" />}
             isActive={activeView === 'profitSource'}
             onClick={() => setActiveView('profitSource')}
-          />
-          <NavButton
-            label="محول الفنون"
-            icon={<PaintBrushIcon className="w-6 h-6" />}
-            isActive={activeView === 'artConverter'}
-            onClick={() => setActiveView('artConverter')}
           />
           <NavButton
             label="قوالب احترافية"
@@ -383,6 +411,14 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, op
             isActive={activeView === 'fileConverter'}
             onClick={() => setActiveView('fileConverter')}
           />
+
+          <NavHeader label="الحساب والنظام" />
+          <NavButton
+            label="الملف الشخصي"
+            icon={<UserCircleIcon className="w-6 h-6" />}
+            isActive={activeView === 'profile'}
+            onClick={() => setActiveView('profile')}
+          />
           <NavButton
             label="سلة المحذوفات"
             icon={<TrashIcon className="w-6 h-6" />}
@@ -390,16 +426,10 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, op
             onClick={() => setActiveView('trash')}
           />
           <NavButton
-            label="الملف الشخصي"
-            icon={<UserCircleIcon className="w-6 h-6" />}
-            isActive={activeView === 'profile'}
-            onClick={() => setActiveView('profile')}
-          />
-           <NavButton
-            label="دليل استخدام المنصة"
-            icon={<InformationCircleIcon className="w-6 h-6" />}
-            isActive={false}
-            onClick={openOnboarding}
+            label="سجل التغييرات"
+            icon={<BellIcon className="w-6 h-6" />}
+            isActive={activeView === 'changelog'}
+            onClick={() => setActiveView('changelog')}
           />
           <NavButton
             label="الدعم الفني"
@@ -408,11 +438,12 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, op
             onClick={() => setActiveView('support')}
           />
           <NavButton
-            label="سجل التغييرات"
-            icon={<BellIcon className="w-6 h-6" />}
-            isActive={activeView === 'changelog'}
-            onClick={() => setActiveView('changelog')}
+            label="دليل الاستخدام"
+            icon={<InformationCircleIcon className="w-6 h-6" />}
+            isActive={false}
+            onClick={openOnboarding}
           />
+          
           <button
             onClick={() => setIsFeedbackModalOpen(true)}
             className="flex items-center w-full gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 text-indigo-400 hover:bg-slate-800 hover:text-indigo-300 mt-2 border border-dashed border-indigo-500/30"

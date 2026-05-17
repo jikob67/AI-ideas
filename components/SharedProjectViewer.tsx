@@ -27,7 +27,14 @@ export const SharedProjectViewer: React.FC = () => {
         if (querySnapshot.empty) {
           setError('المشروع غير موجود أو تم حذفه');
         } else {
-          setProject({ id: querySnapshot.docs[0].id, ...querySnapshot.docs[0].data() } as Project);
+          const projectDoc = querySnapshot.docs[0];
+          const projectData = { id: projectDoc.id, ...projectDoc.data() } as Project;
+          
+          // Fetch files from subcollection if not present in main doc
+          const filesSnap = await getDocs(collection(db, 'projects', projectDoc.id, 'files'));
+          const files = filesSnap.docs.map(doc => doc.data() as any);
+          
+          setProject({ ...projectData, files });
         }
       } catch (err: any) {
         console.error(err);
@@ -41,42 +48,50 @@ export const SharedProjectViewer: React.FC = () => {
   }, []);
 
   const srcDoc = useMemo(() => {
-    if (!project || !project.files) return '';
-    const htmlFile = project.files.find((f: any) => f.name === 'index.html');
-    const cssFile = project.files.find((f: any) => f.name === 'style.css');
-    const jsFile = project.files.find((f: any) => f.name === 'script.js');
+    if (!project) return '';
+    const files = (project as any).files || [];
+    
+    const htmlFile = files.find((f: any) => f.name === 'index.html') || files.find((f: any) => f.name.endsWith('.html'));
+    const cssFiles = files.filter((f: any) => f.name.endsWith('.css'));
+    const jsFiles = files.filter((f: any) => f.name.endsWith('.js'));
 
     if (!htmlFile) {
         // If it's a section-based project
-        let htmlContent = '';
         if (project.sections && project.sections.length > 0) {
             const htmlSection = project.sections.find((s: any) => s.type === 'تكويد مخصص' || s.type === 'HTML');
             if (htmlSection && htmlSection.config?.htmlContent) {
                 return htmlSection.config.htmlContent;
             }
         }
-        return '<html><body><div style="font-family:sans-serif;padding:2rem;">المشروع لا يحتوي على ملفات قابلة للعرض.</div></body></html>';
+        return '<html lang="ar" dir="rtl"><body style="background:#111; color:#fff; display:flex; align-items:center; justify-content:center; height:100vh; font-family:sans-serif;">المشروع لا يحتوي على ملفات قابلة للعرض.</body></html>';
     }
 
-    // Strip existing style/script tags if they exist to prevent duplication or we just inject
-    let htmlContent = htmlFile.content.replace(/<link rel="stylesheet" href="style.css">?/g, '')
-                                      .replace(/<script src="script.js" defer><\/script>?/g, '');
+    let htmlContent = htmlFile.content;
+    
+    // If it's just a fragment, wrap it
+    if (!htmlContent.includes('<html') && !htmlContent.includes('<body')) {
+        htmlContent = `<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head><body>${htmlContent}</body></html>`;
+    }
 
-    return `
-        <!DOCTYPE html>
-        <html>
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>${project.name || 'Shared Project'}</title>
-                <style>${cssFile ? cssFile.content : ''}</style>
-            </head>
-            <body>
-                ${htmlContent}
-                <script>${jsFile ? jsFile.content : ''}</script>
-            </body>
-        </html>
-    `;
+    const styles = cssFiles.map((f: any) => `<style data-filename="${f.name}">${f.content}</style>`).join('\n');
+    const scripts = jsFiles.map((f: any) => `<script data-filename="${f.name}">${f.content}</script>`).join('\n');
+
+    // Inject styles and scripts
+    if (htmlContent.includes('</head>')) {
+        htmlContent = htmlContent.replace('</head>', `${styles}\n</head>`);
+    } else if (htmlContent.includes('<body>')) {
+         htmlContent = htmlContent.replace('<body>', `<body>\n${styles}`);
+    } else {
+        htmlContent = `${styles}\n${htmlContent}`;
+    }
+
+    if (htmlContent.includes('</body>')) {
+        htmlContent = htmlContent.replace('</body>', `${scripts}\n</body>`);
+    } else {
+        htmlContent = `${htmlContent}\n${scripts}`;
+    }
+
+    return htmlContent;
   }, [project]);
 
   if (loading) {

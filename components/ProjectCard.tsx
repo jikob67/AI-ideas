@@ -14,7 +14,7 @@ import { getBlob, deleteBlob, saveBlob } from '../services/storageService';
 
 interface ProjectCardProps {
     project: Project;
-    onDelete: (id: string) => void;
+    onDelete: (id: string, skipConfirm?: boolean) => void;
     onEdit: (project: Project) => void;
     onUpdate: (project: Project) => void;
     categories: string[];
@@ -248,7 +248,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onDelete, onE
     const handleConfirmDelete = async () => {
         if (project.apkBlobId) await deleteBlob(project.apkBlobId);
         if (project.ipaBlobId) await deleteBlob(project.ipaBlobId);
-        onDelete(project.id);
+        onDelete(project.id, true);
         setIsDeleteConfirmOpen(false);
     };
 
@@ -305,21 +305,44 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onDelete, onE
         URL.revokeObjectURL(link.href);
     };
     
-    const handleDuplicateProject = () => {
+    const handleDuplicateProject = async () => {
         setIsMenuOpen(false);
         if (!currentUser?.email) return;
-        const key = `appProjects_${currentUser.email}`;
-        const savedApps = JSON.parse(localStorage.getItem(key) || '[]');
-        const newProject = {
-            ...JSON.parse(JSON.stringify(project)), // Deep copy
-            id: `proj-copy-${Date.now()}`,
-            name: `${project.name} (نسخة)`,
-            timestamp: Date.now(),
-        };
-        savedApps.unshift(newProject);
-        localStorage.setItem(key, JSON.stringify(savedApps));
-        // You might want to refresh the list in the parent component here
-        window.location.reload(); // Simple refresh for now
+
+        try {
+            // Get files
+            let projectFiles = (project as any).files;
+            if (!projectFiles || projectFiles.length === 0) {
+                projectFiles = await persistenceService.getProjectFiles(project.id);
+            }
+
+            // Get messages
+            let projectMessages = (project as any).messages;
+            if (!projectMessages || projectMessages.length === 0) {
+                projectMessages = await persistenceService.getProjectMessages(project.id);
+            }
+
+            const newId = `proj-dup-${Date.now()}`;
+            const newProject = {
+                ...JSON.parse(JSON.stringify(project)), // Deep copy metadata
+                id: newId,
+                name: `${project.name} (نسخة)`,
+                timestamp: Date.now(),
+                ownerUid: currentUser.uid,
+                ownerEmail: currentUser.email,
+                files: projectFiles,
+                builderChat: projectMessages
+            };
+
+            // Save via persistence service
+            await persistenceService.fullProjectSave(newProject, projectFiles, projectMessages);
+            
+            alert("تم تكرار المشروع بنجاح سيظهر الآن في لوحة التحكم.");
+            window.location.reload(); // Refresh to see the new project
+        } catch (error) {
+            console.error("Duplicate failed:", error);
+            alert("فشل تكرار المشروع.");
+        }
     };
 
     const handleShare = () => {
@@ -419,7 +442,8 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onDelete, onE
                                 <div className="kebab-menu-dropdown">
                                     <button onClick={() => onEdit(project)} className="kebab-menu-item"><PencilIcon className="w-4 h-4"/>تعديل</button>
                                     <button onClick={handleDuplicateProject} className="kebab-menu-item"><RectangleStackIcon className="w-4 h-4"/>تكرار</button>
-                                    <button onClick={handleDownloadProjectZip} className="kebab-menu-item"><ArrowDownTrayIcon className="w-4 h-4"/>تنزيل ZIP</button>
+                                    <button onClick={handleExportProject} className="kebab-menu-item"><ArrowDownTrayIcon className="w-4 h-4"/>تصدير JSON</button>
+                                    <button onClick={handleDownloadProjectZip} className="kebab-menu-item"><CodeIcon className="w-4 h-4"/>تنزيل ZIP</button>
                                     <button onClick={handleConvertToFlutter} disabled={isFlutterLoading} className="kebab-menu-item text-blue-400">
                                         <FlutterIcon className="w-4 h-4"/>
                                         {isFlutterLoading ? 'جاري التحويل...' : 'تحويل إلى تطبيق (Flutter)'}

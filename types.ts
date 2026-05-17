@@ -40,7 +40,10 @@ export type View =
   | 'projectWizard'
   | 'zipToApp'
   | 'linkWizard'
-  | 'urlToCode';
+  | 'urlToCode'
+  | 'seoOptimizer'
+  | 'showroom'
+  | 'assetStudio';
 
 export interface User {
   uid: string;
@@ -192,6 +195,7 @@ export interface Message {
   id: string;
   text: string;
   sender: 'user' | 'ai';
+  timestamp?: number;
   taskType?: Feature;
   status?: 'generating' | 'completed' | 'error';
   content?: ReactNode;

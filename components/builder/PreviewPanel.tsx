@@ -153,10 +153,15 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ project, currentUser, devic
             .filter(s => !HIDDEN_SECTIONS.includes(s.type))
             .map(section => {
                 let content = '';
-                switch (section.type) {
-                    case SectionType.HTML:
-                        content = section.config.htmlContent || '';
-                        break;
+                
+                // Prefer custom HTML content if provided by AI or user, regardless of type
+                if (section.config.htmlContent) {
+                    content = section.config.htmlContent;
+                } else {
+                    switch (section.type) {
+                        case SectionType.HTML:
+                            content = section.config.htmlContent || '';
+                            break;
                     case SectionType.STORE:
                         const products = (section.config.products as StoreProduct[]) || [{id: '1', name: 'منتج نموذجي', price: 19.99, imageUrl: 'https://images.pexels.com/photos/404280/pexels-photo-404280.jpeg?auto=compress&cs=tinysrgb&w=400', description: 'هذا وصف قصير للمنتج.'}];
                         content = `<h2 class="section-title">${section.title}</h2><div class="grid grid-cols-auto">${products.map(p => `<div class="card product-card">
@@ -236,6 +241,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ project, currentUser, devic
                     default:
                         content = `<h2 class="section-title">${section.title}</h2><p style="color: #9ca3af;">(معاينة قسم '${section.type}' قيد التطوير)</p>`;
                 }
+            }
                 // Each section now has a unique ID attribute
                 return `<section id="${section.id}">${content}</section>`;
             }).join('\n');

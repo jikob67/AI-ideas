@@ -38,8 +38,17 @@ import {
   MagnifyingGlassIcon,
   PencilSquareIcon,
   InformationCircleIcon,
-  ShieldCheckIcon as ShieldIcon
+  ShieldCheckIcon as ShieldIcon,
+  TypeIcon,
+  FileTextIcon,
+  ImageIcon,
+  GlobeIcon,
+  GlobeAltIcon,
+  LoaderIcon,
+  UploadIcon as UploadIcon_v2,
+  AlignLeftIcon
 } from './Icons';
+import { motion, AnimatePresence } from 'motion/react';
 import { useUsage } from '../hooks/useUsage';
 import { BuildModal } from './builder/modals/BuildModal';
 import { BuildInstructionsModal } from './builder/modals/BuildInstructionsModal';
@@ -71,7 +80,7 @@ declare global {
 }
 
 const HtmlIcon: React.FC<React.SVGProps<SVGSVGElement>> = FileCodeIcon;
-type GenerationMode = 'idea' | 'text' | 'screen' | 'recognizer' | 'draw';
+type GenerationMode = 'idea' | 'text' | 'screen' | 'recognizer' | 'draw' | 'wizard' | 'url';
 type Screen = 'list' | 'generator' | 'editor';
 type SuggestionStep = 'category' | 'ideas' | 'refine';
 
@@ -167,10 +176,20 @@ export const SoftwareProjectBuilder: React.FC<{
     const [screen, setScreen] = useState<Screen>('list');
     const [projects, setProjects] = useState<Project[]>([]);
     const [project, setProject] = useState<Project | null>(null); // The project being edited/viewed
+    const [categories, setCategories] = useState<string[]>(['عام', 'تجريبي', 'تجاري', 'شخصي']);
     const [logs, setLogs] = useState<string[]>([]);
     const [isGenerating, setIsGenerating] = useState(false);
     const [error, setError] = useState('');
     const [saveStatus, setSaveStatus] = useState('');
+
+    // Wizard state
+    const [wizardStep, setWizardStep] = useState(1);
+    const [wizardData, setWizardData] = useState({
+        icon: context?.initialProject?.iconUrl || null as string | null,
+        name: context?.initialProject?.name || '',
+        description: context?.initialProject?.description || '',
+        url: context?.initialProject?.url || ''
+    });
 
     // List View State
     const [searchQuery, setSearchQuery] = useState('');
@@ -179,7 +198,7 @@ export const SoftwareProjectBuilder: React.FC<{
 
     // Shared UI State
     const [activeFile, setActiveFile] = useState<string>('index.html');
-    const [sidebarTab, setSidebarTab] = useState<'files' | 'chat'>('chat');
+    const [sidebarTab, setSidebarTab] = useState<'files' | 'chat' | 'snapshots'>('chat');
     const [device, setDevice] = useState<'desktop' | 'mobile'>('desktop');
     const [isBuildModalOpen, setIsBuildModalOpen] = useState(false);
     const [isBuildInstructionsModalOpen, setIsBuildInstructionsModalOpen] = useState(false);
@@ -192,6 +211,7 @@ export const SoftwareProjectBuilder: React.FC<{
     const [isConvertMenuOpen, setIsConvertMenuOpen] = useState(false);
     const convertMenuRef = useRef<HTMLDivElement>(null);
     const [isVisualEditMode, setIsVisualEditMode] = useState(false);
+    const [isSavingSnapshot, setIsSavingSnapshot] = useState(false);
 
 
     // AI Chat State
@@ -219,6 +239,7 @@ export const SoftwareProjectBuilder: React.FC<{
     const [isGeneratingIcon, setIsGeneratingIcon] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isSuggestingFeatures, setIsSuggestingFeatures] = useState(false);
+    const [isAnalyzingUrl, setIsAnalyzingUrl] = useState(false);
 
     const { incrementUsage, isLimitReached } = useUsage();
     const { currentUser, updateUser } = useAuth();
@@ -230,6 +251,8 @@ export const SoftwareProjectBuilder: React.FC<{
             case 'screen': return 'screenToCode';
             case 'recognizer': return 'uiRecognizer';
             case 'draw': return 'drawToCode';
+            case 'wizard': return 'projectWizard';
+            case 'url': return 'urlToCode';
             default: return undefined;
         }
     }, [mode]);
@@ -360,6 +383,33 @@ export const SoftwareProjectBuilder: React.FC<{
         }
     }, [currentUser, mode, context]);
 
+    const [snapshots, setSnapshots] = useState<any[]>([]);
+    const [isLoadingSnapshots, setIsLoadingSnapshots] = useState(false);
+
+    useEffect(() => {
+        if (sidebarTab === 'snapshots' && project?.id) {
+            setIsLoadingSnapshots(true);
+            const q = query(collection(db, 'projects', project.id, 'snapshots'), where('timestamp', '!=', null));
+            const unsubscribe = onSnapshot(q, (snapshot) => {
+                const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                setSnapshots(list.sort((a: any, b: any) => b.timestamp?.seconds - a.timestamp?.seconds));
+                setIsLoadingSnapshots(false);
+            }, (err) => {
+                console.error("Error fetching snapshots:", err);
+                setIsLoadingSnapshots(false);
+            });
+            return () => unsubscribe();
+        }
+    }, [sidebarTab, project?.id]);
+
+    const handleRestoreSnapshot = (snap: any) => {
+        if (!window.confirm('هل أنت متأكد من استعادة هذه النسخة؟ سيتم استبدال الملفات الحالية.')) return;
+        setProjectFiles(snap.projectFiles);
+        if (snap.projectFiles.length > 0) setActiveFile(snap.projectFiles[0].name);
+        setSaveStatus('تم استعادة النسخة الاحتياطية!');
+        setTimeout(() => setSaveStatus(''), 2000);
+    };
+
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (shareMenuRef.current && !shareMenuRef.current.contains(event.target as Node)) {
@@ -372,6 +422,27 @@ export const SoftwareProjectBuilder: React.FC<{
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
+
+    const handleSaveSnapshot = async () => {
+        if (!project || !currentUser?.uid) return;
+        setIsSavingSnapshot(true);
+        try {
+            const snapshotData = {
+                name: `نسخة احتياطية - ${new Date().toLocaleString('ar-EG')}`,
+                timestamp: serverTimestamp(),
+                projectFiles: projectFiles,
+                description: project.description
+            };
+            await addDoc(collection(db, 'projects', project.id, 'snapshots'), snapshotData);
+            setSaveStatus('تم حفظ النسخة الاحتياطية بنجاح!');
+            setTimeout(() => setSaveStatus(''), 3000);
+        } catch (err) {
+            console.error("Error saving snapshot:", err);
+            setError('فشل حفظ النسخة الاحتياطية.');
+        } finally {
+            setIsSavingSnapshot(false);
+        }
+    };
 
     const handleSaveSession = () => {
         if (!currentUser) return;
@@ -478,31 +549,115 @@ export const SoftwareProjectBuilder: React.FC<{
             case 'text': return { title: 'نص إلى كود', icon: <CodeIcon className="w-8 h-8"/>, usageType: ProjectType.PROJECT_GENERATION };
             case 'screen': return { title: 'شاشة إلى كود', icon: <CameraIcon className="w-8 h-8"/>, usageType: ProjectType.SCREENSHOT_TO_CODE };
             case 'recognizer': return { title: 'محلل الواجهات', icon: <BeakerIcon className="w-8 h-8"/>, usageType: ProjectType.UI_ANALYSIS };
-            case 'draw': return { title: 'تصميم إلى كود', icon: <PencilSquareIcon className="w-8 h-8"/>, usageType: ProjectType.DRAW_TO_CODE };
+            case 'draw': return { title: 'من المخطط للكود', icon: <PencilSquareIcon className="w-8 h-8"/>, usageType: ProjectType.DRAW_TO_CODE };
+            case 'wizard': return { title: 'بناء مشروع جديد', icon: <RocketLaunchIcon className="w-8 h-8"/>, usageType: ProjectType.PROJECT_GENERATION };
+            case 'url': return { title: 'بناء مشروع من رابط', icon: <GlobeAltIcon className="w-8 h-8"/>, usageType: ProjectType.PROJECT_GENERATION };
             default: return { title: 'بناء مشروع', icon: <CodeIcon className="w-8 h-8"/>, usageType: ProjectType.PROJECT_GENERATION };
         }
     }, [mode]);
 
     const srcDoc = useMemo(() => {
         if (!project) return '';
-        const htmlFile = projectFiles.find(f => f.name === 'index.html');
-        const cssFile = projectFiles.find(f => f.name === 'style.css');
-        const jsFile = projectFiles.find(f => f.name === 'script.js');
+        if (projectFiles.length === 0) {
+            return `
+            <html lang="ar" dir="rtl">
+            <body style="background:#111; color:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; font-family:sans-serif; text-align:center; padding: 20px;">
+                <div style="font-size: 48px; margin-bottom: 20px;">📂</div>
+                <h2 style="margin-bottom: 10px;">لا توجد ملفات حالياً</h2>
+                <p style="color: #888; max-width: 300px; margin-bottom: 20px;">لم نتمكن من العثور على ملفات لهذا المشروع. اضغط على زر "إصلاح المشروع" لإنشاء الملفات الأساسية.</p>
+                <button onclick="parent.postMessage('repair-project', '*')" style="background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 16px;">إصلاح المشروع الآن</button>
+            </body>
+            </html>`;
+        }
 
-        if (!htmlFile) return '<html><body>HTML file not found.</body></html>';
+        const htmlFile = projectFiles.find(f => f.name === 'index.html') || projectFiles.find(f => f.name.endsWith('.html'));
+        const cssFiles = projectFiles.filter(f => f.name.endsWith('.css'));
+        const jsFiles = projectFiles.filter(f => f.name.endsWith('.js'));
 
-        return `
-            <html>
-                <head>
-                    ${cssFile ? `<style>${cssFile.content}</style>` : ''}
-                </head>
-                <body>
-                    ${htmlFile.content}
-                    ${jsFile ? `<script>${jsFile.content}</script>` : ''}
-                </body>
-            </html>
-        `;
-    }, [project]);
+        if (!htmlFile) {
+            return `
+            <html lang="ar" dir="rtl">
+            <body style="background:#111; color:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; font-family:sans-serif; text-align:center; padding: 20px;">
+                <div style="font-size: 48px; margin-bottom: 20px;">⚠️</div>
+                <h2 style="margin-bottom: 10px;">ملف HTML مفقود</h2>
+                <p style="color: #888; max-width: 300px; margin-bottom: 20px;">ليتم عرض المعاينة، يجب وجود ملف باسم index.html.</p>
+                <button onclick="parent.postMessage('repair-project', '*')" style="background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 16px;">إضافة الملفات الأساسية</button>
+            </body>
+            </html>`;
+        }
+
+        let htmlContent = htmlFile.content;
+        
+        // If it's just a fragment, wrap it
+        if (!htmlContent.includes('<html') && !htmlContent.includes('<body')) {
+            htmlContent = `<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head><body>${htmlContent}</body></html>`;
+        }
+
+        const styles = cssFiles.map(f => `<style data-filename="${f.name}">${f.content}</style>`).join('\n');
+        const scripts = jsFiles.map(f => `<script data-filename="${f.name}">${f.content}</script>`).join('\n');
+
+        // Inject styles and scripts
+        if (htmlContent.includes('</head>')) {
+            htmlContent = htmlContent.replace('</head>', `${styles}\n</head>`);
+        } else if (htmlContent.includes('<body>')) {
+             htmlContent = htmlContent.replace('<body>', `<body>\n${styles}`);
+        } else {
+            htmlContent = `${styles}\n${htmlContent}`;
+        }
+
+        if (htmlContent.includes('</body>')) {
+            htmlContent = htmlContent.replace('</body>', `${scripts}\n</body>`);
+        } else {
+            htmlContent = `${htmlContent}\n${scripts}`;
+        }
+
+        return htmlContent;
+    }, [project, projectFiles]);
+
+    // Listener for messages from iframe
+    useEffect(() => {
+        const handleMessage = (event: MessageEvent) => {
+            if (event.data === 'repair-project') {
+                handleRepairProject();
+            }
+        };
+        window.addEventListener('message', handleMessage);
+        return () => window.removeEventListener('message', handleMessage);
+    }, [projectFiles, project]);
+
+    const handleRepairProject = async () => {
+        if (!project) return;
+        setIsGenerating(true);
+        onLog("جاري إصلاح ملفات المشروع...");
+        
+        try {
+            const repairResponse = await geminiService.buildProjectFromSpec({
+                projectName: project.name,
+                prompt: `Please regenerate the base files (index.html, style.css, script.js) for this project: ${project.description || project.name}. Ensure they follow the AI Ideas Trinity standard.`,
+                projectType: project.type,
+                files: [],
+                iconUrl: project.icon,
+            }, onLog);
+
+            const newFiles = (repairResponse as any).files || [];
+            
+            if (currentUser?.uid) {
+                // Remove old files if any (optional, setDoc merge: false usually handles this for same names)
+                for (const file of newFiles) {
+                    await persistenceService.saveFile(project.id, file);
+                }
+            }
+            
+            setProjectFiles(newFiles);
+            setActiveFile('index.html');
+            onLog("تم إصلاح المشروع بنجاح!");
+        } catch (error) {
+            console.error("Repair failed", error);
+            onLog("فشل إصلاح المشروع. حاول مرة أخرى.");
+        } finally {
+            setIsGenerating(false);
+        }
+    };
 
     useEffect(() => {
         // Only fetch projects if we are in list screen
@@ -605,17 +760,27 @@ export const SoftwareProjectBuilder: React.FC<{
     
     const handleGenerate = async () => {
         let finalPrompt = prompt;
-        if (mode === 'idea' && selectedIdea) {
-             finalPrompt = `اسم المشروع: ${projectName || selectedIdea.name}. نوع المشروع: ${selectedIdea.type}. وصف المشروع: ${selectedIdea.description}. الميزات المقترحة: ${selectedIdea.suggestedFeatures.join(', ')}.`;
-        } else if (mode === 'recognizer' && recognitionResult) {
-            finalPrompt = recognitionResult.description;
+        let finalName = projectName;
+        let finalIcon = projectIconUrl;
+        let finalType = projectType;
+
+        if (mode === 'wizard') {
+            finalName = wizardData.name;
+            finalPrompt = wizardData.description;
+            finalIcon = wizardData.icon;
+            finalType = ProjectType.WEB_APP;
+        } else if (mode === 'url') {
+            finalName = wizardData.name;
+            finalPrompt = wizardData.description;
+            finalIcon = wizardData.icon;
+            finalType = ProjectType.WEBSITE;
         }
 
-        if (!finalPrompt && files.length === 0) {
+        if (!finalPrompt && files.length === 0 && mode !== 'wizard' && mode !== 'url') {
             setError('الرجاء تقديم وصف أو رفع ملف للبدء.');
             return;
         }
-        if (!projectName) {
+        if (!finalName) {
             setError('الرجاء إدخال اسم للمشروع.');
             return;
         }
@@ -629,13 +794,38 @@ export const SoftwareProjectBuilder: React.FC<{
         setError('');
 
         try {
+            let actualPrompt = finalPrompt;
+
+            if (mode === 'url') {
+                onLog('جاري جلب محتوى الرابط...');
+                const proxyRes = await fetch(`/api/proxy?url=${encodeURIComponent(wizardData.url)}`);
+                if (!proxyRes.ok) throw new Error('فشل جلب محتوى الرابط. تأكد من صحة الرابط.');
+                const htmlContent = await proxyRes.text();
+                
+                onLog('تم جلب المحتوى بنجاح. جاري تحليل البيانات...');
+                
+                actualPrompt = `
+                    بناء مشروع جديد بناءً على الرابط التالي: ${wizardData.url}
+                    اسم المشروع: ${finalName}
+                    وصف المشروع: ${finalPrompt}
+                    محتوى الصفحة المرجعية (HTML):
+                    ${htmlContent.substring(0, 10000)}
+                    
+                    المطلوب: إنشاء مشروع متكامل (HTML, CSS, JS) مستوحى من هذا الرابط ولكن بتصميم عصري وفريد.
+                `;
+            } else if (mode === 'idea' && selectedIdea) {
+                actualPrompt = `اسم المشروع: ${finalName}. نوع المشروع: ${selectedIdea.type}. وصف المشروع: ${selectedIdea.description}. الميزات المقترحة: ${selectedIdea.suggestedFeatures.join(', ')}.`;
+            } else if (mode === 'recognizer' && recognitionResult) {
+                actualPrompt = recognitionResult.description;
+            }
+
             const ipProtection = (mode === 'screen' || mode === 'recognizer');
             const newProject = await geminiService.buildProjectFromSpec({
-                projectName,
-                prompt: finalPrompt,
-                projectType,
+                projectName: finalName,
+                prompt: actualPrompt,
+                projectType: finalType,
                 files,
-                iconUrl: projectIconUrl,
+                iconUrl: finalIcon,
             }, onLog, ipProtection);
 
             // Add creationMode to project for routing
@@ -645,22 +835,33 @@ export const SoftwareProjectBuilder: React.FC<{
                 newProject.ownerUid = currentUser.uid;
                 
                 // Extract files and messages before saving metadata
-                const files = (newProject as any).files || [];
-                const messages = (newProject as any).builderChat || [{ id: 'init', sender: 'ai', text: 'مرحباً! أنا مساعدك الذكي. اطلب مني أي تعديل على مشروعك.' }];
+                const generatedFiles = (newProject as any).files || [];
+                const generatedMessages = (newProject as any).builderChat || [{ 
+                    id: 'init', 
+                    sender: 'ai', 
+                    text: 'مرحباً! أنا مساعدك الذكي. اطلب مني أي تعديل على مشروعك.',
+                    timestamp: Date.now() 
+                }];
                 
                 // Save everything granularly
                 await persistenceService.saveProjectMetadata(newProject);
-                for (const file of files) {
+                for (const file of generatedFiles) {
                     await persistenceService.saveFile(newProject.id, file);
                 }
-                for (const msg of messages) {
+                for (const msg of generatedMessages) {
                     await persistenceService.saveMessage(newProject.id, msg);
                 }
                 
-                // Update local state
+                // Update local state immediately
                 setProject(newProject);
-                setMessages(messages);
-                setProjectFiles(files);
+                setMessages(generatedMessages);
+                setProjectFiles(generatedFiles);
+                if (generatedFiles.length > 0) setActiveFile(generatedFiles[0].name);
+            } else {
+                setProject(newProject);
+                setProjectFiles((newProject as any).files || []);
+                setMessages((newProject as any).builderChat || []);
+                if ((newProject as any).files?.[0]) setActiveFile((newProject as any).files[0].name);
             }
 
             incrementUsage(pageConfig.usageType);
@@ -668,9 +869,6 @@ export const SoftwareProjectBuilder: React.FC<{
             
             // Wait a moment then transition to editor
             setTimeout(() => {
-                setProject(newProject as any);
-                setMessages((newProject as any).builderChat || [{ id: 'init', sender: 'ai', text: 'مرحباً! أنا مساعدك الذكي. اطلب مني أي تعديل على مشروعك.' }]);
-                setActiveFile('index.html');
                 setScreen('editor');
             }, 1500);
 
@@ -763,12 +961,13 @@ export const SoftwareProjectBuilder: React.FC<{
             id: `user-${Date.now()}`,
             text: input,
             sender: 'user',
+            timestamp: Date.now(),
             attachments: chatImages.map(img => ({ url: img.url, name: img.name }))
         };
         
         // Save user message immediately
         if (currentUser?.uid) {
-            persistenceService.saveMessage(project.id, userMessage);
+            await persistenceService.saveMessage(project.id, userMessage);
         }
 
         const newMessages = [...messages, userMessage];
@@ -786,7 +985,12 @@ export const SoftwareProjectBuilder: React.FC<{
             const tempProjectWithFiles = { ...project, files: projectFiles };
             const { updatedProject, aiResponse } = await geminiService.modifyProjectWithAI(tempProjectWithFiles as any, command, imagesToSend) as { updatedProject: any, aiResponse: string };
             
-            const aiMessage: Message = { id: `ai-${Date.now()}`, text: aiResponse, sender: 'ai' };
+            const aiMessage: Message = { 
+                id: `ai-${Date.now()}`, 
+                text: aiResponse, 
+                sender: 'ai',
+                timestamp: Date.now()
+            };
             setMessages([...newMessages, aiMessage]);
 
             if (currentUser?.uid) {
@@ -880,11 +1084,35 @@ export const SoftwareProjectBuilder: React.FC<{
         }
     };
 
-    const handleDeleteProject = async (projectId: string) => {
+    const handleDeleteProject = async (projectId: string, skipConfirm = false) => {
         if (!currentUser?.uid) return;
-        if (!window.confirm("هل أنت متأكد من حذف هذا المشروع نهائياً؟")) return;
+        if (!skipConfirm && !window.confirm("هل أنت متأكد؟ سيتم نقل المشروع إلى سلة المحذوفات.")) return;
 
         try {
+            // Find project metadata
+            const projMetadata = projects.find(p => p.id === projectId) || (project?.id === projectId ? project : null);
+            
+            if (projMetadata) {
+                // Fetch files and messages for the trash
+                const [projectFiles, projectMessages] = await Promise.all([
+                    persistenceService.getProjectFiles(projectId),
+                    persistenceService.getProjectMessages(projectId)
+                ]);
+
+                const fullProject = { 
+                    ...projMetadata, 
+                    files: projectFiles, 
+                    builderChat: projectMessages,
+                    deletedAt: Date.now() 
+                };
+
+                // Move to Trash (localStorage to match Trash.tsx component)
+                const trashKey = `deletedProjects_${currentUser.email}`;
+                const deletedApps = JSON.parse(localStorage.getItem(trashKey) || '[]');
+                localStorage.setItem(trashKey, JSON.stringify([fullProject, ...deletedApps]));
+            }
+
+            // Permanently delete from Firebase
             await deleteDoc(doc(db, 'projects', projectId));
             
             if(project && project.id === projectId) {
@@ -995,6 +1223,31 @@ export const SoftwareProjectBuilder: React.FC<{
             setIsGeneratingIcon(false);
         }
     };
+
+    const handleAnalyzeUrl = async () => {
+        if (!wizardData.url) return;
+        setIsAnalyzingUrl(true);
+        try {
+            onLog('جاري تحليل الرابط واستخراج البيانات...');
+            const result = await geminiService.analyzeUrlForMarketing(wizardData.url);
+            if (result) {
+                setWizardData(prev => ({
+                    ...prev,
+                    name: result.name || prev.name,
+                    description: result.description || prev.description,
+                    icon: result.iconUrl || prev.icon
+                }));
+                onLog(`تم التعرف على: ${result.name}`);
+                setWizardStep(2); // Move to next step if successful
+            }
+        } catch (e) {
+            console.error('URL Analysis failed:', e);
+            onLog('فشل تحليل الرابط تلقائياً، يمكنك إدخال البيانات يدوياً.');
+            setWizardStep(2); // Still move forward
+        } finally {
+            setIsAnalyzingUrl(false);
+        }
+    };
     
     // UI Recognizer handler
     const handleAnalyzeUI = async () => {
@@ -1082,11 +1335,37 @@ export const SoftwareProjectBuilder: React.FC<{
                             key={p.id}
                             project={p}
                             onDelete={handleDeleteProject}
-                            onEdit={(proj) => {
+                            onEdit={async (proj) => {
                                 setProject(proj);
-                                setMessages(proj.builderChat || [{ id: 'init', sender: 'ai', text: 'مرحباً! أنا مساعدك الذكي. اطلب مني أي تعديل على مشروعك.' }]);
-                                setActiveFile(proj.files?.[0]?.name || 'index.html');
+                                // Ensure projectFiles and messages are loaded
+                                let files = proj.files || [];
+                                let chat = proj.builderChat || [{ id: 'init', sender: 'ai', text: 'مرحباً! أنا مساعدك الذكي. اطلب مني أي تعديل على مشروعك.' }];
+
+                                if (currentUser?.uid) {
+                                    onLog("تحميل ملفات المشروع...");
+                                    const savedFiles = await persistenceService.getProjectFiles(proj.id);
+                                    if (savedFiles.length > 0) files = savedFiles;
+                                    
+                                    const savedMsgs = await persistenceService.getProjectMessages(proj.id);
+                                    if (savedMsgs.length > 0) chat = savedMsgs;
+                                }
+
+                                setProjectFiles(files);
+                                setMessages(chat);
+                                setActiveFile(files[0]?.name || 'index.html');
                                 setScreen('editor');
+                            }}
+                            onUpdate={(updatedMetadata) => {
+                                setProjects(projects.map(pj => pj.id === updatedMetadata.id ? updatedMetadata : pj));
+                                if (currentUser?.uid) {
+                                    persistenceService.saveProjectMetadata(updatedMetadata);
+                                }
+                            }}
+                            categories={categories}
+                            onAddCategory={(name) => {
+                                if (!categories.includes(name)) {
+                                    setCategories([...categories, name]);
+                                }
                             }}
                         />
                     ))}
@@ -1202,7 +1481,351 @@ export const SoftwareProjectBuilder: React.FC<{
         return null;
     };
     
+    const handleWizardIconUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setWizardData(prev => ({ ...prev, icon: reader.result as string }));
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
     const renderGeneratorInputs = () => {
+        if (mode === 'wizard' || mode === 'url') {
+            const isUrlMode = mode === 'url';
+            return (
+                <div className="max-w-2xl mx-auto py-8">
+                    <div className="mb-8 font-sans">
+                        <div className="flex items-center justify-between mb-4">
+                            {[1, 2, 3, 4].map((s) => (
+                                <div key={s} className="flex flex-col items-center flex-1 relative">
+                                    <div 
+                                        className={`w-10 h-10 rounded-full flex items-center justify-center z-10 transition-all duration-500 ${
+                                            s <= wizardStep ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' : 'bg-slate-800 text-slate-500'
+                                        }`}
+                                    >
+                                        {s < wizardStep ? <CheckIcon className="w-6 h-6" /> : s}
+                                    </div>
+                                    <span className={`text-xs mt-2 font-medium transition-colors ${s <= wizardStep ? 'text-indigo-400' : 'text-slate-600'}`}>
+                                        {isUrlMode ? (
+                                            s === 1 ? 'الرابط' : s === 2 ? 'الهوية' : s === 3 ? 'التأكيد' : ''
+                                        ) : (
+                                            s === 1 ? 'الأيقونة' : s === 2 ? 'الاسم' : s === 3 ? 'المتطلبات' : 'التأكيد'
+                                        )}
+                                    </span>
+                                    {(isUrlMode ? s < 3 : s < 4) && (
+                                        <div className={`absolute top-5 left-1/2 w-full h-[2px] -z-0 transition-all duration-500 ${
+                                            s < wizardStep ? 'bg-indigo-600' : 'bg-slate-800'
+                                        }`} />
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-[2.5rem] p-8 md:p-12 shadow-2xl relative overflow-hidden min-h-[400px] flex flex-col">
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-blue-500 opacity-50" />
+                        
+                        <div className="flex-grow">
+                            <AnimatePresence mode="wait">
+                                {isUrlMode ? (
+                                    <>
+                                        {wizardStep === 1 && (
+                                            <motion.div key="url-step1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
+                                                <div className="text-center font-sans">
+                                                    <div className="w-16 h-16 bg-emerald-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                                        <GlobeIcon className="w-8 h-8 text-emerald-400" />
+                                                    </div>
+                                                    <h2 className="text-2xl font-bold text-white mb-2">رابط الموقع المرجعي</h2>
+                                                    <p className="text-slate-400">أدخل رابط الموقع الذي تريد استلهام التصميم منه</p>
+                                                </div>
+                                                <div className="relative">
+                                                    <input
+                                                        type="url"
+                                                        value={wizardData.url}
+                                                        onChange={(e) => setWizardData(prev => ({ ...prev, url: e.target.value }))}
+                                                        placeholder="https://example.com"
+                                                        className="w-full bg-slate-800/50 border border-slate-700 rounded-2xl px-6 py-4 text-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all text-white placeholder:text-slate-600 font-sans"
+                                                        autoFocus
+                                                        onKeyDown={(e) => e.key === 'Enter' && wizardData.url && handleAnalyzeUrl()}
+                                                    />
+                                                </div>
+                                            </motion.div>
+                                        )}
+                                        {wizardStep === 2 && (
+                                            <motion.div key="url-step2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
+                                                <div className="text-center font-sans">
+                                                    <div className="w-16 h-16 bg-blue-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                                        <SparklesIcon className="w-8 h-8 text-blue-400" />
+                                                    </div>
+                                                    <h2 className="text-2xl font-bold text-white mb-2 font-sans">هوية المشروع</h2>
+                                                    <p className="text-slate-400">راجع البيانات المستخرجة من الرابط</p>
+                                                </div>
+                                                
+                                                <div className="space-y-4">
+                                                    <div className="flex gap-4">
+                                                        <div className="w-24 h-24 bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden flex-shrink-0 cursor-pointer hover:border-indigo-500 transition-colors" onClick={() => fileInputRef.current?.click()}>
+                                                            {wizardData.icon ? <img src={wizardData.icon} className="w-full h-full object-cover" /> : <ImageIcon className="w-full h-full p-6 text-slate-600" />}
+                                                            <input type="file" ref={fileInputRef} onChange={handleWizardIconUpload} className="hidden" accept="image/*" />
+                                                        </div>
+                                                        <div className="flex-grow space-y-2">
+                                                            <label className="text-xs text-slate-500 block">اسم المشروع</label>
+                                                            <input
+                                                                type="text"
+                                                                value={wizardData.name}
+                                                                onChange={(e) => setWizardData(prev => ({ ...prev, name: e.target.value }))}
+                                                                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-white focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <label className="text-xs text-slate-500 block">وصف مختصر</label>
+                                                        <textarea
+                                                            value={wizardData.description}
+                                                            onChange={(e) => setWizardData(prev => ({ ...prev, description: e.target.value }))}
+                                                            rows={3}
+                                                            className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-white focus:ring-1 focus:ring-indigo-500 focus:outline-none resize-none text-sm"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </motion.div>
+                                        )}
+                                        {wizardStep === 3 && (
+                                            <motion.div key="url-step3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
+                                                <div className="text-center font-sans">
+                                                    <div className="w-16 h-16 bg-purple-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                                        <RocketLaunchIcon className="w-8 h-8 text-purple-400" />
+                                                    </div>
+                                                    <h2 className="text-2xl font-bold text-white mb-2">تأكيد البناء</h2>
+                                                    <p className="text-slate-400">أنت على وشك بناء مشروع متكامل مستوحى من {new URL(wizardData.url).hostname}</p>
+                                                </div>
+                                                <div className="bg-slate-800/40 rounded-2xl p-6 border border-slate-700 space-y-3">
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="text-slate-400">اسم المشروع:</span>
+                                                        <span className="text-white font-bold">{wizardData.name}</span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="text-slate-400">الرابط المرجعي:</span>
+                                                        <span className="text-indigo-400 text-sm">{wizardData.url}</span>
+                                                    </div>
+                                                </div>
+                                            </motion.div>
+                                        )}
+                                    </>
+                                ) : (
+                                    <>
+                                        {wizardStep === 1 && (
+                                    <motion.div
+                                        key="step1"
+                                        initial={{ opacity: 0, x: 20 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        exit={{ opacity: 0, x: -20 }}
+                                        className="space-y-6"
+                                    >
+                                        <div className="text-center">
+                                            <div className="w-16 h-16 bg-indigo-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                                <ImageIcon className="w-8 h-8 text-indigo-400" />
+                                            </div>
+                                            <h2 className="text-2xl font-bold text-white mb-2 font-sans">رفع آيقونة المشروع</h2>
+                                            <p className="text-slate-400 font-sans">اختر صورة تعبر عن هوية مشروعك الجديد</p>
+                                        </div>
+
+                                        <div 
+                                            onClick={() => fileInputRef.current?.click()}
+                                            className="border-2 border-dashed border-slate-700 rounded-3xl p-12 flex flex-col items-center justify-center cursor-pointer hover:border-indigo-500 hover:bg-indigo-500/5 transition-all group"
+                                        >
+                                            {wizardData.icon ? (
+                                                <div className="relative">
+                                                    <img src={wizardData.icon} alt="Icon Preview" className="w-32 h-32 rounded-2xl object-cover shadow-2xl border-4 border-slate-800 font-sans" />
+                                                    <div className="absolute -bottom-2 -right-2 bg-green-500 rounded-full p-1 shadow-lg">
+                                                        <CheckIcon className="w-5 h-5 text-white" />
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    <div className="w-20 h-20 bg-slate-800 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                                                        <UploadIcon_v2 className="w-10 h-10 text-slate-400 group-hover:text-indigo-400" />
+                                                    </div>
+                                                    <span className="text-slate-300 font-medium font-sans">اضغط هنا لرفع الصورة</span>
+                                                    <span className="text-slate-500 text-sm mt-2 font-sans text-center">PNG, JPG (أقصى حجم 2MB)</span>
+                                                </>
+                                            )}
+                                            <input 
+                                                type="file" 
+                                                ref={fileInputRef} 
+                                                onChange={handleWizardIconUpload} 
+                                                className="hidden" 
+                                                accept="image/*"
+                                            />
+                                        </div>
+                                    </motion.div>
+                                )}
+
+                                {wizardStep === 2 && (
+                                    <motion.div
+                                        key="step2"
+                                        initial={{ opacity: 0, x: 20 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        exit={{ opacity: 0, x: -20 }}
+                                        className="space-y-6"
+                                    >
+                                        <div className="text-center font-sans">
+                                            <div className="w-16 h-16 bg-blue-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                                <TypeIcon className="w-8 h-8 text-blue-400" />
+                                            </div>
+                                            <h2 className="text-2xl font-bold text-white mb-2">تسمية المشروع</h2>
+                                            <p className="text-slate-400">ما هو الاسم الذي اخترته لمشروعك؟</p>
+                                        </div>
+
+                                        <div className="relative">
+                                            <input
+                                                type="text"
+                                                value={wizardData.name}
+                                                onChange={(e) => setWizardData(prev => ({ ...prev, name: e.target.value }))}
+                                                placeholder="مثال: متجر السعادة، تطبيق اللياقة..."
+                                                className="w-full bg-slate-800/50 border border-slate-700 rounded-2xl px-6 py-4 text-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all text-white placeholder:text-slate-600 font-sans"
+                                                autoFocus
+                                            />
+                                        </div>
+                                    </motion.div>
+                                )}
+
+                                {wizardStep === 3 && (
+                                    <motion.div
+                                        key="step3"
+                                        initial={{ opacity: 0, x: 20 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        exit={{ opacity: 0, x: -20 }}
+                                        className="space-y-6"
+                                    >
+                                        <div className="text-center font-sans">
+                                            <div className="w-16 h-16 bg-emerald-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                                {isUrlMode ? <GlobeIcon className="w-8 h-8 text-emerald-400" /> : <FileTextIcon className="w-8 h-8 text-emerald-400" />}
+                                            </div>
+                                            <h2 className="text-2xl font-bold text-white mb-2">{isUrlMode ? 'رابط الموقع المرجعي' : 'وصف المشروع'}</h2>
+                                            <p className="text-slate-400">{isUrlMode ? 'أدخل الرابط الذي تريد بناء المشروع بناءً عليه' : 'اشرح فكرة مشروعك وما الذي ترغب في بنائه'}</p>
+                                        </div>
+
+                                        <div className="relative">
+                                            {isUrlMode ? (
+                                                <input
+                                                    type="url"
+                                                    value={wizardData.url}
+                                                    onChange={(e) => setWizardData(prev => ({ ...prev, url: e.target.value }))}
+                                                    placeholder="https://example.com"
+                                                    className="w-full bg-slate-800/50 border border-slate-700 rounded-2xl px-6 py-4 text-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all text-white placeholder:text-slate-600 font-sans"
+                                                    autoFocus
+                                                />
+                                            ) : (
+                                                <textarea
+                                                    value={wizardData.description}
+                                                    onChange={(e) => setWizardData(prev => ({ ...prev, description: e.target.value }))}
+                                                    placeholder="اكتب وصفاً تفصيلياً هنا..."
+                                                    rows={5}
+                                                    className="w-full bg-slate-800/50 border border-slate-700 rounded-2xl px-6 py-4 text-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all text-white placeholder:text-slate-600 resize-none font-sans"
+                                                    autoFocus
+                                                />
+                                            )}
+                                        </div>
+                                    </motion.div>
+                                )}
+
+                                {wizardStep === 4 && (
+                                    <motion.div
+                                        key="step4"
+                                        initial={{ opacity: 0, x: 20 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        exit={{ opacity: 0, x: -20 }}
+                                        className="space-y-6"
+                                    >
+                                        <div className="text-center font-sans">
+                                            <div className="w-16 h-16 bg-purple-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                                <RocketLaunchIcon className="w-8 h-8 text-purple-400" />
+                                            </div>
+                                            <h2 className="text-2xl font-bold text-white mb-2">تأكيد البيانات</h2>
+                                            <p className="text-slate-400">راجع البيانات قبل البدء في عملية البناء الذكي</p>
+                                        </div>
+
+                                        <div className="bg-slate-800/30 rounded-2xl p-6 space-y-4 border border-slate-800 font-sans text-right">
+                                            <div className="flex items-center gap-4 justify-end">
+                                                <div className="text-right">
+                                                    <div className="text-slate-500 text-xs text-right">اسم المشروع</div>
+                                                    <div className="text-white font-bold">{wizardData.name}</div>
+                                                </div>
+                                                <div className="w-12 h-12 rounded-xl bg-slate-800 overflow-hidden border border-slate-700">
+                                                    {wizardData.icon ? <img src={wizardData.icon} className="w-full h-full object-cover" /> : <ImageIcon className="w-full h-full p-3 text-slate-600 font-sans" />}
+                                                </div>
+                                            </div>
+                                            {isUrlMode && (
+                                                <div>
+                                                    <div className="text-slate-500 text-xs">الرابط المرجعي</div>
+                                                    <div className="text-indigo-400 text-sm truncate">{wizardData.url}</div>
+                                                </div>
+                                            )}
+                                            {!isUrlMode && (
+                                                <div>
+                                                    <div className="text-slate-500 text-xs">وصف المشروع</div>
+                                                    <div className="text-white text-sm line-clamp-2">{wizardData.description}</div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </>
+                        )}
+                    </AnimatePresence>
+                        </div>
+
+                        <div className="mt-8 flex items-center justify-between gap-4 font-sans">
+                            <button
+                                onClick={() => setWizardStep(prev => prev - 1)}
+                                disabled={wizardStep === 1 || isGenerating}
+                                className={`flex items-center gap-2 px-6 py-4 rounded-2xl font-medium transition-all ${
+                                    wizardStep === 1 ? 'opacity-0 pointer-events-none' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                                }`}
+                            >
+                                <ArrowRightIcon className="w-5 h-5 font-sans" />
+                                السابق
+                            </button>
+
+                            <button
+                                onClick={() => {
+                                    if (isUrlMode) {
+                                        if (wizardStep === 1) handleAnalyzeUrl();
+                                        else if (wizardStep < 3) setWizardStep(prev => prev + 1);
+                                        else handleGenerate();
+                                    } else {
+                                        if (wizardStep < 4) setWizardStep(prev => prev + 1);
+                                        else handleGenerate();
+                                    }
+                                }}
+                                disabled={isGenerating || isAnalyzingUrl || (isUrlMode ? (wizardStep === 1 && !wizardData.url) : ((wizardStep === 2 && !wizardData.name) || (wizardStep === 3 && !wizardData.description)))}
+                                className={`flex items-center gap-2 px-8 py-4 rounded-2xl font-bold transition-all shadow-xl ${
+                                    isGenerating || isAnalyzingUrl || (isUrlMode ? (wizardStep === 1 && !wizardData.url) : ((wizardStep === 2 && !wizardData.name) || (wizardStep === 3 && !wizardData.description)))
+                                        ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                                        : 'bg-indigo-600 text-white hover:bg-indigo-500 hover:-translate-y-0.5 active:translate-y-0 shadow-indigo-500/20'
+                                }`}
+                            >
+                                {isGenerating || isAnalyzingUrl ? (
+                                    <>
+                                        <LoaderIcon className="w-5 h-5 animate-spin font-sans" />
+                                        {isAnalyzingUrl ? 'جاري التحليل...' : 'جاري البناء...'}
+                                    </>
+                                ) : (
+                                    <>
+                                        {(isUrlMode ? wizardStep === 3 : wizardStep === 4) ? `ابدأ بناء المشروع` : 'التالي'}
+                                        {(isUrlMode ? wizardStep === 3 : wizardStep === 4) ? <RocketLaunchIcon className="w-5 h-5 font-sans" /> : <ArrowLeftIcon className="w-5 h-5 font-sans" />}
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
         if (mode === 'idea') return renderIdeaWizard();
 
         const showFileUpload = mode === 'screen' || mode === 'recognizer' || mode === 'text';
@@ -1444,6 +2067,9 @@ export const SoftwareProjectBuilder: React.FC<{
                     <button onClick={() => setIsAnalysisModalOpen(true)} title="تحليل الجودة" className="p-2 rounded-full hover:bg-slate-700">
                         <ShieldCheckIcon className="w-5 h-5"/>
                     </button>
+                    <button onClick={handleSaveSnapshot} disabled={isSavingSnapshot} title="حفظ نسخة احتياطية (Snapshot)" className="p-2 rounded-full hover:bg-slate-700 text-amber-400">
+                        {isSavingSnapshot ? <SpinnerIcon className="w-5 h-5 animate-spin" /> : <CameraIcon className="w-5 h-5"/>}
+                    </button>
                     <button onClick={() => handleDeleteProject(project!.id)} title="حذف المشروع" className="p-2 rounded-full hover:bg-slate-700 text-red-400 hover:text-red-300">
                         <TrashIcon className="w-5 h-5"/>
                     </button>
@@ -1455,6 +2081,7 @@ export const SoftwareProjectBuilder: React.FC<{
                     <div className="flex bg-slate-800/50 border-b border-slate-700">
                         <button onClick={() => setSidebarTab('chat')} className={`flex-1 py-3 text-[11px] font-bold transition-all ${sidebarTab === 'chat' ? 'text-indigo-400 bg-indigo-500/5 border-b-2 border-indigo-500' : 'text-slate-500 hover:text-slate-300'}`}>الدردشة</button>
                         <button onClick={() => setSidebarTab('files')} className={`flex-1 py-3 text-[11px] font-bold transition-all ${sidebarTab === 'files' ? 'text-indigo-400 bg-indigo-500/5 border-b-2 border-indigo-500' : 'text-slate-500 hover:text-slate-300'}`}>الملفات</button>
+                        <button onClick={() => setSidebarTab('snapshots')} className={`flex-1 py-3 text-[11px] font-bold transition-all ${sidebarTab === 'snapshots' ? 'text-indigo-400 bg-indigo-500/5 border-b-2 border-indigo-500' : 'text-slate-500 hover:text-slate-300'}`}>النسخ</button>
                     </div>
                     
                     <div className="flex-grow overflow-hidden relative">
@@ -1530,6 +2157,33 @@ export const SoftwareProjectBuilder: React.FC<{
                                 ))}
                             </div>
                         )}
+                        {sidebarTab === 'snapshots' && (
+                            <div className="flex flex-col h-full bg-slate-900/30 p-2 space-y-2 overflow-y-auto custom-scrollbar">
+                                {isLoadingSnapshots ? (
+                                    <div className="flex flex-col items-center justify-center py-10 opacity-50">
+                                        <SpinnerIcon className="w-6 h-6 animate-spin mb-2" />
+                                        <p className="text-xs">جاري تحميل النسخ الاحتياطية...</p>
+                                    </div>
+                                ) : snapshots.length === 0 ? (
+                                    <div className="text-center py-10 opacity-40">
+                                        <CameraIcon className="w-10 h-10 mx-auto mb-2" />
+                                        <p className="text-xs">لا توجد نسخ احتياطية بعد.</p>
+                                    </div>
+                                ) : snapshots.map(snap => (
+                                    <button 
+                                        key={snap.id} 
+                                        onClick={() => handleRestoreSnapshot(snap)}
+                                        className="w-full text-right p-3 rounded-xl bg-slate-800/50 border border-slate-700 hover:bg-slate-700 transition-all group"
+                                    >
+                                        <div className="flex justify-between items-start mb-1">
+                                            <span className="text-[10px] text-indigo-400 font-bold">{snap.projectFiles?.length || 0} ملف</span>
+                                            <span className="text-[9px] text-slate-500">{new Date(snap.timestamp?.seconds * 1000).toLocaleTimeString('ar-EG')}</span>
+                                        </div>
+                                        <p className="text-xs text-white group-hover:text-amber-400 transition-colors truncate">{snap.name}</p>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -1568,37 +2222,42 @@ export const SoftwareProjectBuilder: React.FC<{
     
     if (isGenerating) return <LoadingScreen logs={logs} projectType={projectType}/>;
 
-    switch(screen) {
-        case 'list': return renderListView();
-        case 'generator': return renderGeneratorView();
-        case 'editor': return project ? (
-            <>
-                {renderEditorView()}
-                <BuildModal isOpen={isBuildModalOpen} onClose={() => setIsBuildModalOpen(false)} project={project} platform={buildPlatform} onUpdateProject={updateProjectLocal} />
-                <BuildInstructionsModal isOpen={isBuildInstructionsModalOpen} onClose={() => setIsBuildInstructionsModalOpen(false)} />
-                <QualityAnalysisModal 
-                    isOpen={isAnalysisModalOpen} 
-                    onClose={() => setIsAnalysisModalOpen(false)} 
-                    project={project}
-                    onUpdateProject={(updatedProject) => {
-                        setProject(updatedProject);
-                        // Update messages if needed, though updatedProject.builderChat should handle it
-                        if (updatedProject.builderChat) {
-                            setMessages(updatedProject.builderChat);
-                        }
-                        // Save to local storage
-                        if (currentUser?.email) {
-                            const key = `appProjects_${currentUser.email}`;
-                            const savedApps: Project[] = JSON.parse(localStorage.getItem(key) || '[]');
-                            const updatedApps = savedApps.map(p => p.id === updatedProject.id ? updatedProject : p);
-                            localStorage.setItem(key, JSON.stringify(updatedApps));
-                        }
-                    }}
-                />
-            </>
-        ) : renderListView(); // Fallback if project is somehow null
-        default: return renderListView();
-    }
+    return (
+        <>
+            {(() => {
+                switch(screen) {
+                    case 'list': return renderListView();
+                    case 'generator': return renderGeneratorView();
+                    case 'editor': return project ? (
+                        <>
+                            {renderEditorView()}
+                            <BuildModal isOpen={isBuildModalOpen} onClose={() => setIsBuildModalOpen(false)} project={project} platform={buildPlatform} onUpdateProject={updateProjectLocal} />
+                            <BuildInstructionsModal isOpen={isBuildInstructionsModalOpen} onClose={() => setIsBuildInstructionsModalOpen(false)} />
+                            <QualityAnalysisModal 
+                                isOpen={isAnalysisModalOpen} 
+                                onClose={() => setIsAnalysisModalOpen(false)} 
+                                project={project}
+                                onUpdateProject={(updatedProject) => {
+                                    setProject(updatedProject);
+                                    if (updatedProject.builderChat) {
+                                        setMessages(updatedProject.builderChat);
+                                    }
+                                    if (currentUser?.email) {
+                                        const key = `appProjects_${currentUser.email}`;
+                                        const savedApps: Project[] = JSON.parse(localStorage.getItem(key) || '[]');
+                                        const updatedApps = savedApps.map(p => p.id === updatedProject.id ? updatedProject : p);
+                                        localStorage.setItem(key, JSON.stringify(updatedApps));
+                                    }
+                                }}
+                            />
+                        </>
+                    ) : renderListView();
+                    default: return renderListView();
+                }
+            })()}
+            <UpgradeModal isOpen={isUpgradeModalOpen} onClose={() => setUpgradeModalOpen(false)} />
+        </>
+    );
 };
 
 export default SoftwareProjectBuilder;
