@@ -294,20 +294,20 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, op
           
           <NavHeader label="تطوير واجهات وأكواد" />
           <NavButton
-            label="بناء مشروع جديد"
+            label="خطوات إلى كود"
             icon={<RocketLaunchIcon className="w-6 h-6 text-indigo-400" />}
             isActive={activeView === 'projectWizard'}
             onClick={() => setActiveView('projectWizard')}
           />
           <NavButton
-            label="بناء مشروع من رابط"
-            icon={<GlobeIcon className="w-6 h-6 text-indigo-400" />}
+            label="رابط إلى كود"
+            icon={<GlobeIcon className="w-6 h-6 text-sky-400" />}
             isActive={activeView === 'linkWizard'}
             onClick={() => setActiveView('linkWizard')}
           />
           <NavButton
             label="فكرة إلى كود"
-            icon={<LightBulbIcon className="w-6 h-6" />}
+            icon={<LightBulbIcon className="w-6 h-6 text-yellow-400" />}
             isActive={activeView === 'ideaToCode'}
             onClick={() => setActiveView('ideaToCode')}
           />
@@ -325,25 +325,25 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, op
           />
           <NavButton
             label="نص إلى كود"
-            icon={<CommandLineIcon className="w-6 h-6" />}
+            icon={<CommandLineIcon className="w-6 h-6 text-slate-400" />}
             isActive={activeView === 'textToCode'}
             onClick={() => setActiveView('textToCode')}
           />
           <NavButton
             label="شاشة إلى كود"
-            icon={<CameraIcon className="w-6 h-6" />}
+            icon={<CameraIcon className="w-6 h-6 text-cyan-400" />}
             isActive={activeView === 'screenToCode'}
             onClick={() => setActiveView('screenToCode')}
           />
           <NavButton
             label="من المخطط للكود"
-            icon={<PencilSquareIcon className="w-6 h-6" />}
+            icon={<PencilSquareIcon className="w-6 h-6 text-blue-400" />}
             isActive={activeView === 'drawToCode'}
             onClick={() => setActiveView('drawToCode')}
           />
           <NavButton
             label="محلل الواجهات"
-            icon={<BeakerIcon className="w-6 h-6" />}
+            icon={<BeakerIcon className="w-6 h-6 text-purple-400" />}
             isActive={activeView === 'uiRecognizer'}
             onClick={() => setActiveView('uiRecognizer')}
           />
@@ -375,7 +375,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, op
           />
           <NavButton
             label="محادثة مباشرة"
-            icon={<MicrophoneIcon className="w-6 h-6" />}
+            icon={<MicrophoneIcon className="w-6 h-6 text-red-400" />}
             isActive={activeView === 'live'}
             onClick={() => setActiveView('live')}
           />
@@ -389,7 +389,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, op
           />
           <NavButton
             label="تحليل البيانات"
-            icon={<ChartPieIcon className="w-6 h-6" />}
+            icon={<ChartPieIcon className="w-6 h-6 text-teal-400" />}
             isActive={activeView === 'dataAnalysis'}
             onClick={() => setActiveView('dataAnalysis')}
           />
@@ -401,13 +401,13 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, op
           />
           <NavButton
             label="قوالب احترافية"
-            icon={<TemplateIcon className="w-6 h-6" />}
+            icon={<TemplateIcon className="w-6 h-6 text-violet-400" />}
             isActive={activeView === 'professionalTemplateGenerator'}
             onClick={() => setActiveView('professionalTemplateGenerator')}
           />
           <NavButton
             label="مركز تحويل الملفات"
-            icon={<WrenchScrewdriverIcon className="w-6 h-6" />}
+            icon={<WrenchScrewdriverIcon className="w-6 h-6 text-amber-600" />}
             isActive={activeView === 'fileConverter'}
             onClick={() => setActiveView('fileConverter')}
           />
@@ -415,31 +415,31 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, op
           <NavHeader label="الحساب والنظام" />
           <NavButton
             label="الملف الشخصي"
-            icon={<UserCircleIcon className="w-6 h-6" />}
+            icon={<UserCircleIcon className="w-6 h-6 text-lime-400" />}
             isActive={activeView === 'profile'}
             onClick={() => setActiveView('profile')}
           />
           <NavButton
             label="سلة المحذوفات"
-            icon={<TrashIcon className="w-6 h-6" />}
+            icon={<TrashIcon className="w-6 h-6 text-gray-500" />}
             isActive={activeView === 'trash'}
             onClick={() => setActiveView('trash')}
           />
           <NavButton
             label="سجل التغييرات"
-            icon={<BellIcon className="w-6 h-6" />}
+            icon={<BellIcon className="w-6 h-6 text-blue-300" />}
             isActive={activeView === 'changelog'}
             onClick={() => setActiveView('changelog')}
           />
           <NavButton
             label="الدعم الفني"
-            icon={<SupportIcon className="w-6 h-6" />}
+            icon={<SupportIcon className="w-6 h-6 text-indigo-300" />}
             isActive={activeView === 'support'}
             onClick={() => setActiveView('support')}
           />
           <NavButton
             label="دليل الاستخدام"
-            icon={<InformationCircleIcon className="w-6 h-6" />}
+            icon={<InformationCircleIcon className="w-6 h-6 text-sky-300" />}
             isActive={false}
             onClick={openOnboarding}
           />
@@ -448,7 +448,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, op
             onClick={() => setIsFeedbackModalOpen(true)}
             className="flex items-center w-full gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 text-indigo-400 hover:bg-slate-800 hover:text-indigo-300 mt-2 border border-dashed border-indigo-500/30"
           >
-            <StarIcon className="w-6 h-6" />
+            <StarIcon className="w-6 h-6 text-amber-400" />
             <span className="truncate font-semibold">قيم تجربتك معنا</span>
           </button>
         </nav>
