@@ -38,7 +38,7 @@ interface GalleryProject {
   liveUrl?: string;
 }
 
-export const Showroom: React.FC<{ navigate: (view: any, context?: any) => void }> = ({ navigate }) => {
+export const Showroom: React.FC<{ navigate: (view: any, context?: any) => void; context?: any }> = ({ navigate, context }) => {
   const [projects, setProjects] = useState<GalleryProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('الجميع');
@@ -54,7 +54,11 @@ export const Showroom: React.FC<{ navigate: (view: any, context?: any) => void }
 
   useEffect(() => {
     fetchPublishedProjects();
-  }, [filter]);
+    if (context?.project) {
+      setShowPublishModal(true);
+      fetchUserProjects();
+    }
+  }, [filter, context]);
 
   const fetchPublishedProjects = async () => {
     setLoading(true);

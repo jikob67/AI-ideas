@@ -50,10 +50,10 @@ async function startServer() {
     try {
       console.log("Mock Netlify Function triggered with prompt:", prompt);
       const response = await ai.models.generateContent({
-        model: "gemini-1.5-flash",
+        model: "gemini-flash-latest",
         contents: [{ role: "user", parts: [{ text: prompt }] }]
       });
-      const responseText = response.candidates?.[0]?.content?.parts?.[0]?.text || "No response received";
+      const responseText = response.text || "No response received";
       
       console.log("Gemini response retrieved successfully");
       res.json({ result: responseText });
@@ -67,7 +67,7 @@ async function startServer() {
     const { model, contents, config } = req.body;
     try {
       const response = await ai.models.generateContent({
-        model: model || "gemini-1.5-flash",
+        model: model || "gemini-flash-latest",
         contents,
         config
       });
@@ -83,7 +83,7 @@ async function startServer() {
     const { model, contents, config } = req.body;
     try {
       const response = await ai.models.generateContentStream({
-        model: model || "gemini-1.5-flash",
+        model: model || "gemini-flash-latest",
         contents,
         config
       });

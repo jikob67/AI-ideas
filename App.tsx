@@ -233,7 +233,7 @@ const App: React.FC = () => {
       case 'seoOptimizer':
         return <SeoOptimizer context={navigationContext} />;
       case 'showroom':
-        return <Showroom navigate={navigate} />;
+        return <Showroom navigate={navigate} context={navigationContext} />;
       case 'assetStudio':
         return <AssetStudio context={navigationContext} />;
       case 'flowDemo':

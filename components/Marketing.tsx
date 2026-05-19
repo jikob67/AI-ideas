@@ -80,9 +80,16 @@ const Marketing: React.FC<MarketingProps> = ({ context, navigate }) => {
 
     // Generator State
     const [allProjects, setAllProjects] = useState<Project[]>([]);
-    const [selectedProjectId, setSelectedProjectId] = useState<string>('');
-    const [campaignName, setCampaignName] = useState('');
-    const [marketingGoals, setMarketingGoals] = useState('');
+    const [selectedProjectId, setSelectedProjectId] = useState<string>(context?.project?.id || '');
+    const [campaignName, setCampaignName] = useState(context?.project ? `حملة ${context.project.name}` : '');
+    const [marketingGoals, setMarketingGoals] = useState(context?.project ? `ترويج مشروع: ${context.project.name}\n${context.project.description}` : '');
+    
+    // Automatically switch to generator if project context is passed and not already in editor
+    useEffect(() => {
+        if (context?.project && screen === 'list') {
+            setScreen('generator');
+        }
+    }, [context, screen]);
     
     const [isGenerating, setIsGenerating] = useState(false);
     const [logs, setLogs] = useState<string[]>([]);
