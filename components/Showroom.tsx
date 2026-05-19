@@ -19,7 +19,7 @@ const HeartSolidIcon: React.FC<React.SVGProps<SVGSVGElement>> = props => (
   </svg>
 );
 
-import { collection, query, getDocs, limit, orderBy, where, updateDoc, doc } from 'firebase/firestore';
+import { collection, query, getDocs, limit, orderBy, where, updateDoc, doc, increment } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { SpinnerIcon, XMarkIcon, ArrowLeftIcon } from './Icons';
 import { ProjectType } from '../types';
@@ -43,6 +43,16 @@ export const Showroom: React.FC<{ navigate: (view: any, context?: any) => void; 
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('الجميع');
   const [liked, setLiked] = useState<string[]>([]);
+  useEffect(() => {
+    const savedLiked = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith('liked_')) {
+        savedLiked.push(key.replace('liked_', ''));
+      }
+    }
+    setLiked(savedLiked);
+  }, []);
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [userProjects, setUserProjects] = useState<GalleryProject[]>([]);
   const [publishing, setPublishing] = useState(false);
@@ -66,7 +76,7 @@ export const Showroom: React.FC<{ navigate: (view: any, context?: any) => void; 
       let q = query(
         collection(db, 'projects'),
         where('isPublished', '==', true),
-        orderBy('timestamp', 'desc'),
+        orderBy('publishedAt', 'desc'),
         limit(24)
       );
 
@@ -119,11 +129,16 @@ export const Showroom: React.FC<{ navigate: (view: any, context?: any) => void; 
   };
 
   const handleOpenPublish = () => {
+    if (!auth.currentUser) {
+      alert("الرجاء تسجيل الدخول أولاً لتتمكن من نشر مشاريعك.");
+      return;
+    }
     setShowPublishModal(true);
     fetchUserProjects();
   };
 
   const handlePublish = async (projectId: string) => {
+    if (!auth.currentUser) return;
     setPublishing(true);
     try {
       const projectRef = doc(db, 'projects', projectId);
@@ -137,6 +152,7 @@ export const Showroom: React.FC<{ navigate: (view: any, context?: any) => void; 
       setShowPublishModal(false);
       setPublishForm({ apkUrl: '', ipaUrl: '', liveUrl: '' });
       fetchPublishedProjects();
+      alert("تم نشر مشروعك بنجاح في معرض المجتمع!");
     } catch (err) {
       console.error("Error publishing project:", err);
       alert("فشل نشر المشروع، تأكد من صلاحياتك.");
@@ -157,6 +173,11 @@ export const Showroom: React.FC<{ navigate: (view: any, context?: any) => void; 
       : [...liked, project.id];
     
     setLiked(newLiked);
+    if (!isLiked) {
+      localStorage.setItem(`liked_${project.id}`, 'true');
+    } else {
+      localStorage.removeItem(`liked_${project.id}`);
+    }
     
     // Optimistic update
     setProjects(prev => prev.map(p => 
@@ -168,7 +189,7 @@ export const Showroom: React.FC<{ navigate: (view: any, context?: any) => void; 
     try {
       const projectRef = doc(db, 'projects', project.id);
       await updateDoc(projectRef, {
-        likes: (project.likes || 0) + (isLiked ? -1 : 1)
+        likes: increment(isLiked ? -1 : 1)
       });
     } catch (err) {
       console.error("Error updating likes:", err);
@@ -186,7 +207,7 @@ export const Showroom: React.FC<{ navigate: (view: any, context?: any) => void; 
     try {
       const projectRef = doc(db, 'projects', project.id);
       await updateDoc(projectRef, {
-        views: (project.views || 0) + 1
+        views: increment(1)
       });
       setProjects(prev => prev.map(p => 
         p.id === project.id ? { ...p, views: (p.views || 0) + 1 } : p
@@ -211,7 +232,13 @@ export const Showroom: React.FC<{ navigate: (view: any, context?: any) => void; 
       alert(`عذراً، لا يوجد ملف ${type} متاح حالياً لهذا المشروع.`);
       return;
     }
-    // Create a temporary link to trigger download
+    
+    // Safety check for URL to prevent XSS
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      alert('تم اكتشاف رابط غير آمن، لا يمكن التحميل.');
+      return;
+    }
+
     const link = document.createElement('a');
     link.href = url;
     link.download = `project-${type.toLowerCase()}`;
@@ -419,7 +446,9 @@ export const Showroom: React.FC<{ navigate: (view: any, context?: any) => void; 
                     <button 
                       onClick={(e) => { 
                         e.stopPropagation(); 
-                        if (project.liveUrl) window.open(project.liveUrl, '_blank');
+                        if (project.liveUrl && (project.liveUrl.startsWith('http://') || project.liveUrl.startsWith('https://'))) {
+                          window.open(project.liveUrl, '_blank');
+                        }
                         else if ((project as any).publicShareId) window.open(`/shared/${(project as any).publicShareId}`, '_blank');
                         else alert('لا يوجد رابط معاينة حية حالياً لهذا المشروع.'); 
                       }}
@@ -453,7 +482,12 @@ export const Showroom: React.FC<{ navigate: (view: any, context?: any) => void; 
                 </div>
                 <div className="flex items-center gap-2">
                    <button 
-                    onClick={(e) => { e.stopPropagation(); alert('تم نسخ رابط المشاركة!'); }}
+                    onClick={(e) => { 
+                      e.stopPropagation(); 
+                      const shareUrl = `${window.location.origin}/shared/${(project as any).publicShareId || project.id}`;
+                      navigator.clipboard.writeText(shareUrl);
+                      alert('تم نسخ رابط المشاركة إلى الحافظة!'); 
+                    }}
                     className="p-2 transition-all hover:bg-slate-800 rounded-lg text-slate-500 hover:text-indigo-400"
                    >
                       <ShareIcon className="w-5 h-5" />

@@ -251,6 +251,12 @@ export const SoftwareProjectBuilder: React.FC<{
     const { incrementUsage, isLimitReached } = useUsage();
     const { currentUser, updateUser } = useAuth();
 
+    const isOwner = useMemo(() => {
+        if (!project) return true; // Handling generator state or new projects
+        if (!currentUser) return false;
+        return project.ownerUid === currentUser.uid;
+    }, [currentUser, project]);
+
     const creationModeForThisView = useMemo(() => {
         switch(mode) {
             case 'idea': return 'ideaToCode';
@@ -2168,22 +2174,28 @@ export const SoftwareProjectBuilder: React.FC<{
                     <button onClick={() => setIsAnalysisModalOpen(true)} title="تحليل الجودة" className="p-2 rounded-full hover:bg-slate-700">
                         <ShieldCheckIcon className="w-5 h-5"/>
                     </button>
-                    <button 
-                        onClick={() => {
-                            setIsVisualEditMode(!isVisualEditMode);
-                            setCommandBarState(null);
-                        }} 
-                        title="المحرر المرئي" 
-                        className={`p-2 rounded-full transition-all ${isVisualEditMode ? 'bg-indigo-600 text-white animate-pulse' : 'hover:bg-slate-700 text-slate-300'}`}
-                    >
-                        <CommandLineIcon className="w-5 h-5"/>
-                    </button>
-                    <button onClick={handleSaveSnapshot} disabled={isSavingSnapshot} title="حفظ نسخة احتياطية (Snapshot)" className="p-2 rounded-full hover:bg-slate-700 text-amber-400">
-                        {isSavingSnapshot ? <SpinnerIcon className="w-5 h-5 animate-spin" /> : <CameraIcon className="w-5 h-5"/>}
-                    </button>
-                    <button onClick={() => handleDeleteProject(project!.id)} title="حذف المشروع" className="p-2 rounded-full hover:bg-slate-700 text-red-400 hover:text-red-300">
-                        <TrashIcon className="w-5 h-5"/>
-                    </button>
+                    {isOwner && (
+                        <button 
+                            onClick={() => {
+                                setIsVisualEditMode(!isVisualEditMode);
+                                setCommandBarState(null);
+                            }} 
+                            title="المحرر المرئي" 
+                            className={`p-2 rounded-full transition-all ${isVisualEditMode ? 'bg-indigo-600 text-white animate-pulse' : 'hover:bg-slate-700 text-slate-300'}`}
+                        >
+                            <CommandLineIcon className="w-5 h-5"/>
+                        </button>
+                    )}
+                    {isOwner && (
+                        <button onClick={handleSaveSnapshot} disabled={isSavingSnapshot} title="حفظ نسخة احتياطية (Snapshot)" className="p-2 rounded-full hover:bg-slate-700 text-amber-400">
+                            {isSavingSnapshot ? <SpinnerIcon className="w-5 h-5 animate-spin" /> : <CameraIcon className="w-5 h-5"/>}
+                        </button>
+                    )}
+                    {isOwner && (
+                        <button onClick={() => handleDeleteProject(project!.id)} title="حذف المشروع" className="p-2 rounded-full hover:bg-slate-700 text-red-400 hover:text-red-300">
+                            <TrashIcon className="w-5 h-5"/>
+                        </button>
+                    )}
                 </div>
             </div>
             
@@ -2219,6 +2231,12 @@ export const SoftwareProjectBuilder: React.FC<{
                                 </div>
                                 
                                 <div className="p-3 border-t border-slate-800 bg-slate-900/50">
+                                    {!isOwner && (
+                                        <div className="absolute inset-x-0 bottom-0 top-0 bg-slate-900/60 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center p-4 text-center">
+                                            <ShieldIcon className="w-8 h-8 text-indigo-400 mb-2" />
+                                            <p className="text-[10px] text-slate-300 leading-relaxed font-bold">هذا المشروع في وضع القراءة فقط.<br/>لا يمكنك الدردشة مع مساعد الذكاء الاصطناعي لتعديله.</p>
+                                        </div>
+                                    )}
                                     {chatImages.length > 0 && (
                                         <div className="flex gap-2 mb-2 overflow-x-auto pb-1">
                                             {chatImages.map(img => (
@@ -2243,11 +2261,11 @@ export const SoftwareProjectBuilder: React.FC<{
                                             value={input}
                                             onChange={(e) => setInput(e.target.value)}
                                             onKeyPress={(e) => e.key === 'Enter' && handleChatSend()}
-                                            placeholder="اطلب تعديلاً..."
+                                            placeholder={isOwner ? "اطلب تعديلاً..." : "عرض فقط..."}
                                             className="flex-1 bg-transparent focus:outline-none px-1 text-slate-100 placeholder:text-slate-600 text-[13px]"
-                                            disabled={isChatLoading}
+                                            disabled={isChatLoading || !isOwner}
                                         />
-                                        <button onClick={handleChatSend} disabled={(!input.trim() && chatImages.length === 0) || isChatLoading} className="bg-indigo-600 text-white rounded-lg p-2 disabled:bg-slate-700 transition-all shadow-md active:scale-95">
+                                        <button onClick={handleChatSend} disabled={(!input.trim() && chatImages.length === 0) || isChatLoading || !isOwner} className="bg-indigo-600 text-white rounded-lg p-2 disabled:bg-slate-700 transition-all shadow-md active:scale-95">
                                             {isChatLoading ? <SpinnerIcon className="w-4.5 h-4.5 animate-spin"/> : <SendIcon className="w-4.5 h-4.5" />}
                                         </button>
                                     </div>

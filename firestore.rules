@@ -102,13 +102,16 @@ service cloud.firestore {
       allow update: if (isOwner(existing().ownerUid) && isValidProject(incoming())) || (
         existing().get('isPublished', false) == true &&
         incoming().diff(existing()).affectedKeys().hasOnly(['likes', 'views']) &&
-        (incoming().get('likes', 0) >= existing().get('likes', 0)) &&
-        (incoming().get('views', 0) >= existing().get('views', 0))
+        (incoming().get('likes', 0) == existing().get('likes', 0) + 1 || incoming().get('likes', 0) == existing().get('likes', 0) - 1 || incoming().get('likes', 0) == existing().get('likes', 0)) &&
+        (incoming().get('views', 0) == existing().get('views', 0) + 1 || incoming().get('views', 0) == existing().get('views', 0))
       );
       allow delete: if isOwner(existing().ownerUid);
 
       match /files/{fileId} {
-        allow read: if isOwner(get(/databases/$(database)/documents/projects/$(projectId)).data.ownerUid) || (get(/databases/$(database)/documents/projects/$(projectId)).data.get('isShared', false) == true) || (get(/databases/$(database)/documents/projects/$(projectId)).data.get('publicShareId', '') != '');
+        allow read: if isOwner(get(/databases/$(database)/documents/projects/$(projectId)).data.ownerUid) || 
+                     (get(/databases/$(database)/documents/projects/$(projectId)).data.get('isShared', false) == true) || 
+                     (get(/databases/$(database)/documents/projects/$(projectId)).data.get('publicShareId', '') != '') ||
+                     (get(/databases/$(database)/documents/projects/$(projectId)).data.get('isPublished', false) == true);
         allow write: if isProjectOwner(projectId) && isValidFile(incoming());
       }
 
