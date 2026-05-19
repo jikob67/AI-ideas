@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { db } from '../firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { Project } from '../types';
 import { SpinnerIcon } from './Icons';
 
@@ -21,13 +21,32 @@ export const SharedProjectViewer: React.FC = () => {
       }
 
       try {
-        const q = query(collection(db, 'projects'), where('publicShareId', '==', shareId));
-        const querySnapshot = await getDocs(q);
+        // Try to find by publicShareId first
+        let q = query(collection(db, 'projects'), where('publicShareId', '==', shareId));
+        let querySnapshot = await getDocs(q);
         
-        if (querySnapshot.empty) {
+        let projectDoc = !querySnapshot.empty ? querySnapshot.docs[0] : null;
+
+        // If not found by shareId, try as a direct document ID if it looks like one
+        if (!projectDoc) {
+            try {
+                const docRef = doc(db, 'projects', shareId);
+                const docSnapshot = await getDoc(docRef);
+                if (docSnapshot.exists()) {
+                    const data = docSnapshot.data();
+                    // Only allow if it's actually shared or published
+                    if (data.isShared || data.isPublished || data.publicShareId) {
+                        projectDoc = docSnapshot;
+                    }
+                }
+            } catch (e) {
+                // Not a valid doc ID or other error
+            }
+        }
+        
+        if (!projectDoc) {
           setError('المشروع غير موجود أو تم حذفه');
         } else {
-          const projectDoc = querySnapshot.docs[0];
           const projectData = { id: projectDoc.id, ...projectDoc.data() } as Project;
           
           // Fetch files from subcollection if not present in main doc

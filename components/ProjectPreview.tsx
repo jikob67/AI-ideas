@@ -23,10 +23,46 @@ interface ProjectPreviewProps {
 
 export const ProjectPreview: React.FC<ProjectPreviewProps> = ({ navigate, context }) => {
   const [device, setDevice] = React.useState<'desktop' | 'mobile'>('desktop');
+  const [loadingFiles, setLoadingFiles] = React.useState(false);
+  const [fetchedFiles, setFetchedFiles] = React.useState<ProjectFile[]>([]);
   const project = context?.project as Project;
-  const projectFiles = (context?.projectFiles as ProjectFile[]) || [];
+  
+  const projectFiles = React.useMemo(() => {
+    if (context?.projectFiles && context.projectFiles.length > 0) return context.projectFiles as ProjectFile[];
+    if (project?.files && project.files.length > 0) return project.files;
+    return fetchedFiles;
+  }, [context?.projectFiles, project?.files, fetchedFiles]);
+
+  React.useEffect(() => {
+    const hasFiles = (context?.projectFiles && context.projectFiles.length > 0) || (project?.files && project.files.length > 0);
+    if (project && !hasFiles) {
+      setLoadingFiles(true);
+      import('../services/persistenceService').then(({ persistenceService }) => {
+        persistenceService.getProjectFiles(project.id).then(files => {
+          setFetchedFiles(files);
+          setLoadingFiles(false);
+        }).catch(err => {
+          console.error("Error fetching project files for preview:", err);
+          setLoadingFiles(false);
+        });
+      });
+    }
+  }, [project, context?.projectFiles]);
 
   const srcDoc = useMemo(() => {
+    if (loadingFiles) {
+        return `
+            <html lang="ar" dir="rtl">
+            <body style="background:#111; color:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; font-family:sans-serif; text-align:center; padding: 20px;">
+                <div style="font-size: 48px; margin-bottom: 20px; animation: pulse 2s infinite;">⏳</div>
+                <h2 style="margin-bottom: 10px;">جاري جلب الملفات...</h2>
+                <p style="color: #888;">يرجى الانتظار قليلاً بينما نقوم بتجهيز المعاينة.</p>
+                <style>
+                    @keyframes pulse { 0% { opacity: 0.5; transform: scale(0.9); } 50% { opacity: 1; transform: scale(1.1); } 100% { opacity: 0.5; transform: scale(0.9); } }
+                </style>
+            </body>
+            </html>`;
+    }
     if (!projectFiles || projectFiles.length === 0) {
       return `
         <html lang="ar" dir="rtl">

@@ -223,11 +223,11 @@ export interface Project {
   type: ProjectType;
   creationMode?: View;
   iconUrl?: string;
-  // files: ProjectFile[]; // Moved to subcollection
-  // builderChat?: Message[]; // Moved to subcollection
-  // marketingAssets?: MarketingAsset[]; // Moved to subcollection
-  // marketingSuggestions?: MarketingSuggestion[]; // Moved to subcollection
-  sections: ProjectSection[]; // Keep for now if small, but consider moving if it grows
+  files?: ProjectFile[];
+  builderChat?: Message[];
+  marketingAssets?: MarketingAsset[];
+  marketingSuggestions?: MarketingSuggestion[];
+  sections: ProjectSection[]; 
   timestamp: number;
   updatedAt?: number;
   ownerEmail?: string;

@@ -524,7 +524,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onDelete, onE
                 onClose={() => setIsDeleteConfirmOpen(false)}
                 onConfirm={handleConfirmDelete}
                 title={`حذف "${project.name}"`}
-                message="هل أنت متأكد؟ سيتم نقل المشروع إلى سلة المحذوفات."
+                message="هل أنت متأكد؟ سيتم نقل المشروع إلى سلة المهملات."
             />
         </>
     );

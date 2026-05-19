@@ -328,16 +328,28 @@ export const SoftwareProjectBuilder: React.FC<{
                 if (currentUser?.uid) {
                     persistenceService.getProjectFiles(proj.id).then(files => {
                         setProjectFiles(files);
-                        if (files.length > 0) setActiveFile(files[0].name);
-                        else setActiveFile('index.html');
+                        if (files.length > 0) {
+                            const trinity = ['index.html', 'style.css', 'script.js'];
+                            const primary = trinity.find(name => files.some(f => f.name === name)) || files[0].name;
+                            setActiveFile(primary);
+                        } else {
+                            setActiveFile('index.html');
+                        }
                     });
                     persistenceService.getProjectMessages(proj.id).then(msgs => {
                         setMessages(msgs.length > 0 ? msgs : [{ id: 'init', sender: 'ai', text: 'مرحباً! أنا مساعدك الذكي. اطلب مني أي تعديل على مشروعك.' }]);
                     });
                 } else {
                     setMessages(proj.builderChat || [{ id: 'init', sender: 'ai', text: 'مرحباً! أنا مساعدك الذكي. اطلب مني أي تعديل على مشروعك.' }]);
-                    setProjectFiles(proj.files || []);
-                    setActiveFile(proj.files?.[0]?.name || 'index.html');
+                    const files = proj.files || [];
+                    setProjectFiles(files);
+                    if (files.length > 0) {
+                      const trinity = ['index.html', 'style.css', 'script.js'];
+                      const primary = trinity.find(name => files.some(f => f.name === name)) || files[0].name;
+                      setActiveFile(primary);
+                    } else {
+                      setActiveFile('index.html');
+                    }
                 }
                 
                 setScreen('editor');
@@ -1194,7 +1206,7 @@ export const SoftwareProjectBuilder: React.FC<{
 
     const handleDeleteProject = async (projectId: string, skipConfirm = false) => {
         if (!currentUser?.uid) return;
-        if (!skipConfirm && !window.confirm("هل أنت متأكد؟ سيتم نقل المشروع إلى سلة المحذوفات.")) return;
+        if (!skipConfirm && !window.confirm("هل أنت متأكد؟ سيتم نقل المشروع إلى سلة المهملات.")) return;
 
         try {
             // Find project metadata
@@ -2295,7 +2307,15 @@ export const SoftwareProjectBuilder: React.FC<{
                         )}
                         {sidebarTab === 'files' && (
                             <div className="flex flex-col h-full bg-slate-900/30 p-2 space-y-1 overflow-y-auto custom-scrollbar">
-                                {projectFiles.map(file => (
+                                {[...projectFiles].sort((a, b) => {
+                                    const trinity = ['index.html', 'style.css', 'script.js'];
+                                    const aIdx = trinity.indexOf(a.name);
+                                    const bIdx = trinity.indexOf(b.name);
+                                    if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+                                    if (aIdx !== -1) return -1;
+                                    if (bIdx !== -1) return 1;
+                                    return a.name.localeCompare(b.name);
+                                }).map(file => (
                                     <button 
                                         key={file.name} 
                                         onClick={() => setActiveFile(file.name)} 
@@ -2307,6 +2327,20 @@ export const SoftwareProjectBuilder: React.FC<{
                                         {activeFile === file.name && <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
                                     </button>
                                 ))}
+
+                                {projectFiles.length < 3 && (
+                                    <div className="mt-6 px-2 py-4 border-t border-slate-800/50">
+                                        <p className="text-[10px] text-slate-500 mb-2 text-center">يبدو أن ملفات البرمجة الأساسية مفقودة</p>
+                                        <button 
+                                            onClick={handleRepairProject}
+                                            disabled={isGenerating}
+                                            className="w-full flex items-center justify-center gap-2 py-2 pr-3 bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 rounded-xl text-[10px] font-bold hover:bg-indigo-500 hover:text-white transition-all disabled:opacity-50"
+                                        >
+                                            {isGenerating ? <SpinnerIcon className="w-3 h-3 animate-spin" /> : <ArrowPathIcon className="w-3 h-3" />}
+                                            إنشاء ملفات HTML/CSS/JS المفقودة
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         )}
                         {sidebarTab === 'snapshots' && (
@@ -2346,10 +2380,13 @@ export const SoftwareProjectBuilder: React.FC<{
                             <span className="text-[10px] bg-indigo-500/10 text-indigo-400 px-2 py-0.5 rounded-full border border-indigo-500/20">{activeFile}</span>
                         </div>
                         <textarea 
-                            readOnly 
-                            value={projectFiles.find(f => f.name === activeFile)?.content || ''}
-                            className="flex-grow bg-slate-950 p-6 font-mono text-[13px] leading-relaxed resize-none focus:outline-none text-slate-300 custom-scrollbar"
+                            className="flex-grow bg-slate-950 p-6 font-mono text-[13px] leading-relaxed resize-none focus:outline-none text-slate-300 custom-scrollbar selection:bg-indigo-500/30"
                             spellCheck="false"
+                            value={projectFiles.find(f => f.name === activeFile)?.content || ''}
+                            onChange={(e) => {
+                                const newContent = e.target.value;
+                                setProjectFiles(prev => prev.map(f => f.name === activeFile ? { ...f, content: newContent } : f));
+                            }}
                         />
                     </div>
                     

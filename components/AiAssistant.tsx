@@ -57,11 +57,11 @@ const AiAssistant: React.FC<AiAssistantProps> = ({ navigate, context }) => {
             [Feature.TRANSCRIBE_AUDIO]: <AudioTranscriber />,
             [Feature.TEXT_TO_SPEECH]: <TextToSpeech />,
             [Feature.LIVE_CONVERSATION]: <LiveConversation />,
-            [Feature.AI_CHAT]: <ChatInterface feature={Feature.AI_CHAT} model="gemini-2.5-flash" title="محادثة عامة" {...chatProps} />,
+            [Feature.AI_CHAT]: <ChatInterface feature={Feature.AI_CHAT} model="gemini-flash-latest" title="محادثة عامة" {...chatProps} />,
             [Feature.FAST_CHAT]: <ChatInterface feature={Feature.FAST_CHAT} model="gemini-flash-lite-latest" title="محادثة سريعة" {...chatProps} />,
-            [Feature.THINKING_MODE_CHAT]: <ChatInterface feature={Feature.THINKING_MODE_CHAT} model="gemini-2.5-pro" title="محادثة متعمقة" systemInstruction="You are a helpful expert assistant. Think carefully and provide comprehensive answers." config={{ thinkingConfig: { thinkingBudget: 32768 } }} {...chatProps} />,
-            [Feature.WEB_SEARCH]: <ChatInterface feature={Feature.WEB_SEARCH} model="gemini-2.5-flash" title="بحث معزز" config={{ tools: [{googleSearch: {}}] }} {...chatProps} />,
-            [Feature.MAPS_SEARCH]: <ChatInterface feature={Feature.MAPS_SEARCH} model="gemini-2.5-flash" title="بحث خرائط" config={{ tools: [{googleMaps: {}}] }} {...chatProps} />,
+            [Feature.THINKING_MODE_CHAT]: <ChatInterface feature={Feature.THINKING_MODE_CHAT} model="gemini-flash-latest" title="محادثة متعمقة" systemInstruction="You are a helpful expert assistant. Think carefully and provide comprehensive answers." config={{ thinkingConfig: { thinkingBudget: 32768 } }} {...chatProps} />,
+            [Feature.WEB_SEARCH]: <ChatInterface feature={Feature.WEB_SEARCH} model="gemini-flash-latest" title="بحث معزز" config={{ tools: [{googleSearch: {}}] }} {...chatProps} />,
+            [Feature.MAPS_SEARCH]: <ChatInterface feature={Feature.MAPS_SEARCH} model="gemini-flash-latest" title="بحث خرائط" config={{ tools: [{googleMaps: {}}] }} {...chatProps} />,
         };
 
         const specificUI = featureUI[activeFeature];

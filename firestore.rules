@@ -119,6 +119,10 @@ service cloud.firestore {
         allow read: if isProjectOwner(projectId);
         allow write: if isProjectOwner(projectId) && isValidMessage(incoming());
       }
+
+      match /snapshots/{snapshotId} {
+        allow read, write: if isProjectOwner(projectId);
+      }
     }
   }
 }

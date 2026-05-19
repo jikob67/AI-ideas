@@ -22,7 +22,7 @@ export class GeminiService {
         return base64.split(',')[1] || base64;
     }
 
-    private async callGenerate(model: string, contents: any, config?: any, retries: number = 2) {
+    private async callGenerate(model: string, contents: any, config?: any, retries: number = 3) {
         try {
             const response = await fetch('/api/gemini/generate', {
                 method: 'POST',
@@ -31,21 +31,66 @@ export class GeminiService {
             });
 
             if (!response.ok) {
-                const err = await response.json();
-                if (response.status === 429 && retries > 0) {
-                    console.warn(`Rate limit hit for ${model}, retrying... (${retries} left)`);
-                    await delay(2000 * (3 - retries)); // Exponential backoff
+                let errorMsg = 'Failed to generate content';
+                const contentType = response.headers.get('content-type');
+                
+                if (contentType && contentType.includes('application/json')) {
+                    try {
+                        const err = await response.json();
+                        errorMsg = err.error || errorMsg;
+                    } catch (e) {
+                        errorMsg = response.statusText || errorMsg;
+                    }
+                } else {
+                    errorMsg = await response.text();
+                    // If it's HTML, just use a generic message with the status
+                    if (errorMsg.trim().startsWith('<!DOCTYPE') || errorMsg.trim().startsWith('<html')) {
+                        errorMsg = `API Error ${response.status}: ${response.statusText}`;
+                    }
+                }
+
+                // Handle 429 (Rate Limit) and 503 (Service Unavailable/High Demand)
+                if ((response.status === 429 || response.status === 503) && retries > 0) {
+                    console.warn(`Gemini API ${response.status} for ${model}, retrying... (${retries} left)`);
+                    await delay(3000 * (4 - retries)); // Exponential backoff
                     return this.callGenerate(model, contents, config, retries - 1);
                 }
-                throw new Error(err.error || 'Failed to generate content');
+                throw new Error(errorMsg);
             }
             return await response.json();
         } catch (error: any) {
-            if (error.message?.includes('429') && retries > 0) {
-                await delay(2000 * (3 - retries));
+            if ((error.message?.includes('429') || error.message?.includes('503')) && retries > 0) {
+                await delay(3000 * (4 - retries));
                 return this.callGenerate(model, contents, config, retries - 1);
             }
             throw error;
+        }
+    }
+
+    private parseAIJson(text: string): any {
+        if (!text) throw new Error("Empty response from AI");
+        
+        // Clean text from possible markdown block markers
+        const cleanText = text.trim().replace(/^```json\n?/, '').replace(/\n?```$/, '').trim();
+        
+        try {
+            return JSON.parse(cleanText);
+        } catch (e) {
+            // Attempt to extract the first JSON object found in the text
+            const firstBrace = cleanText.indexOf('{');
+            const lastBrace = cleanText.lastIndexOf('}');
+            
+            if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+                const jsonCandidate = cleanText.substring(firstBrace, lastBrace + 1);
+                try {
+                    return JSON.parse(jsonCandidate);
+                } catch (innerE) {
+                    console.error("Nested JSON parse failed:", innerE);
+                }
+            }
+            
+            console.error("Original JSON parse failed. Raw text:", text.slice(0, 500));
+            throw new Error(`Invalid JSON format: ${cleanText.slice(0, 50)}...`);
         }
     }
 
@@ -298,7 +343,7 @@ export class GeminiService {
                 responseSchema,
             });
             const jsonText = result.response.candidates[0].content.parts[0].text;
-            return JSON.parse(jsonText);
+            return this.parseAIJson(jsonText);
         } catch (e) {
             console.error('[GeminiService] Error in analyzeAndCategorizeUI:', e);
             throw new Error('فشل الذكاء الاصطناعي في تحليل الواجهة.');
@@ -514,7 +559,7 @@ export class GeminiService {
             });
 
             const jsonText = result.response.candidates[0].content.parts[0].text;
-            const parsed = JSON.parse(jsonText);
+            const parsed = this.parseAIJson(jsonText);
             
             const designSection: ProjectSection = { 
                 id: `sec-${Date.now()}-design`, 
@@ -600,14 +645,14 @@ export class GeminiService {
         };
 
         try {
-            const result = await this.callGenerate('gemini-3.1-pro-preview', [{ role: 'user', parts }], {
+            const result = await this.callGenerate('gemini-flash-latest', [{ role: 'user', parts }], {
                 systemInstruction,
                 responseMimeType: 'application/json',
                 responseSchema
             });
 
             const jsonText = result.response.candidates[0].content.parts[0].text;
-            const parsed = JSON.parse(jsonText) as { aiResponse: string, files: { name: string, content: string }[] };
+            const parsed = this.parseAIJson(jsonText) as { aiResponse: string, files: { name: string, content: string }[] };
             
             const updatedProject = { ...project } as any;
             const updatedFiles = [...(project as any).files];
@@ -617,8 +662,14 @@ export class GeminiService {
                 if (fileIndex !== -1) {
                     updatedFiles[fileIndex] = { ...updatedFiles[fileIndex], content: updatedFile.content };
                 } else {
-                     // This case is less likely if the AI is instructed to only modify existing files
-                    console.warn(`AI returned a new file '${updatedFile.name}', which is not handled in this flow.`);
+                    // Properly handle new files returned by AI
+                    updatedFiles.push({
+                        name: updatedFile.name,
+                        content: updatedFile.content,
+                        language: updatedFile.name.endsWith('.html') ? 'html' : 
+                                  updatedFile.name.endsWith('.css') ? 'css' : 
+                                  updatedFile.name.endsWith('.js') ? 'javascript' : 'text'
+                    } as any);
                 }
             }
             
@@ -717,14 +768,14 @@ export class GeminiService {
         
         try {
             onLog("Generating code with Gemini Pro...");
-            const result = await this.callGenerate('gemini-3.1-pro-preview', [{ role: 'user', parts: contentParts }], {
+            const result = await this.callGenerate('gemini-flash-latest', [{ role: 'user', parts: contentParts }], {
                 systemInstruction,
                 responseMimeType: 'application/json',
                 responseSchema,
             });
 
             const jsonText = result.response.candidates[0].content.parts[0].text;
-            const parsed = JSON.parse(jsonText) as { files: ProjectFile[] };
+            const parsed = this.parseAIJson(jsonText) as { files: ProjectFile[] };
 
             // Ensure Trinity of files exists
             const requiredFiles = [
@@ -842,14 +893,14 @@ export class GeminiService {
     
         try {
             onLog("Connecting to Gemini Pro...");
-            const result = await this.callGenerate('gemini-3.1-pro-preview', [{ role: 'user', parts }], {
+            const result = await this.callGenerate('gemini-flash-latest', [{ role: 'user', parts }], {
                 systemInstruction,
                 responseMimeType: 'application/json',
                 responseSchema
             });
 
             const jsonText = result.response.candidates[0].content.parts[0].text;
-            const parsed = JSON.parse(jsonText) as { files: ProjectFile[] };
+            const parsed = this.parseAIJson(jsonText) as { files: ProjectFile[] };
             onLog("Conversion complete!");
             return parsed.files;
         } catch(e) {
@@ -904,7 +955,7 @@ export class GeminiService {
                 responseSchema,
             });
             const jsonText = result.response.candidates[0].content.parts[0].text;
-            return JSON.parse(jsonText);
+            return this.parseAIJson(jsonText);
         } catch (e) {
             console.error('[GeminiService] Error in analyzeUrlForMarketing:', e);
             throw new Error('Failed to analyze URL with AI.');
@@ -1021,7 +1072,7 @@ export class GeminiService {
                 responseSchema
             });
             const jsonText = result.response.candidates[0].content.parts[0].text;
-            return JSON.parse(jsonText);
+            return this.parseAIJson(jsonText);
         } catch (e) {
             console.error("Error in generateProfessionalTemplate:", e);
             throw new Error("Failed to generate template from AI.");
@@ -1062,7 +1113,7 @@ export class GeminiService {
                 responseSchema,
             });
             const jsonText = result.response.candidates[0].content.parts[0].text;
-            return JSON.parse(jsonText);
+            return this.parseAIJson(jsonText);
         } catch(e) {
             console.error("AI theme suggestion failed, falling back to default.", e);
             return { 
@@ -1143,7 +1194,7 @@ export class GeminiService {
                 responseSchema,
             });
             const jsonText = result.response.candidates[0].content.parts[0].text;
-            const parsed = JSON.parse(jsonText) as { ideas: { name: string; description: string; type: ProjectType; suggestedFeatures: string[] }[] };
+            const parsed = this.parseAIJson(jsonText) as { ideas: { name: string; description: string; type: ProjectType; suggestedFeatures: string[] }[] };
             return parsed.ideas;
         } catch (e) {
             console.error("AI idea generation failed.", e);
@@ -1182,7 +1233,7 @@ export class GeminiService {
                 responseSchema,
             });
             const jsonText = result.response.candidates[0].content.parts[0].text;
-            return JSON.parse(jsonText);
+            return this.parseAIJson(jsonText);
         } catch (e) {
             console.error("AI idea refinement failed.", e);
             throw new Error("Failed to refine project idea.");
@@ -1219,7 +1270,7 @@ export class GeminiService {
                 responseSchema,
             });
             const jsonText = result.response.candidates[0].content.parts[0].text;
-            const parsed = JSON.parse(jsonText) as { features: string[] };
+            const parsed = this.parseAIJson(jsonText) as { features: string[] };
             return parsed.features;
         } catch (e) {
             console.error("AI feature suggestion failed.", e);
@@ -1256,7 +1307,7 @@ export class GeminiService {
                 responseSchema
             });
             const jsonText = result.response.candidates[0].content.parts[0].text;
-            return JSON.parse(jsonText);
+            return this.parseAIJson(jsonText);
         } catch (e) {
             console.error("Error in analyzeApiEndpoints:", e);
             // Fallback or throw error
@@ -1299,7 +1350,7 @@ export class GeminiService {
                 responseSchema
             });
             const jsonText = result.response.candidates[0].content.parts[0].text;
-            return JSON.parse(jsonText);
+            return this.parseAIJson(jsonText);
         } catch (e) {
             console.error("Error in generateComponentTree:", e);
             return { name: 'Error', type: 'Error', children: [] };
@@ -1345,7 +1396,7 @@ export class GeminiService {
                 responseSchema,
             });
             const jsonText = result.response.candidates[0].content.parts[0].text;
-            return JSON.parse(jsonText);
+            return this.parseAIJson(jsonText);
         } catch (e) {
             console.error("Error in getMonetizationStrategy:", e);
             throw new Error("فشل الذكاء الاصطناعي في اقتراح استراتيجيات الربح.");

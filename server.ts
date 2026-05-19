@@ -74,7 +74,11 @@ async function startServer() {
       res.json({ response });
     } catch (error: any) {
       console.error("Gemini Generate Error:", error.message);
-      const status = error.status || (error.message?.includes('429') ? 429 : 500);
+      let status = error.status || 500;
+      if (!error.status) {
+        if (error.message?.includes('429')) status = 429;
+        else if (error.message?.includes('503')) status = 503;
+      }
       res.status(status).json({ error: error.message });
     }
   });

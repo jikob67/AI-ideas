@@ -357,12 +357,6 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, op
           />
           <NavHeader label="ذكاء اصطناعي ومحتوى" />
           <NavButton
-            label="صياغة الطلب"
-            icon={<SparklesIcon className="w-6 h-6 text-indigo-400" />}
-            isActive={activeView === 'promptRefiner'}
-            onClick={() => setActiveView('promptRefiner')}
-          />
-          <NavButton
             label="مساعد AI الشامل"
             icon={<ChatBubbleLeftRightIcon className="w-6 h-6 text-purple-400" />}
             isActive={activeView === 'aiAssistant'}
@@ -393,7 +387,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, op
             onClick={() => setActiveView('live')}
           />
 
-          <NavHeader label="إدارة ومعرض" />
+          <NavHeader label="الإطلاق والتحويل" />
           <NavButton
             label="معرض المجتمع"
             icon={<TrophyIcon className="w-6 h-6 text-yellow-500" />}
@@ -401,16 +395,24 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, op
             onClick={() => setActiveView('showroom')}
           />
           <NavButton
-            label="الأكاديمية التعليمية"
-            icon={<AcademicCapIcon className="w-6 h-6 text-indigo-400" />}
-            isActive={activeView === 'guide'}
-            onClick={() => setActiveView('guide')}
-          />
-          <NavButton
             label="المعاينة والتحقق"
             icon={<ShieldCheckIcon className="w-6 h-6 text-emerald-500" />}
             isActive={activeView === 'preview'}
             onClick={() => setActiveView('preview')}
+          />
+          <NavButton
+            label="نقل الطلب وتطوير الفكرة"
+            icon={<SparklesIcon className="w-6 h-6 text-indigo-400" />}
+            isActive={activeView === 'promptRefiner'}
+            onClick={() => setActiveView('promptRefiner')}
+          />
+
+          <NavHeader label="إدارة وتحليل" />
+          <NavButton
+            label="الأكاديمية التعليمية"
+            icon={<AcademicCapIcon className="w-6 h-6 text-indigo-400" />}
+            isActive={activeView === 'guide'}
+            onClick={() => setActiveView('guide')}
           />
           <NavButton
             label="تحليل البيانات"

@@ -62,15 +62,6 @@ const App: React.FC = () => {
       }
   }, [currentUser]);
 
-  React.useEffect(() => {
-    // This effect now only clears the context after a short delay
-    // The SoftwareProjectBuilder will handle consuming it on its own first render.
-    if (navigationContext) {
-      const timer = setTimeout(() => setNavigationContext(null), 500);
-      return () => clearTimeout(timer);
-    }
-  }, [navigationContext, activeView]);
-
   // Effect to handle redirection for specific project types, moved here to fix conditional hook call.
   React.useEffect(() => {
     if (activeView === 'editApp') {

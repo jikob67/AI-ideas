@@ -38,7 +38,7 @@ export const PromptRefiner: React.FC<PromptRefinerProps> = ({ navigate }) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'gemini-3-flash-preview',
+          model: 'gemini-flash-latest',
           contents: [{
             role: 'user',
             parts: [{
