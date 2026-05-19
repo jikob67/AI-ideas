@@ -26,9 +26,20 @@ class StorageService {
 
     // Compatibility methods for existing code
     async saveBlob(id: string, blob: Blob): Promise<string> {
-        const storageRef = ref(storage, `blobs/${id}`);
-        const snapshot = await uploadBytes(storageRef, blob);
-        return getDownloadURL(snapshot.ref);
+        try {
+            const storageRef = ref(storage, `blobs/${id}`);
+            const snapshot = await uploadBytes(storageRef, blob);
+            return await getDownloadURL(snapshot.ref);
+        } catch (error: any) {
+            console.error('[StorageService] Save blob error:', error);
+            if (error.code === 'storage/retry-limit-exceeded') {
+                throw new Error('فشل الاتصال بخدمة التخزين. يرجى التأكد من استقرار الإنترنت وحاول مرة أخرى.');
+            }
+            if (error.code === 'storage/unauthorized') {
+                throw new Error('ليس لديك صلاحية لرفع الملفات. يرجى تسجيل الدخول.');
+            }
+            throw new Error(`فشل رفع الملف: ${error.message || error.code}`);
+        }
     }
 
     async getBlob(id: string): Promise<Blob | null> {

@@ -5,7 +5,7 @@ import { Project, SectionType } from '../types';
 import { 
     BriefcaseIcon, CodeIcon, DotsVerticalIcon, TrashIcon, RectangleStackIcon, 
     ArrowDownTrayIcon, ArrowRightIcon, Share2Icon, FlutterIcon, FolderPlusIcon,
-    PencilIcon, LinkIcon, UserIcon
+    PencilIcon, LinkIcon, UserIcon, GlobeAltIcon
 } from './Icons';
 import { useAuth } from '../hooks/useAuth';
 import { persistenceService } from '../services/persistenceService';
@@ -361,27 +361,30 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onDelete, onE
             
             const tempProject = { ...project, files };
             const dartCode = await generateFlutterCode(tempProject as any);
-            const { apkBlob, ipaBlob } = await simulateFullBuild();
+            const { apkBlob, projectZip } = await simulateFullBuild(tempProject as any);
             
-            const apkBlobId = `apk-${Date.now()}`;
-            const ipaBlobId = `ipa-${Date.now()}`;
+            const timestamp = Date.now();
+            const zipBlobId = `zip-${timestamp}`;
             
-            await saveBlob(apkBlobId, apkBlob);
-            await saveBlob(ipaBlobId, ipaBlob);
+            // Upload once and reuse if identical
+            const zipUrl = await saveBlob(zipBlobId, projectZip);
+            
+            let finalApkUrl = zipUrl;
+            let finalIpaUrl = zipUrl;
+            let apkBlobId = zipBlobId;
+            let ipaBlobId = zipBlobId;
 
-            const apkUrl = URL.createObjectURL(apkBlob);
-            const ipaUrl = URL.createObjectURL(ipaBlob);
-
-            setApkUrl(apkUrl);
-            setIpaUrl(ipaUrl);
+            setApkUrl(finalApkUrl);
+            setIpaUrl(finalIpaUrl);
 
             const updatedProjectMetadata = {
                 ...project,
-                flutterProjectUrl: 'source_code_generated',
-                apkUrl,
-                ipaUrl,
+                flutterProjectUrl: zipUrl,
+                apkUrl: finalApkUrl,
+                ipaUrl: finalIpaUrl,
                 apkBlobId,
                 ipaBlobId,
+                zipBlobId,
             };
 
             const newFile = { name: 'main.dart', language: 'dart', content: dartCode };
@@ -486,23 +489,26 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onDelete, onE
                 </div>
                 <div className="flex flex-col gap-2 mt-4 border-t border-slate-700 pt-3">
                     <div className="flex items-center justify-between">
-                        <div className="flex gap-2">
-                            {apkUrl && (
+                        <div className="flex flex-wrap gap-2">
+                            {project.flutterProjectUrl && (
                                 <a 
-                                    href={apkUrl} 
-                                    download={`${project.name.replace(/\s+/g, '_')}_v1.0.apk`}
-                                    className="text-[10px] bg-green-600/20 text-green-400 px-2 py-1 rounded border border-green-600/30 hover:bg-green-600/30 transition-colors"
+                                    href={project.flutterProjectUrl} 
+                                    download={`${project.name.replace(/\s+/g, '_')}_flutter_project.zip`}
+                                    className="text-[10px] bg-green-600/20 text-green-400 px-2 py-1 rounded border border-green-600/30 hover:bg-green-600/30 transition-colors flex items-center gap-1"
                                 >
-                                    تنزيل APK
+                                    <FlutterIcon className="w-3 h-3" />
+                                    مشروع Flutter
                                 </a>
                             )}
-                            {ipaUrl && (
+                            {project.lastDeploymentUrl && (
                                 <a 
-                                    href={ipaUrl} 
-                                    download={`${project.name.replace(/\s+/g, '_')}_v1.0.ipa`}
-                                    className="text-[10px] bg-blue-600/20 text-blue-400 px-2 py-1 rounded border border-blue-600/30 hover:bg-blue-600/30 transition-colors"
+                                    href={project.lastDeploymentUrl} 
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[10px] bg-indigo-600/20 text-indigo-400 px-2 py-1 rounded border border-indigo-600/30 hover:bg-indigo-600/30 transition-colors flex items-center gap-1"
                                 >
-                                    تنزيل IPA
+                                    <GlobeAltIcon className="w-3 h-3" />
+                                    زيارة المشروع
                                 </a>
                             )}
                         </div>

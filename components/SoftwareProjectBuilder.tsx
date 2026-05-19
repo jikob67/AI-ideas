@@ -203,7 +203,7 @@ export const SoftwareProjectBuilder: React.FC<{
 
     // Shared UI State
     const [activeFile, setActiveFile] = useState<string>('index.html');
-    const [sidebarTab, setSidebarTab] = useState<'files' | 'chat' | 'snapshots' | 'roadmap'>('chat');
+    const [sidebarTab, setSidebarTab] = useState<'files' | 'chat' | 'snapshots' | 'roadmap' | 'build'>('chat');
     const [device, setDevice] = useState<'desktop' | 'mobile'>('desktop');
     const [isBuildModalOpen, setIsBuildModalOpen] = useState(false);
     const [isBuildInstructionsModalOpen, setIsBuildInstructionsModalOpen] = useState(false);
@@ -2238,6 +2238,7 @@ export const SoftwareProjectBuilder: React.FC<{
                         <button onClick={() => setSidebarTab('chat')} className={`flex-1 py-3 text-[11px] font-bold transition-all ${sidebarTab === 'chat' ? 'text-indigo-400 bg-indigo-500/5 border-b-2 border-indigo-500' : 'text-slate-500 hover:text-slate-300'}`}>الدردشة</button>
                         <button onClick={() => setSidebarTab('files')} className={`flex-1 py-3 text-[11px] font-bold transition-all ${sidebarTab === 'files' ? 'text-indigo-400 bg-indigo-500/5 border-b-2 border-indigo-500' : 'text-slate-500 hover:text-slate-300'}`}>الملفات</button>
                         <button onClick={() => setSidebarTab('snapshots')} className={`flex-1 py-3 text-[11px] font-bold transition-all ${sidebarTab === 'snapshots' ? 'text-indigo-400 bg-indigo-500/5 border-b-2 border-indigo-500' : 'text-slate-500 hover:text-slate-300'}`}>النسخ</button>
+                        <button onClick={() => setSidebarTab('build')} className={`flex-1 py-3 text-[11px] font-bold transition-all ${sidebarTab === 'build' ? 'text-indigo-400 bg-indigo-500/5 border-b-2 border-indigo-500' : 'text-slate-500 hover:text-slate-300'}`}>بناء</button>
                         <button onClick={() => setSidebarTab('roadmap')} className={`flex-1 py-3 text-[11px] font-bold transition-all ${sidebarTab === 'roadmap' ? 'text-indigo-400 bg-indigo-500/5 border-b-2 border-indigo-500' : 'text-slate-500 hover:text-slate-300'}`}>الخطة</button>
                     </div>
                     
@@ -2368,6 +2369,100 @@ export const SoftwareProjectBuilder: React.FC<{
                                         <p className="text-xs text-white group-hover:text-amber-400 transition-colors truncate">{snap.name}</p>
                                     </button>
                                 ))}
+                            </div>
+                        )}
+                        {sidebarTab === 'build' && (
+                            <div className="flex flex-col h-full bg-slate-900/30 p-4 space-y-6 overflow-y-auto custom-scrollbar">
+                                <div className="text-right">
+                                    <h4 className="text-white font-bold text-lg mb-1">مركز البناء والتصدير</h4>
+                                    <p className="text-slate-400 text-xs">قم بتحويل مشروعك إلى تطبيق حقيقي بضغطة زر واحدة.</p>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <div className="p-4 bg-slate-800/50 border border-slate-700 rounded-2xl space-y-4">
+                                        <div className="flex items-center gap-3 justify-end mb-2">
+                                            <div className="text-right">
+                                                <h5 className="text-white font-bold text-sm">تطبيق الويب (Live)</h5>
+                                                <p className="text-[10px] text-slate-500">نشر مباشر برابط https://</p>
+                                            </div>
+                                            <div className="p-2 bg-indigo-500/10 rounded-lg text-indigo-400">
+                                                <GlobeAltIcon className="w-5 h-5" />
+                                            </div>
+                                        </div>
+                                        <button 
+                                            onClick={() => handleOpenBuildModal('web')}
+                                            className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2"
+                                        >
+                                            <RocketLaunchIcon className="w-4 h-4" />
+                                            نشر المشروع وطلب الرابط
+                                        </button>
+                                    </div>
+
+                                    <div className="p-4 bg-slate-800/50 border border-slate-700 rounded-2xl space-y-4">
+                                        <div className="flex items-center gap-3 justify-end mb-2">
+                                            <div className="text-right">
+                                                <h5 className="text-white font-bold text-sm">تطبيقات الهاتف (Native)</h5>
+                                                <p className="text-[10px] text-slate-500">توليد ملفات APK و IPA</p>
+                                            </div>
+                                            <div className="p-2 bg-purple-500/10 rounded-lg text-purple-400">
+                                                <DevicePhoneMobileIcon className="w-5 h-5" />
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-1 gap-2">
+                                            <button 
+                                                onClick={() => handleOpenBuildModal('android')}
+                                                className="w-full py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-xs font-bold transition-all border border-slate-600 flex items-center justify-center gap-2"
+                                            >
+                                                <div className="w-4 h-4 rounded-full bg-green-500/20 flex items-center justify-center"><CheckIcon className="w-3 h-3 text-green-400" /></div>
+                                                إنشاء ملف Android (APK)
+                                            </button>
+                                            <button 
+                                                onClick={() => handleOpenBuildModal('ios')}
+                                                className="w-full py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-xs font-bold transition-all border border-slate-600 flex items-center justify-center gap-2"
+                                            >
+                                                <div className="w-4 h-4 rounded-full bg-blue-500/20 flex items-center justify-center"><CheckIcon className="w-3 h-3 text-blue-400" /></div>
+                                                إنشاء ملف iOS (IPA)
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="p-4 bg-slate-800/50 border border-slate-700 rounded-2xl space-y-4">
+                                        <div className="flex items-center gap-3 justify-end mb-2">
+                                            <div className="text-right">
+                                                <h5 className="text-white font-bold text-sm">المصدر المفتوح (ZIP)</h5>
+                                                <p className="text-[10px] text-slate-500">تجميع كافة الملفات</p>
+                                            </div>
+                                            <div className="p-2 bg-emerald-500/10 rounded-lg text-emerald-400">
+                                                <ArrowDownTrayIcon className="w-5 h-5" />
+                                            </div>
+                                        </div>
+                                        <button 
+                                            onClick={async () => {
+                                                const zip = new (window as any).JSZip();
+                                                projectFiles.forEach(f => zip.file(f.name, f.content));
+                                                const content = await zip.generateAsync({ type: 'blob' });
+                                                const url = URL.createObjectURL(content);
+                                                const a = document.createElement('a');
+                                                a.href = url;
+                                                a.download = `${project?.name || 'project'}.zip`;
+                                                document.body.appendChild(a);
+                                                a.click();
+                                                document.body.removeChild(a);
+                                                URL.revokeObjectURL(url);
+                                            }}
+                                            className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2"
+                                        >
+                                            <ArrowDownTrayIcon className="w-4 h-4" />
+                                            تنزيل المشروع (ZIP)
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl">
+                                    <p className="text-[10px] text-amber-200 text-right leading-relaxed font-sans">
+                                        <strong>ملاحظة:</strong> يتم تجميع ملفات HTML و CSS و JavaScript تلقائياً لتعمل كأداة متكاملة فور التحميل أو النشر.
+                                    </p>
+                                </div>
                             </div>
                         )}
                     </div>

@@ -309,7 +309,7 @@ const FileConverter: React.FC<{ navigate: (view: View, context?: any) => void; c
                 let isSimulated = false;
                 if (!foundApk && !foundIpa) {
                     onLog("لم يتم العثور على تطبيقات جاهزة. بدء عملية بناء محاكاة...");
-                    const buildResult = await simulateFullBuild();
+                    const buildResult = await simulateFullBuild({ name: extractedProjectName, files: inputFiles });
                     foundApk = buildResult.apkBlob;
                     foundIpa = buildResult.ipaBlob;
                     apkName = `${extractedProjectName}_v1.0.apk`;
@@ -318,11 +318,28 @@ const FileConverter: React.FC<{ navigate: (view: View, context?: any) => void; c
                     onLog("تم إنشاء تطبيقات تجريبية بنجاح.");
                 }
 
-                const apkBlobId = foundApk ? `apk-${Date.now()}` : undefined;
-                const ipaBlobId = foundIpa ? `ipa-${Date.now()}` : undefined;
+                let apkBlobId: string | undefined;
+                let ipaBlobId: string | undefined;
+                let foundApkUrl: string | undefined;
+                let foundIpaUrl: string | undefined;
 
-                if (foundApk && apkBlobId) await saveBlob(apkBlobId, foundApk);
-                if (foundIpa && ipaBlobId) await saveBlob(ipaBlobId, foundIpa);
+                if (foundApk && foundIpa && foundApk === foundIpa) {
+                    const blobId = `app-${Date.now()}`;
+                    const url = await saveBlob(blobId, foundApk);
+                    apkBlobId = blobId;
+                    ipaBlobId = blobId;
+                    foundApkUrl = url;
+                    foundIpaUrl = url;
+                } else {
+                    if (foundApk) {
+                        apkBlobId = `apk-${Date.now()}`;
+                        foundApkUrl = await saveBlob(apkBlobId, foundApk);
+                    }
+                    if (foundIpa) {
+                        ipaBlobId = `ipa-${Date.now()}`;
+                        foundIpaUrl = await saveBlob(ipaBlobId, foundIpa);
+                    }
+                }
 
                 const newProject: any = {
                     id: `proj-app-${Date.now()}`,
@@ -336,8 +353,8 @@ const FileConverter: React.FC<{ navigate: (view: View, context?: any) => void; c
                     ownerEmail: currentUser?.email,
                     apkBlobId,
                     ipaBlobId,
-                    apkUrl: foundApk ? URL.createObjectURL(foundApk) : undefined,
-                    ipaUrl: foundIpa ? URL.createObjectURL(foundIpa) : undefined,
+                    apkUrl: foundApkUrl,
+                    ipaUrl: foundIpaUrl,
                 };
 
                 if (currentUser?.email) {

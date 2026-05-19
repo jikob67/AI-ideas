@@ -52,7 +52,7 @@ export const AssetStudio: React.FC<{ context?: any }> = ({ context }) => {
 
       // For code types, we use generateText, for visuals we use generateImage
       if (['icon', 'pattern'].includes(selectedType)) {
-        const base64 = await geminiService.generateImage(fullPrompt, 'ai_asset');
+        const base64 = await geminiService.generateImage(fullPrompt, '1:1');
         setResult(`data:image/png;base64,${base64}`);
       } else {
         const code = await geminiService.generateText(`${fullPrompt}. Return ONLY the HTML/Tailwind/CSS code in a code block.`);
