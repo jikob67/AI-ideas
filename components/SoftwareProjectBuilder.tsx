@@ -49,6 +49,7 @@ import {
   LoaderIcon,
   PaintBrushIcon,
   ChartPieIcon,
+  AcademicCapIcon,
   UploadIcon as UploadIcon_v2,
   AlignLeftIcon
 } from './Icons';
@@ -2094,8 +2095,21 @@ export const SoftwareProjectBuilder: React.FC<{
                             </button>
                          </div>
                     </header>
-                    <div className="flex-grow w-full overflow-y-auto pr-2 flex justify-center">
-                        {renderGeneratorInputs()}
+                    <div className="flex-grow w-full overflow-y-auto pr-2 flex flex-col items-center">
+                        <div className="w-full flex justify-center">
+                            {renderGeneratorInputs()}
+                        </div>
+                        
+                        <div className="mt-8 text-center bg-slate-900/40 border border-slate-800 rounded-2xl p-6 w-full max-w-3xl">
+                            <p className="text-slate-500 text-[13px] mb-4">هل تواجه صعوبة في وصف فكرتك؟ تعلم أسرار الهندسة الوصفية في أكاديميتنا.</p>
+                            <button 
+                                onClick={() => navigate('guide')}
+                                className="inline-flex items-center gap-2 text-indigo-400 hover:text-indigo-300 font-bold px-6 py-2 border border-indigo-500/30 rounded-xl hover:bg-indigo-500/10 transition-all text-sm"
+                            >
+                                <AcademicCapIcon className="w-4 h-4" />
+                                زيارة الأكاديمية التعليمية
+                            </button>
+                        </div>
                     </div>
                     {saveStatus && <p className="text-xs text-green-400 text-center mt-2 fixed bottom-4">{saveStatus}</p>}
                 </>

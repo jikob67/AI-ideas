@@ -10,11 +10,18 @@ const ChatInterface: React.FC<{
     model: string, 
     title: string, 
     systemInstruction?: string, 
-    config?: any 
-}> = ({ feature, model, title, systemInstruction, config }) => {
+    config?: any,
+    initialMessage?: string
+}> = ({ feature, model, title, systemInstruction, config, initialMessage }) => {
     const [messages, setMessages] = useState<Message[]>([
         { id: 'welcome-1', text: `تم اختيار مهمة: ${title}. كيف يمكنني مساعدتك؟`, sender: 'ai' }
     ]);
+
+    useEffect(() => {
+        if (initialMessage) {
+            setInput(initialMessage);
+        }
+    }, [initialMessage]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const { incrementUsage, isLimitReached } = useUsage();

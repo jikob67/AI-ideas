@@ -41,7 +41,7 @@ const SimpleBarChart: React.FC<{ data: { label: string, value: number }[] }> = (
 
 
 const DataAnalysis: React.FC<DataAnalysisProps> = ({ onComplete, navigate, context }) => {
-    const [data, setData] = useState(context?.project?.description || '');
+    const [data, setData] = useState(context?.project?.description || context?.prefillPrompt || '');
     const [query, setQuery] = useState(context?.project ? `قم بتحليل نموذج العمل لمشروع: ${context.project.name}` : '');
     const [result, setResult] = useState<AnalysisResult | null>(null);
     const [isLoading, setIsLoading] = useState(false);

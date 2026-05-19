@@ -18,18 +18,24 @@ import LiveConversation from './LiveConversation';
 // For now, we assume AiAssistant receives navigate as a prop from App.tsx
 interface AiAssistantProps {
     navigate: (view: any, context?: any) => void;
+    context?: any;
 }
 
 
-const AiAssistant: React.FC<AiAssistantProps> = ({ navigate }) => {
-    const [activeFeature, setActiveFeature] = useState<Feature | null>(null);
+const AiAssistant: React.FC<AiAssistantProps> = ({ navigate, context }) => {
+    const [templateText, setTemplateText] = useState<string | null>(null);
+    const [activeFeature, setActiveFeature] = useState<Feature | null>(
+        context?.targetFeature || (context?.prefillPrompt ? Feature.AI_CHAT : null)
+    );
 
-    const handleFeatureSelect = (feature: Feature) => {
+    const handleFeatureSelect = (feature: Feature, initialText?: string) => {
+        if (initialText) setTemplateText(initialText);
         setActiveFeature(feature);
     };
 
     const handleBackToMenu = () => {
         setActiveFeature(null);
+        setTemplateText(null);
     };
 
     const renderFeatureContent = () => {
@@ -37,21 +43,25 @@ const AiAssistant: React.FC<AiAssistantProps> = ({ navigate }) => {
              return <FeatureSelectionScreen onSelect={handleFeatureSelect} />;
         }
         
+        const chatProps = (context?.prefillPrompt || templateText) 
+            ? { initialMessage: context?.prefillPrompt || templateText } 
+            : {};
+
         const featureUI: { [key in Feature]?: React.ReactNode } = {
-            [Feature.GENERATE_VIDEO]: <VideoGenerator />,
+            [Feature.GENERATE_VIDEO]: <VideoGenerator initialPrompt={context?.prefillPrompt || templateText} />,
             [Feature.GENERATE_IMAGE]: <ImageGenerator />,
             [Feature.EDIT_IMAGE]: <ImageEditor />,
             [Feature.ANALYZE_IMAGE]: <ImageAnalyzer />,
             [Feature.ANALYZE_VIDEO]: <VideoAnalyzer />,
-            [Feature.DATA_ANALYSIS]: <DataAnalysis navigate={navigate}/>,
+            [Feature.DATA_ANALYSIS]: <DataAnalysis navigate={navigate} context={context}/>,
             [Feature.TRANSCRIBE_AUDIO]: <AudioTranscriber />,
             [Feature.TEXT_TO_SPEECH]: <TextToSpeech />,
             [Feature.LIVE_CONVERSATION]: <LiveConversation />,
-            [Feature.AI_CHAT]: <ChatInterface feature={Feature.AI_CHAT} model="gemini-2.5-flash" title="محادثة عامة" />,
-            [Feature.FAST_CHAT]: <ChatInterface feature={Feature.FAST_CHAT} model="gemini-flash-lite-latest" title="محادثة سريعة" />,
-            [Feature.THINKING_MODE_CHAT]: <ChatInterface feature={Feature.THINKING_MODE_CHAT} model="gemini-2.5-pro" title="محادثة متعمقة" systemInstruction="You are a helpful expert assistant. Think carefully and provide comprehensive answers." config={{ thinkingConfig: { thinkingBudget: 32768 } }} />,
-            [Feature.WEB_SEARCH]: <ChatInterface feature={Feature.WEB_SEARCH} model="gemini-2.5-flash" title="بحث معزز" config={{ tools: [{googleSearch: {}}] }} />,
-            [Feature.MAPS_SEARCH]: <ChatInterface feature={Feature.MAPS_SEARCH} model="gemini-2.5-flash" title="بحث خرائط" config={{ tools: [{googleMaps: {}}] }} />,
+            [Feature.AI_CHAT]: <ChatInterface feature={Feature.AI_CHAT} model="gemini-2.5-flash" title="محادثة عامة" {...chatProps} />,
+            [Feature.FAST_CHAT]: <ChatInterface feature={Feature.FAST_CHAT} model="gemini-flash-lite-latest" title="محادثة سريعة" {...chatProps} />,
+            [Feature.THINKING_MODE_CHAT]: <ChatInterface feature={Feature.THINKING_MODE_CHAT} model="gemini-2.5-pro" title="محادثة متعمقة" systemInstruction="You are a helpful expert assistant. Think carefully and provide comprehensive answers." config={{ thinkingConfig: { thinkingBudget: 32768 } }} {...chatProps} />,
+            [Feature.WEB_SEARCH]: <ChatInterface feature={Feature.WEB_SEARCH} model="gemini-2.5-flash" title="بحث معزز" config={{ tools: [{googleSearch: {}}] }} {...chatProps} />,
+            [Feature.MAPS_SEARCH]: <ChatInterface feature={Feature.MAPS_SEARCH} model="gemini-2.5-flash" title="بحث خرائط" config={{ tools: [{googleMaps: {}}] }} {...chatProps} />,
         };
 
         const specificUI = featureUI[activeFeature];
@@ -82,8 +92,8 @@ const AiAssistant: React.FC<AiAssistantProps> = ({ navigate }) => {
 };
 
 // A wrapper component to satisfy App.tsx which doesn't pass navigate
-const AiAssistantWrapper: React.FC<{navigate: (view: any, context?: any) => void;}> = ({navigate}) => {
-    return <AiAssistant navigate={navigate} />;
+const AiAssistantWrapper: React.FC<{navigate: (view: any, context?: any) => void; context?: any;}> = ({navigate, context}) => {
+    return <AiAssistant navigate={navigate} context={context} />;
 };
 
 

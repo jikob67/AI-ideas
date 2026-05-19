@@ -2,26 +2,26 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { 
   FireIcon, 
-  SparklesIcon as EyeIcon, 
+  EyeIcon, 
   HeartIcon, 
-  Share2Icon as ShareIcon,
-  PlusIcon as PlusCircleIcon,
+  ShareIcon,
+  PlusIcon,
   RocketLaunchIcon,
   TrophyIcon,
   ChatBubbleLeftRightIcon,
   AppleIcon,
   AndroidIcon,
-  LinkExternalIcon
+  LinkExternalIcon,
+  HeartSolidIcon,
+  SparklesIcon,
+  MagnifyingGlassIcon,
+  ArrowLeftIcon,
+  XMarkIcon,
+  SpinnerIcon
 } from './Icons';
-const HeartSolidIcon: React.FC<React.SVGProps<SVGSVGElement>> = props => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
-    <path d="M11.645 20.91l-.007-.003-.003-.001a11.478 11.478 0 01-1.055-.514c-1.15-.61-2.617-1.572-3.957-2.912a9.124 9.124 0 01-2.623-6.48c0-2.484 2.1-4.5 4.5-4.5 1.54 0 2.87.584 3.75 1.48.88-.896 2.21-1.48 3.75-1.48 2.4 0 4.5 2.016 4.5 4.5 0 2.488-1.5 4.53-2.623 6.48-1.34 1.34-2.807 2.302-3.957 2.912-.34.18-.84.444-1.055.514l-.003.001-.007.003-.037.017-.037-.017z" />
-  </svg>
-);
 
 import { collection, query, getDocs, limit, orderBy, where, updateDoc, doc, increment } from 'firebase/firestore';
 import { db, auth } from '../firebase';
-import { SpinnerIcon, XMarkIcon, ArrowLeftIcon } from './Icons';
 import { ProjectType } from '../types';
 
 interface GalleryProject {
@@ -42,6 +42,8 @@ export const Showroom: React.FC<{ navigate: (view: any, context?: any) => void; 
   const [projects, setProjects] = useState<GalleryProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('الجميع');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<'newest' | 'likes' | 'views'>('newest');
   const [liked, setLiked] = useState<string[]>([]);
   useEffect(() => {
     const savedLiked = [];
@@ -76,8 +78,8 @@ export const Showroom: React.FC<{ navigate: (view: any, context?: any) => void; 
       let q = query(
         collection(db, 'projects'),
         where('isPublished', '==', true),
-        orderBy('publishedAt', 'desc'),
-        limit(24)
+        orderBy(sortBy === 'newest' ? 'publishedAt' : sortBy, 'desc'),
+        limit(48)
       );
 
       // Map filter names to categories if stored in DB, or filter client-side.
@@ -97,16 +99,10 @@ export const Showroom: React.FC<{ navigate: (view: any, context?: any) => void; 
   };
 
   const filteredProjects = projects.filter(p => {
-    if (filter === 'الجميع') return true;
-    const typeMap: Record<string, ProjectType> = {
-      'تطبيقات ويب': ProjectType.WEB_APP,
-      'متاجر': ProjectType.STORE,
-      'ألعاب': ProjectType.GAME,
-      'واجهات UI': ProjectType.UI_ANALYSIS, // Using UI_ANALYSIS as UI category
-      'بورتفوليو': ProjectType.WEBSITE
-    };
-    // Special handling for the enum values which are Arabic strings
-    return p.type === typeMap[filter] || (p as any).category === filter;
+    const matchesFilter = filter === 'الجميع' || p.type === filter || (p as any).category === filter;
+    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          p.description?.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesFilter && matchesSearch;
   });
 
   const fetchUserProjects = async () => {
@@ -326,37 +322,69 @@ export const Showroom: React.FC<{ navigate: (view: any, context?: any) => void; 
       )}
 
       {/* Main Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-12 animate-fade-in">
         <div>
           <h1 className="text-4xl font-black text-white flex items-center gap-3">
             <TrophyIcon className="w-10 h-10 text-yellow-400" />
-            معرض المجتمع (Showroom)
+            معرض المبدعين
           </h1>
-          <p className="text-slate-400 mt-2 text-lg italic">استلهم، تعلم، وشارك إبداعاتك البرمجية مع العالم</p>
+          <p className="text-slate-400 mt-2 text-lg">استكشف وساهم في مشاريع تم بناؤها بالذكاء الاصطناعي</p>
         </div>
-        <button 
-          onClick={handleOpenPublish}
-          className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold py-3 px-8 rounded-2xl shadow-lg shadow-indigo-500/20 flex items-center gap-3 transition-all transform hover:scale-105 active:scale-95 leading-none"
-        >
-          <PlusCircleIcon className="w-6 h-6" />
-          نشر مشروعي هنا
-        </button>
+        <div className="flex flex-col sm:flex-row gap-4">
+            <button 
+                onClick={handleOpenPublish}
+                className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3.5 px-8 rounded-2xl shadow-xl shadow-indigo-900/40 flex items-center justify-center gap-3 transition-all hover:scale-105 active:scale-95 leading-none"
+            >
+                <PlusIcon className="w-6 h-6" />
+                انشر مشروعك
+            </button>
+        </div>
       </div>
 
-      <div className="flex items-center gap-3 mb-8 overflow-x-auto pb-2 scrollbar-none">
-        {['الجميع', 'تطبيقات ويب', 'متاجر', 'ألعاب', 'واجهات UI', 'بورتفوليو'].map(cat => (
-          <button
-            key={cat}
-            onClick={() => setFilter(cat)}
-            className={`px-6 py-2.5 rounded-full text-sm font-bold whitespace-nowrap transition-all ${
-              filter === cat 
-                ? 'bg-white text-indigo-900 shadow-xl' 
+      {/* Control Bar */}
+      <div className="flex flex-col lg:flex-row gap-4 items-center justify-between bg-slate-900/40 p-4 rounded-3xl border border-slate-800 mb-8">
+        <div className="relative w-full lg:w-96 group">
+          <MagnifyingGlassIcon className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
+          <input 
+            type="text" 
+            placeholder="ابحث عن مشاريع ملهمة..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-slate-800/50 border border-slate-700/50 text-white rounded-xl py-2.5 pr-12 pl-4 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all font-sans"
+          />
+        </div>
+
+        <div className="flex items-center gap-2 overflow-x-auto w-full lg:w-auto pb-2 lg:pb-0 scrollbar-hide">
+          {['الجميع', 'تطبيقات ويب', 'متاجر', 'ألعاب', 'واجهات UI', 'بورتفوليو'].map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setFilter(cat)}
+              className={`px-5 py-2.5 rounded-xl text-sm font-bold flex-shrink-0 transition-all ${
+                filter === cat 
+                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/40' 
                 : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-            }`}
-          >
-            {cat}
-          </button>
-        ))}
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-2 bg-slate-800/50 p-1.5 rounded-xl w-full lg:w-auto justify-center">
+            {[
+                { id: 'newest', label: 'الأحدث' },
+                { id: 'likes', label: 'الأكثر إعجاباً' },
+                { id: 'views', label: 'الأكثر مشاهدة' }
+            ].map(s => (
+                <button
+                    key={s.id}
+                    onClick={() => setSortBy(s.id as any)}
+                    className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${sortBy === s.id ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}
+                >
+                    {s.label}
+                </button>
+            ))}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 flex-1 overflow-y-auto pr-2 custom-scrollbar">
@@ -377,114 +405,76 @@ export const Showroom: React.FC<{ navigate: (view: any, context?: any) => void; 
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: idx * 0.05 }}
-            className="group bg-slate-900/50 rounded-3xl overflow-hidden border border-slate-800 hover:border-indigo-500/30 transition-all hover:shadow-2xl hover:shadow-indigo-500/10"
+            className="group bg-slate-900/60 rounded-[2rem] overflow-hidden border border-slate-800 hover:border-indigo-500/40 transition-all hover:shadow-2xl hover:shadow-indigo-500/10 flex flex-col h-[420px]"
             onClick={() => handleViewProject(project)}
           >
-            <div className="relative aspect-video overflow-hidden bg-slate-800 flex items-center justify-center">
+            <div className="relative h-48 overflow-hidden bg-slate-800">
               {project.iconUrl ? (
                 <img 
-                  src={project.iconUrl} 
-                  alt={project.name}
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                  referrerPolicy="no-referrer"
+                   src={project.iconUrl} 
+                   alt={project.name}
+                   className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                   referrerPolicy="no-referrer"
                 />
               ) : (
-                <div className="text-4xl transition-transform group-hover:scale-125 duration-300">🚀</div>
+                <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-800 to-slate-900">
+                  <RocketLaunchIcon className="w-12 h-12 text-slate-700 mb-2 opacity-50" />
+                  <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">No Preview</span>
+                </div>
               )}
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-60" />
-              <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between">
-                <span className="bg-indigo-600/90 backdrop-blur-md px-3 py-1 rounded-lg text-[10px] font-bold text-white uppercase tracking-wider">
-                  {project.type || 'مشروع'}
-                </span>
+              
+              <div className="absolute top-4 left-4 flex gap-2">
+                 <div className="bg-slate-950/80 backdrop-blur-md text-indigo-400 text-[10px] font-black px-2.5 py-1 rounded-lg border border-indigo-500/20 shadow-xl flex items-center gap-1.5 uppercase tracking-tighter">
+                    <SparklesIcon className="w-3 h-3" />
+                    AI Build
+                 </div>
+              </div>
+              
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-80" />
+              
+              <div className="absolute bottom-4 right-4 bg-indigo-600 text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-lg">
+                {project.type || 'عام'}
               </div>
             </div>
             
-            <div className="p-5">
-              <h3 className="text-white font-bold truncate mb-1 text-lg">{project.name}</h3>
-              <p className="text-slate-500 text-xs flex items-center gap-1.5 mb-4 italic truncate">
-                {project.description || 'لا يوجد وصف متاح لهذا المشروع.'}
+            <div className="p-6 flex flex-col flex-1">
+              <h3 className="text-white font-bold text-xl mb-2 group-hover:text-indigo-400 transition-colors line-clamp-1">{project.name}</h3>
+              <p className="text-slate-400 text-xs leading-relaxed line-clamp-3 mb-6 flex-1">
+                {project.description || 'هذا المشروع تم إنشاؤه ووصفه بدقة عالية باستخدام تقنيات الذكاء الاصطناعي المتقدمة لتوفير حلول مبتكرة.'}
               </p>
               
-              <div className="flex flex-col gap-3 mb-4">
-                 <button 
-                  onClick={(e) => { e.stopPropagation(); handleViewProject(project); }}
-                  className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2"
-                 >
-                    فتح المشروع
-                    <ArrowLeftIcon className="w-4 h-4" />
-                 </button>
-
-                 <div className="grid grid-cols-3 gap-2">
-                    <button 
-                      onClick={(e) => { 
-                        e.stopPropagation(); 
-                        handleDownload(project.apkUrl, 'APK');
-                      }}
-                      className={`flex flex-col items-center justify-center py-2 rounded-xl border transition-all ${project.apkUrl ? 'bg-slate-800 border-slate-700 text-green-400 hover:bg-slate-750' : 'bg-slate-900 border-slate-800 text-slate-600 cursor-not-allowed opacity-50'}`}
-                    >
-                      <AndroidIcon className="w-4 h-4 mb-1" />
-                      <span className="text-[10px] font-bold">APK</span>
-                    </button>
-                    
-                    <button 
-                      onClick={(e) => { 
-                        e.stopPropagation(); 
-                        handleDownload(project.ipaUrl, 'IPA');
-                      }}
-                      className={`flex flex-col items-center justify-center py-2 rounded-xl border transition-all ${project.ipaUrl ? 'bg-slate-800 border-slate-700 text-blue-400 hover:bg-slate-750' : 'bg-slate-900 border-slate-800 text-slate-600 cursor-not-allowed opacity-50'}`}
-                    >
-                      <AppleIcon className="w-4 h-4 mb-1" />
-                      <span className="text-[10px] font-bold">IPA</span>
-                    </button>
-
-                    <button 
-                      onClick={(e) => { 
-                        e.stopPropagation(); 
-                        if (project.liveUrl && (project.liveUrl.startsWith('http://') || project.liveUrl.startsWith('https://'))) {
-                          window.open(project.liveUrl, '_blank');
-                        }
-                        else if ((project as any).publicShareId) window.open(`/shared/${(project as any).publicShareId}`, '_blank');
-                        else alert('لا يوجد رابط معاينة حية حالياً لهذا المشروع.'); 
-                      }}
-                      className={`flex flex-col items-center justify-center py-2 rounded-xl border transition-all ${project.liveUrl || (project as any).publicShareId ? 'bg-slate-800 border-slate-700 text-purple-400 hover:bg-slate-750' : 'bg-slate-900 border-slate-800 text-slate-600 cursor-not-allowed opacity-50'}`}
-                    >
-                      <LinkExternalIcon className="w-4 h-4 mb-1" />
-                      <span className="text-[10px] font-bold">HTTPS</span>
-                    </button>
-                 </div>
-              </div>
-
-              <div className="flex items-center justify-between border-t border-slate-800 pt-4">
+              <div className="flex items-center justify-between pt-4 border-t border-slate-800/80">
                 <div className="flex items-center gap-4">
                   <button 
                     onClick={(e) => { e.stopPropagation(); toggleLike(project); }}
-                    className="flex items-center gap-1.5 transition-colors group/like"
+                    className={`flex items-center gap-1.5 transition-all ${liked.includes(project.id) ? 'text-pink-500 font-bold scale-110' : 'text-slate-500 hover:text-pink-400'}`}
                   >
-                    {liked.includes(project.id) ? (
-                      <HeartSolidIcon className="w-5 h-5 text-red-500" />
-                    ) : (
-                      <HeartIcon className="w-5 h-5 text-slate-500 group-hover/like:text-red-400" />
-                    )}
-                    <span className={`text-xs font-bold ${liked.includes(project.id) ? 'text-red-400' : 'text-slate-500'}`}>
-                      {project.likes || 0}
-                    </span>
+                    {liked.includes(project.id) ? <HeartSolidIcon className="w-5 h-5" /> : <HeartIcon className="w-5 h-5" />}
+                    <span className="text-sm">{project.likes || 0}</span>
                   </button>
-                  <div className="flex items-center gap-1.5 text-slate-500 group-hover:text-indigo-400 transition-colors">
+                  <div className="flex items-center gap-1.5 text-slate-500">
                     <EyeIcon className="w-5 h-5" />
-                    <span className="text-xs font-bold">{project.views || 0}</span>
+                    <span className="text-sm">{project.views || 0}</span>
                   </div>
                 </div>
+                
                 <div className="flex items-center gap-2">
+                   <button 
+                      onClick={(e) => { e.stopPropagation(); handleViewProject(project); }}
+                      className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-lg shadow-indigo-900/40"
+                   >
+                     معاينة
+                   </button>
                    <button 
                     onClick={(e) => { 
                       e.stopPropagation(); 
                       const shareUrl = `${window.location.origin}/shared/${(project as any).publicShareId || project.id}`;
                       navigator.clipboard.writeText(shareUrl);
-                      alert('تم نسخ رابط المشاركة إلى الحافظة!'); 
+                      alert('تم نسخ الرابط!'); 
                     }}
-                    className="p-2 transition-all hover:bg-slate-800 rounded-lg text-slate-500 hover:text-indigo-400"
+                    className="p-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-slate-400 hover:text-indigo-400 transition-all border border-slate-700"
                    >
-                      <ShareIcon className="w-5 h-5" />
+                      <ShareIcon className="w-4 h-4" />
                    </button>
                 </div>
               </div>

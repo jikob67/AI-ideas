@@ -30,6 +30,7 @@ import FileConverter from './components/FileConverter';
 import { SeoOptimizer } from './components/SeoOptimizer';
 import { Showroom } from './components/Showroom';
 import { AssetStudio } from './components/AssetStudio';
+import { PromptRefiner } from './components/PromptRefiner';
 import FlowDemo from './components/FlowDemo';
 import { useAuth } from './hooks/useAuth';
 import LandingPage from './components/LandingPage';
@@ -39,6 +40,7 @@ import { SpinnerIcon, ArrowLeftIcon } from './components/Icons';
 import OnboardingModal from './components/OnboardingModal';
 
 import { ProjectPreview } from './components/ProjectPreview';
+import { GuideBoard } from './components/GuideBoard';
 
 type GenerationMode = 'idea' | 'text' | 'screen' | 'recognizer' | 'draw' | 'wizard' | 'url';
 
@@ -181,7 +183,7 @@ const App: React.FC = () => {
                />;
       }
       case 'aiAssistant':
-        return <AiAssistant navigate={navigate} />;
+        return <AiAssistant navigate={navigate} context={navigationContext} />;
       case 'projectBooster':
         return <ProjectBooster navigate={navigate} />;
       case 'profile':
@@ -240,14 +242,18 @@ const App: React.FC = () => {
         return <AssetStudio context={navigationContext} />;
       case 'preview':
         return <ProjectPreview navigate={navigate} context={navigationContext} />;
+      case 'guide':
+        return <GuideBoard />;
       case 'flowDemo':
         return <FlowDemo />;
+      case 'promptRefiner':
+        return <PromptRefiner navigate={navigate} />;
       default:
         return <SoftwareProjectBuilder navigate={navigate} mode="idea" context={navigationContext} />;
     }
   };
 
-  const fullScreenViews: View[] = ['editApp', 'aiAssistant', 'support', 'ideaToCode', 'textToCode', 'screenToCode', 'uiRecognizer', 'drawToCode', 'dataAnalysis', 'aiContentDetector', 'changelog', 'live', 'fileConverter', 'privacy', 'terms', 'projectWizard', 'linkWizard', 'urlToCode', 'seoOptimizer', 'showroom', 'assetStudio', 'preview', 'flowDemo'];
+  const fullScreenViews: View[] = ['editApp', 'aiAssistant', 'support', 'ideaToCode', 'textToCode', 'screenToCode', 'uiRecognizer', 'drawToCode', 'dataAnalysis', 'aiContentDetector', 'changelog', 'live', 'fileConverter', 'privacy', 'terms', 'projectWizard', 'linkWizard', 'urlToCode', 'seoOptimizer', 'showroom', 'assetStudio', 'preview', 'guide', 'flowDemo', 'promptRefiner'];
   const isFullScreen = fullScreenViews.includes(activeView);
 
   return (

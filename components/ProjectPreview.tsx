@@ -7,7 +7,12 @@ import {
   Share2Icon,
   CodeIcon,
   RocketLaunchIcon,
-  ArrowDownTrayIcon
+  ArrowDownTrayIcon,
+  SparklesIcon,
+  MegaphoneIcon,
+  PaintBrushIcon,
+  CheckCircleIcon,
+  CheckIcon
 } from './Icons';
 import { motion } from 'motion/react';
 
@@ -19,7 +24,7 @@ interface ProjectPreviewProps {
 export const ProjectPreview: React.FC<ProjectPreviewProps> = ({ navigate, context }) => {
   const [device, setDevice] = React.useState<'desktop' | 'mobile'>('desktop');
   const project = context?.project as Project;
-  const projectFiles = context?.projectFiles as ProjectFile[] || project?.files || [];
+  const projectFiles = (context?.projectFiles as ProjectFile[]) || [];
 
   const srcDoc = useMemo(() => {
     if (!projectFiles || projectFiles.length === 0) {
@@ -93,7 +98,7 @@ export const ProjectPreview: React.FC<ProjectPreviewProps> = ({ navigate, contex
           </button>
           <div>
             <h1 className="text-lg font-bold text-white flex items-center gap-2">
-               {project.icon ? <span className="text-xl">{project.icon}</span> : <RocketLaunchIcon className="w-5 h-5 text-indigo-400" />}
+               {project.iconUrl ? <img src={project.iconUrl} className="w-5 h-5" alt="" /> : <RocketLaunchIcon className="w-5 h-5 text-indigo-400" />}
                {project.name}
             </h1>
             <p className="text-xs text-slate-500 font-medium">قسم المعاينة والتحقق</p>
@@ -137,26 +142,73 @@ export const ProjectPreview: React.FC<ProjectPreviewProps> = ({ navigate, contex
       </div>
 
       {/* Preview Area */}
-      <div className="flex-1 bg-slate-900/20 p-6 flex items-center justify-center overflow-auto">
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.98 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className={`bg-white rounded-2xl shadow-2xl overflow-hidden transition-all duration-500 relative ${
-            device === 'mobile' ? 'w-[375px] h-[667px] ring-8 ring-slate-800' : 'w-full h-full'
-          }`}
-        >
-          {device === 'mobile' && (
-            <div className="absolute top-0 inset-x-0 h-6 bg-slate-800 flex justify-center items-center">
-              <div className="w-16 h-1 bg-slate-700 rounded-full"></div>
+      <div className="flex-1 bg-slate-900/20 p-6 flex flex-col md:flex-row gap-6 overflow-hidden">
+        <div className="flex-1 flex items-center justify-center overflow-auto">
+            <motion.div 
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className={`bg-white rounded-2xl shadow-2xl overflow-hidden transition-all duration-500 relative ${
+                device === 'mobile' ? 'w-[375px] h-[667px] ring-8 ring-slate-800' : 'w-full h-full'
+            }`}
+            >
+            {device === 'mobile' && (
+                <div className="absolute top-0 inset-x-0 h-6 bg-slate-800 flex justify-center items-center">
+                <div className="w-16 h-1 bg-slate-700 rounded-full"></div>
+                </div>
+            )}
+            <iframe 
+                srcDoc={srcDoc}
+                className={`w-full h-full border-none ${device === 'mobile' ? 'mt-6' : ''}`}
+                title="Project Preview"
+                sandbox="allow-scripts"
+            />
+            </motion.div>
+        </div>
+
+        {/* Right Sidebar - Checklist & Actions */}
+        <div className="w-full md:w-80 flex flex-col gap-6 flex-shrink-0 animate-fade-in">
+            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5">
+                <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+                    <CheckCircleIcon className="w-5 h-5 text-indigo-400" />
+                    خارطة طريق الإطلاق
+                </h3>
+                <div className="space-y-3">
+                    {[
+                        { text: 'معاينة التصميم وتجربة المستخدم', done: true },
+                        { text: 'توليد المحتوى التسويقي للمشروع', done: false, action: () => navigate('marketingHub', { project }) },
+                        { text: 'إنشاء الأيقونات والهوية البصرية', done: false, action: () => navigate('assetStudio', { project }) },
+                        { text: 'تحسين SEO لمحركات البحث', done: false, action: () => navigate('seoOptimizer', { project }) },
+                        { text: 'النشر في المعرض المجتمعي', done: false, action: () => navigate('showroom', { project }) },
+                    ].map((item, i) => (
+                        <div 
+                            key={i} 
+                            onClick={item.action}
+                            className={`p-3 rounded-xl border flex items-center gap-3 transition-all cursor-pointer ${
+                                item.done 
+                                ? 'bg-indigo-500/10 border-indigo-500/20' 
+                                : 'bg-slate-800/50 border-slate-700/50 hover:border-indigo-500/40 hover:bg-slate-800'
+                            }`}
+                        >
+                            <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${item.done ? 'bg-indigo-500 text-white' : 'border-2 border-slate-600'}`}>
+                                {item.done && <CheckIcon className="w-3 h-3" />}
+                            </div>
+                            <span className={`text-xs ${item.done ? 'text-slate-200 line-through opacity-70' : 'text-slate-400 hover:text-indigo-400'}`}>{item.text}</span>
+                        </div>
+                    ))}
+                </div>
             </div>
-          )}
-          <iframe 
-            srcDoc={srcDoc}
-            className={`w-full h-full border-none ${device === 'mobile' ? 'mt-6' : ''}`}
-            title="Project Preview"
-            sandbox="allow-scripts"
-          />
-        </motion.div>
+
+            <div className="bg-gradient-to-br from-indigo-600/20 to-purple-600/20 border border-indigo-500/20 rounded-2xl p-5">
+                <h4 className="text-white text-sm font-bold mb-2">هل تحتاج لميزات جديدة؟</h4>
+                <p className="text-[11px] text-indigo-200/60 leading-relaxed mb-4">يمكنك في أي وقت العودة للمحرر وطلب ميزات إضافية من المساعد الذكي.</p>
+                <button 
+                   onClick={() => navigate('editApp', { project })}
+                   className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition-all"
+                >
+                    متابعة التطوير عبر AI
+                </button>
+            </div>
+        </div>
       </div>
 
       {/* Footer Info */}
@@ -165,10 +217,31 @@ export const ProjectPreview: React.FC<ProjectPreviewProps> = ({ navigate, contex
           <span className="flex items-center gap-1"><CodeIcon className="w-3.5 h-3.5" /> {projectFiles.length} ملفات</span>
           <span className="flex items-center gap-1 uppercase tracking-tight font-bold text-indigo-400/70">{project.type}</span>
         </div>
-        <div className="flex items-center gap-2">
-           <button className="flex items-center gap-2 text-indigo-400 hover:text-indigo-300 text-sm font-bold">
+        <div className="flex items-center gap-4">
+           <button 
+              onClick={() => navigate('marketingHub', { project })}
+              className="flex items-center gap-2 text-rose-400 hover:text-rose-300 text-sm font-medium transition-colors"
+           >
+              <MegaphoneIcon className="w-4 h-4" />
+              ترويج تسويقي
+           </button>
+           <button 
+              onClick={() => navigate('assetStudio', { project })}
+              className="flex items-center gap-2 text-amber-400 hover:text-amber-300 text-sm font-medium transition-colors"
+           >
+              <PaintBrushIcon className="w-4 h-4" />
+              إنشاء أيقونات
+           </button>
+           <button className="flex items-center gap-2 text-slate-400 hover:text-white text-sm font-medium transition-colors">
               <ArrowDownTrayIcon className="w-4 h-4" />
               تصدير الكود
+           </button>
+           <button 
+              onClick={() => navigate('showroom', { project })}
+              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-1.5 rounded-lg text-sm font-bold shadow-lg shadow-indigo-900/40 transition-all transform hover:scale-105"
+           >
+              <RocketLaunchIcon className="w-4 h-4" />
+              نشر في معرض المجتمع
            </button>
         </div>
       </div>

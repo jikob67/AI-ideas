@@ -21,8 +21,8 @@ const GenerationProgress: React.FC<{ progressLogs: string[] }> = ({ progressLogs
     );
 };
 
-const VideoGenerator: React.FC = () => {
-    const [prompt, setPrompt] = useState('');
+const VideoGenerator: React.FC<{ initialPrompt?: string }> = ({ initialPrompt }) => {
+    const [prompt, setPrompt] = useState(initialPrompt || '');
     const [image, setImage] = useState<{file: File, url: string, base64: string} | null>(null);
     const [videoResolution, setVideoResolution] = useState<'720p' | '1080p'>('720p');
     const [videoAspectRatio, setVideoAspectRatio] = useState<'16:9' | '9:16'>('16:9');

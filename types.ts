@@ -43,6 +43,9 @@ export type View =
   | 'urlToCode'
   | 'seoOptimizer'
   | 'showroom'
+  | 'preview'
+  | 'guide'
+  | 'promptRefiner'
   | 'flowDemo'
   | 'assetStudio';
 

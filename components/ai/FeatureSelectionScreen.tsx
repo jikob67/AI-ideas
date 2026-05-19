@@ -22,11 +22,11 @@ const features = [
     { name: Feature.FAST_CHAT, icon: ChatBubbleLeftRightIcon, color: 'text-green-400', desc: 'محادثة سريعة لإجابات فورية.' },
 ];
 
-const FeatureSelectionScreen: React.FC<{onSelect: (feature: Feature) => void}> = ({onSelect}) => {
+const FeatureSelectionScreen: React.FC<{onSelect: (feature: Feature, initialText?: string) => void}> = ({onSelect}) => {
     return (
-        <div className="flex flex-col items-center justify-center h-full p-4 md:p-8 text-center animate-fade-in overflow-y-auto">
-            <h1 className="text-3xl md:text-4xl font-bold text-white">المساعد الذكي الشامل</h1>
-            <p className="text-slate-400 mt-2">ماذا تريد أن تنجز اليوم؟</p>
+        <div className="flex flex-col items-center h-full p-4 md:p-8 text-center animate-fade-in overflow-y-auto custom-scrollbar">
+            <h1 className="text-3xl md:text-5xl font-black text-white bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-500">المساعد الذكي الشامل</h1>
+            <p className="text-slate-400 mt-2 text-lg">ماذا تريد أن تنجز اليوم؟ اختر أداتك الذكية</p>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-8 w-full max-w-5xl">
                 {features.map(feature => {
                     const Icon = feature.icon;
@@ -34,14 +34,41 @@ const FeatureSelectionScreen: React.FC<{onSelect: (feature: Feature) => void}> =
                         <button 
                             key={feature.name} 
                             onClick={() => onSelect(feature.name)} 
-                            className="p-4 bg-slate-800/50 border border-slate-700 rounded-xl hover:bg-slate-700/50 hover:border-indigo-500 transition-all text-center group"
+                            className="p-5 bg-slate-900/40 border border-slate-800 rounded-3xl hover:bg-indigo-600/10 hover:border-indigo-500/50 transition-all text-center group relative overflow-hidden"
                         >
-                            <Icon className={`w-10 h-10 mx-auto mb-3 transition-colors ${feature.color}`} />
-                            <p className="font-semibold text-white text-sm">{feature.name}</p>
-                             <p className="text-xs text-slate-400 mt-1">{feature.desc}</p>
+                            <div className="absolute top-0 right-0 w-16 h-16 bg-indigo-500/5 blur-[40px] group-hover:bg-indigo-500/10 transition-all" />
+                            <Icon className={`w-12 h-12 mx-auto mb-3 transition-transform group-hover:scale-110 duration-300 ${feature.color}`} />
+                            <p className="font-bold text-white text-sm">{feature.name}</p>
+                             <p className="text-[10px] text-slate-500 mt-1 leading-tight">{feature.desc}</p>
                         </button>
                     )
                 })}
+            </div>
+
+            <div className="mt-16 w-full max-w-5xl text-right pb-12">
+                <h3 className="text-xl font-black text-white mb-6 flex items-center gap-3 justify-end">
+                    أفكار سريعة للبدء
+                    <span className="w-8 h-[2px] bg-indigo-500/30" />
+                    <SparklesIcon className="w-5 h-5 text-indigo-400" />
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {[
+                        "اشرح لي مفهوم الـ API وكيفية استخدامه في React",
+                        "ساعدني في كتابة الكود البرمجي لساعة رقمية تفاعلية",
+                        "حلل لي أداء كود جافا سكريبت التالي بحثاً عن الأخطاء",
+                        "كيف يمكنني تحويل تطبيقي من الويب إلى تطبيق موبايل؟",
+                        "اقترح لي 5 أفكار لمشاريع ناشئة تعتمد على الذكاء الاصطناعي",
+                        "صمم لي هيكل قاعدة بيانات لمتجر إلكتروني متكامل"
+                    ].map((prompt, i) => (
+                        <button 
+                            key={i}
+                            onClick={() => onSelect(Feature.AI_CHAT, prompt)} 
+                            className="p-4 bg-slate-900/60 border border-slate-800 rounded-2xl text-slate-300 text-xs font-bold hover:bg-indigo-600 hover:text-white hover:border-indigo-500 transition-all text-right shadow-lg shadow-black/20"
+                        >
+                            {prompt}
+                        </button>
+                    ))}
+                </div>
             </div>
         </div>
     );
