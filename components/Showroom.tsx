@@ -217,14 +217,8 @@ export const Showroom: React.FC<{ navigate: (view: any, context?: any) => void; 
     }
     
     // Determine the view based on project type
-    // If it's a standard app built via the main builder:
-    if (project.type === ProjectType.WEB_APP || project.type === ProjectType.STORE || project.type === ProjectType.GAME) {
-      navigate('editApp', { project }); 
-    } else if (project.type === ProjectType.UI_ANALYSIS) {
-      navigate('uiRecognizer', { project });
-    } else {
-      navigate('editApp', { project });
-    }
+    // New requirement: Redirect all showroom "Open Project" clicks to the Preview section
+    navigate('preview', { project });
   };
 
   const handleDownload = (url: string | undefined, type: string) => {

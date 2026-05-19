@@ -2168,6 +2168,13 @@ export const SoftwareProjectBuilder: React.FC<{
                     <button onClick={() => handleOpenBuildModal('web')} title="تحميل المشروع" className="p-2 rounded-full hover:bg-slate-700">
                         <ArrowDownTrayIcon className="w-5 h-5"/>
                     </button>
+                    <button 
+                         onClick={() => navigate('preview', { project, projectFiles })} 
+                         className="px-3 py-1.5 bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white border border-emerald-500/30 rounded-lg text-xs font-bold transition-all flex items-center gap-2"
+                    >
+                        <SparklesIcon className="w-4 h-4" />
+                        نقل للمعاينة
+                    </button>
                     <button onClick={() => setIsBuildInstructionsModalOpen(true)} title="تعليمات البناء" className="p-2 rounded-full hover:bg-slate-700 text-indigo-400 hover:text-indigo-300">
                         <InformationCircleIcon className="w-5 h-5"/>
                     </button>

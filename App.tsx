@@ -38,7 +38,9 @@ import AppealPage from './components/AppealPage';
 import { SpinnerIcon, ArrowLeftIcon } from './components/Icons';
 import OnboardingModal from './components/OnboardingModal';
 
-type GenerationMode = 'idea' | 'text' | 'screen' | 'recognizer';
+import { ProjectPreview } from './components/ProjectPreview';
+
+type GenerationMode = 'idea' | 'text' | 'screen' | 'recognizer' | 'draw' | 'wizard' | 'url';
 
 const App: React.FC = () => {
   const { currentUser, loading, updateUser } = useAuth();
@@ -236,6 +238,8 @@ const App: React.FC = () => {
         return <Showroom navigate={navigate} context={navigationContext} />;
       case 'assetStudio':
         return <AssetStudio context={navigationContext} />;
+      case 'preview':
+        return <ProjectPreview navigate={navigate} context={navigationContext} />;
       case 'flowDemo':
         return <FlowDemo />;
       default:
@@ -243,7 +247,7 @@ const App: React.FC = () => {
     }
   };
 
-  const fullScreenViews: View[] = ['editApp', 'aiAssistant', 'support', 'ideaToCode', 'textToCode', 'screenToCode', 'uiRecognizer', 'drawToCode', 'dataAnalysis', 'aiContentDetector', 'changelog', 'live', 'fileConverter', 'privacy', 'terms', 'projectWizard', 'linkWizard', 'urlToCode', 'seoOptimizer', 'showroom', 'assetStudio', 'flowDemo'];
+  const fullScreenViews: View[] = ['editApp', 'aiAssistant', 'support', 'ideaToCode', 'textToCode', 'screenToCode', 'uiRecognizer', 'drawToCode', 'dataAnalysis', 'aiContentDetector', 'changelog', 'live', 'fileConverter', 'privacy', 'terms', 'projectWizard', 'linkWizard', 'urlToCode', 'seoOptimizer', 'showroom', 'assetStudio', 'preview', 'flowDemo'];
   const isFullScreen = fullScreenViews.includes(activeView);
 
   return (
