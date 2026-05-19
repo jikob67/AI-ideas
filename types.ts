@@ -43,6 +43,7 @@ export type View =
   | 'urlToCode'
   | 'seoOptimizer'
   | 'showroom'
+  | 'flowDemo'
   | 'assetStudio';
 
 export interface User {

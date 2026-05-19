@@ -30,6 +30,7 @@ import FileConverter from './components/FileConverter';
 import { SeoOptimizer } from './components/SeoOptimizer';
 import { Showroom } from './components/Showroom';
 import { AssetStudio } from './components/AssetStudio';
+import FlowDemo from './components/FlowDemo';
 import { useAuth } from './hooks/useAuth';
 import LandingPage from './components/LandingPage';
 import AppealPage from './components/AppealPage';
@@ -232,15 +233,17 @@ const App: React.FC = () => {
       case 'seoOptimizer':
         return <SeoOptimizer />;
       case 'showroom':
-        return <Showroom />;
+        return <Showroom navigate={navigate} />;
       case 'assetStudio':
         return <AssetStudio />;
+      case 'flowDemo':
+        return <FlowDemo />;
       default:
         return <SoftwareProjectBuilder navigate={navigate} mode="idea" context={navigationContext} />;
     }
   };
 
-  const fullScreenViews: View[] = ['editApp', 'aiAssistant', 'support', 'ideaToCode', 'textToCode', 'screenToCode', 'uiRecognizer', 'drawToCode', 'dataAnalysis', 'aiContentDetector', 'changelog', 'live', 'fileConverter', 'privacy', 'terms', 'projectWizard', 'linkWizard', 'urlToCode', 'seoOptimizer', 'showroom', 'assetStudio'];
+  const fullScreenViews: View[] = ['editApp', 'aiAssistant', 'support', 'ideaToCode', 'textToCode', 'screenToCode', 'uiRecognizer', 'drawToCode', 'dataAnalysis', 'aiContentDetector', 'changelog', 'live', 'fileConverter', 'privacy', 'terms', 'projectWizard', 'linkWizard', 'urlToCode', 'seoOptimizer', 'showroom', 'assetStudio', 'flowDemo'];
   const isFullScreen = fullScreenViews.includes(activeView);
 
   return (

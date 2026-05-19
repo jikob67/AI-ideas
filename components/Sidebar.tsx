@@ -348,6 +348,12 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, op
             onClick={() => setActiveView('uiRecognizer')}
           />
 
+          <NavButton
+            label="تجربة التدفق"
+            icon={<RocketLaunchIcon className="w-6 h-6 text-orange-500" />}
+            isActive={activeView === 'flowDemo'}
+            onClick={() => setActiveView('flowDemo')}
+          />
           <NavHeader label="ذكاء اصطناعي ومحتوى" />
           <NavButton
             label="مساعد AI الشامل"

@@ -22,17 +22,31 @@ export class GeminiService {
         return base64.split(',')[1] || base64;
     }
 
-    private async callGenerate(model: string, contents: any, config?: any) {
-        const response = await fetch('/api/gemini/generate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model, contents, config })
-        });
-        if (!response.ok) {
-            const err = await response.json();
-            throw new Error(err.error || 'Failed to generate content');
+    private async callGenerate(model: string, contents: any, config?: any, retries: number = 2) {
+        try {
+            const response = await fetch('/api/gemini/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ model, contents, config })
+            });
+
+            if (!response.ok) {
+                const err = await response.json();
+                if (response.status === 429 && retries > 0) {
+                    console.warn(`Rate limit hit for ${model}, retrying... (${retries} left)`);
+                    await delay(2000 * (3 - retries)); // Exponential backoff
+                    return this.callGenerate(model, contents, config, retries - 1);
+                }
+                throw new Error(err.error || 'Failed to generate content');
+            }
+            return await response.json();
+        } catch (error: any) {
+            if (error.message?.includes('429') && retries > 0) {
+                await delay(2000 * (3 - retries));
+                return this.callGenerate(model, contents, config, retries - 1);
+            }
+            throw error;
         }
-        return await response.json();
     }
 
     private async *callStream(model: string, contents: any, config?: any) {
@@ -67,12 +81,12 @@ export class GeminiService {
 
     // --- Core Generation Methods ---
 
-    async generateContent(prompt: string, model: string = 'gemini-flash-latest', config?: any): Promise<any> {
+    async generateContent(prompt: string, model: string = 'gemini-1.5-flash', config?: any): Promise<any> {
         const contents = [{ role: 'user', parts: [{ text: prompt }] }];
         return this.callGenerate(model, contents, config);
     }
 
-    async generateText(prompt: string, model: string = 'gemini-flash-latest', config?: any): Promise<string> {
+    async generateText(prompt: string, model: string = 'gemini-1.5-flash', config?: any): Promise<string> {
         const result = await this.generateContent(prompt, model, config);
         return result.response.candidates[0].content.parts[0].text;
     }
@@ -145,7 +159,7 @@ export class GeminiService {
             parts.push({ inlineData: { data: this.sanitizeBase64(image.base64), mimeType: image.mimeType } });
         });
 
-        return this.callGenerate('gemini-flash-latest', [{ role: 'user', parts }], {
+        return this.callGenerate('gemini-1.5-flash', [{ role: 'user', parts }], {
             systemInstruction,
             tools: [{ functionDeclarations: [escalateToEmailSupport] }],
         });
@@ -164,13 +178,13 @@ export class GeminiService {
 
      async refinePrompt(prompt: string): Promise<string> {
         const systemInstruction = `You are an expert prompt engineer. Rephrase the following user request to be clearer, more detailed, and better structured for a code generation AI. Do not change the core meaning or add new features. The response must be only the refined prompt text in Arabic, with no extra explanations.`;
-        return this.generateText(prompt, 'gemini-flash-latest', { systemInstruction });
+        return this.generateText(prompt, 'gemini-1.5-flash', { systemInstruction });
     }
 
     async generateProjectIcon(name: string, description: string): Promise<string> {
         const prompt = `Minimalist, modern, flat vector icon for a digital project. Project name: "${name}". Description: "${description}". The icon should be simple, clean, symbolic, and suitable for a mobile app or website favicon. No text. Centered on a plain, solid-color background.`;
         try {
-            const result = await this.callGenerate('gemini-2.5-flash-image', [{ role: 'user', parts: [{ text: prompt }] }], {
+            const result = await this.callGenerate('gemini-2.0-flash-exp', [{ role: 'user', parts: [{ text: prompt }] }], {
                 imageConfig: { aspectRatio: '1:1' },
                 responseModalities: ['image']
             });
@@ -188,12 +202,12 @@ export class GeminiService {
 
     async generateSupportResponse(query: string): Promise<string> {
         const systemInstruction = `You are a helpful and friendly customer support agent for a platform called "AI ideas". Your goal is to assist users with their questions about the platform. Be concise and clear. The platform helps users build web apps, mobile apps, and generate marketing content using AI.`;
-        return this.generateText(query, 'gemini-flash-latest', { systemInstruction });
+        return this.generateText(query, 'gemini-1.5-flash', { systemInstruction });
     }
 
     async generateImage(prompt: string, aspectRatio: string): Promise<string> {
         try {
-            const result = await this.callGenerate('gemini-2.5-flash-image', [{ role: 'user', parts: [{ text: prompt }] }], {
+            const result = await this.callGenerate('gemini-2.0-flash-exp', [{ role: 'user', parts: [{ text: prompt }] }], {
                 imageConfig: { aspectRatio: aspectRatio as any },
                 responseModalities: ['image']
             });
@@ -215,7 +229,7 @@ export class GeminiService {
     
     async editImageWithText(base64Data: string, prompt: string, mimeType: string = 'image/png'): Promise<string> {
         try {
-            const result = await this.callGenerate('gemini-2.5-flash-image', [{ 
+            const result = await this.callGenerate('gemini-2.0-flash-exp', [{ 
                 role: 'user', 
                 parts: [
                     { inlineData: { data: this.sanitizeBase64(base64Data), mimeType: mimeType } },
@@ -238,7 +252,7 @@ export class GeminiService {
 
     async analyzeImage(base64Data: string, mimeType: string, prompt: string): Promise<string> {
         try {
-            const result = await this.callGenerate('gemini-flash-latest', [{ 
+            const result = await this.callGenerate('gemini-1.5-flash', [{ 
                 role: 'user', 
                 parts: [
                     { inlineData: { data: this.sanitizeBase64(base64Data), mimeType: mimeType } },
@@ -275,7 +289,7 @@ export class GeminiService {
         };
 
         try {
-            const result = await this.callGenerate('gemini-flash-latest', [{ 
+            const result = await this.callGenerate('gemini-1.5-flash', [{ 
                 role: 'user', 
                 parts: [{ inlineData: { data: this.sanitizeBase64(base64Data), mimeType: mimeType } }] 
             }], {
@@ -306,7 +320,7 @@ export class GeminiService {
         }
         
         try {
-            const result = await this.callGenerate('gemini-2.5-flash-image', [{ role: 'user', parts }], {
+            const result = await this.callGenerate('gemini-2.0-flash-exp', [{ role: 'user', parts }], {
                 responseModalities: ['image']
             });
             const imagePart = result.response.candidates?.[0]?.content?.parts?.find((part: any) => part.inlineData);
@@ -329,7 +343,7 @@ export class GeminiService {
         ];
         
         try {
-            const result = await this.callGenerate('gemini-2.5-flash-image', [{ role: 'user', parts }], {
+            const result = await this.callGenerate('gemini-2.0-flash-exp', [{ role: 'user', parts }], {
                 responseModalities: ['image']
             });
             const imagePart = result.response.candidates?.[0]?.content?.parts?.find((part: any) => part.inlineData);
@@ -379,7 +393,7 @@ export class GeminiService {
 
     // Mock
     async transcribeAudio(base64Audio: string, mimeType: string): Promise<string> {
-        const result = await this.callGenerate('gemini-flash-latest', [{
+        const result = await this.callGenerate('gemini-1.5-flash', [{
             role: 'user',
             parts: [
                 { inlineData: { data: this.sanitizeBase64(base64Audio), mimeType: mimeType } },
@@ -390,7 +404,9 @@ export class GeminiService {
     }
 
     async generateSpeech(text: string): Promise<string> {
-        const result = await this.callGenerate('gemini-3.1-flash-tts-preview', [{ role: 'user', parts: [{ text }] }], {
+        // TTS usually needs specific models if supported, but standard ones might not support audio modality returning speech easily without specific config.
+        // gemini-1.5-flash supports audio modality in many regions.
+        const result = await this.callGenerate('gemini-1.5-flash', [{ role: 'user', parts: [{ text }] }], {
             responseModalities: ['audio'],
             speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Aoide' } } }
         });
@@ -491,7 +507,7 @@ export class GeminiService {
         };
 
         try {
-            const result = await this.callGenerate('gemini-flash-latest', [{ role: 'user', parts: [{ text: prompt }] }], {
+            const result = await this.callGenerate('gemini-1.5-flash', [{ role: 'user', parts: [{ text: prompt }] }], {
                 systemInstruction,
                 responseMimeType: 'application/json',
                 responseSchema,
@@ -584,7 +600,7 @@ export class GeminiService {
         };
 
         try {
-            const result = await this.callGenerate('gemini-3.1-pro-preview', [{ role: 'user', parts }], {
+            const result = await this.callGenerate('gemini-1.5-pro', [{ role: 'user', parts }], {
                 systemInstruction,
                 responseMimeType: 'application/json',
                 responseSchema
@@ -701,7 +717,7 @@ export class GeminiService {
         
         try {
             onLog("Generating code with Gemini Pro...");
-            const result = await this.callGenerate('gemini-3.1-pro-preview', [{ role: 'user', parts: contentParts }], {
+            const result = await this.callGenerate('gemini-1.5-pro', [{ role: 'user', parts: contentParts }], {
                 systemInstruction,
                 responseMimeType: 'application/json',
                 responseSchema,
@@ -826,7 +842,7 @@ export class GeminiService {
     
         try {
             onLog("Connecting to Gemini Pro...");
-            const result = await this.callGenerate('gemini-3.1-pro-preview', [{ role: 'user', parts }], {
+            const result = await this.callGenerate('gemini-1.5-pro', [{ role: 'user', parts }], {
                 systemInstruction,
                 responseMimeType: 'application/json',
                 responseSchema
@@ -882,7 +898,7 @@ export class GeminiService {
         };
     
         try {
-            const result = await this.callGenerate('gemini-flash-latest', [{ role: 'user', parts: [{ text: prompt }] }], {
+            const result = await this.callGenerate('gemini-1.5-flash', [{ role: 'user', parts: [{ text: prompt }] }], {
                 systemInstruction,
                 responseMimeType: 'application/json',
                 responseSchema,
@@ -999,7 +1015,7 @@ export class GeminiService {
         };
     
         try {
-            const result = await this.callGenerate('gemini-3.1-pro-preview', [{ role: 'user', parts: [{ text: `Generate the template for "${project.name}".` }] }], {
+            const result = await this.callGenerate('gemini-1.5-flash', [{ role: 'user', parts: [{ text: `Generate the template for "${project.name}".` }] }], {
                 systemInstruction,
                 responseMimeType: 'application/json',
                 responseSchema
@@ -1040,7 +1056,7 @@ export class GeminiService {
         };
         
         try {
-            const result = await this.callGenerate('gemini-flash-latest', [{ role: 'user', parts: [{ text: "Generate a new theme." }] }], {
+            const result = await this.callGenerate('gemini-1.5-flash', [{ role: 'user', parts: [{ text: "Generate a new theme." }] }], {
                 systemInstruction,
                 responseMimeType: 'application/json',
                 responseSchema,
@@ -1121,7 +1137,7 @@ export class GeminiService {
         };
 
         try {
-            const result = await this.callGenerate('gemini-flash-latest', [{ role: 'user', parts: [{ text: prompt }] }], {
+            const result = await this.callGenerate('gemini-1.5-flash', [{ role: 'user', parts: [{ text: prompt }] }], {
                 systemInstruction,
                 responseMimeType: 'application/json',
                 responseSchema,
@@ -1160,7 +1176,7 @@ export class GeminiService {
         };
     
         try {
-            const result = await this.callGenerate('gemini-flash-latest', [{ role: 'user', parts: [{ text: prompt }] }], {
+            const result = await this.callGenerate('gemini-1.5-flash', [{ role: 'user', parts: [{ text: prompt }] }], {
                 systemInstruction,
                 responseMimeType: 'application/json',
                 responseSchema,
@@ -1197,7 +1213,7 @@ export class GeminiService {
         };
 
         try {
-            const result = await this.callGenerate('gemini-flash-latest', [{ role: 'user', parts: [{ text: prompt }] }], {
+            const result = await this.callGenerate('gemini-1.5-flash', [{ role: 'user', parts: [{ text: prompt }] }], {
                 systemInstruction,
                 responseMimeType: 'application/json',
                 responseSchema,
@@ -1234,7 +1250,7 @@ export class GeminiService {
         };
 
         try {
-            const result = await this.callGenerate('gemini-flash-latest', [{ role: 'user', parts }], {
+            const result = await this.callGenerate('gemini-1.5-flash', [{ role: 'user', parts }], {
                 systemInstruction,
                 responseMimeType: 'application/json',
                 responseSchema
@@ -1277,7 +1293,7 @@ export class GeminiService {
         };
 
         try {
-            const result = await this.callGenerate('gemini-flash-latest', [{ role: 'user', parts }], {
+            const result = await this.callGenerate('gemini-1.5-flash', [{ role: 'user', parts }], {
                 systemInstruction,
                 responseMimeType: 'application/json',
                 responseSchema
@@ -1323,7 +1339,7 @@ export class GeminiService {
         };
     
         try {
-            const result = await this.callGenerate('gemini-flash-latest', [{ role: 'user', parts: [{ text: prompt }] }], {
+            const result = await this.callGenerate('gemini-1.5-flash', [{ role: 'user', parts: [{ text: prompt }] }], {
                 systemInstruction,
                 responseMimeType: 'application/json',
                 responseSchema,

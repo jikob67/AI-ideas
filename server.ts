@@ -6,9 +6,6 @@ import { fileURLToPath } from "url";
 import { Readable } from "stream";
 import { GoogleGenAI } from "@google/genai";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 async function startServer() {
   const app = express();
   const PORT = 3000;
@@ -40,20 +37,45 @@ async function startServer() {
     res.json({ status: "ok", env: process.env.NODE_ENV });
   });
 
+  // Serve static files from the 'public' directory
+  app.use(express.static("public"));
+
   // --- Gemini API Endpoints ---
+  
+  // "Netlify Function" style endpoint requested by user
+  app.post("/api/netlify-function-mock", async (req, res) => {
+    const { prompt } = req.body;
+    if (!prompt) return res.status(400).json({ error: "Missing prompt" });
+
+    try {
+      console.log("Mock Netlify Function triggered with prompt:", prompt);
+      const response = await ai.models.generateContent({
+        model: "gemini-1.5-flash",
+        contents: [{ role: "user", parts: [{ text: prompt }] }]
+      });
+      const responseText = response.candidates?.[0]?.content?.parts?.[0]?.text || "No response received";
+      
+      console.log("Gemini response retrieved successfully");
+      res.json({ result: responseText });
+    } catch (error: any) {
+      console.error("Netlify Mock Error:", error.message);
+      res.status(error.status || 500).json({ error: error.message });
+    }
+  });
 
   app.post("/api/gemini/generate", async (req, res) => {
     const { model, contents, config } = req.body;
     try {
       const response = await ai.models.generateContent({
-        model: model || "gemini-3-flash-preview",
+        model: model || "gemini-1.5-flash",
         contents,
         config
       });
       res.json({ response });
     } catch (error: any) {
       console.error("Gemini Generate Error:", error.message);
-      res.status(error.status || 500).json({ error: error.message });
+      const status = error.status || (error.message?.includes('429') ? 429 : 500);
+      res.status(status).json({ error: error.message });
     }
   });
 
@@ -61,7 +83,7 @@ async function startServer() {
     const { model, contents, config } = req.body;
     try {
       const response = await ai.models.generateContentStream({
-        model: model || "gemini-3-flash-preview",
+        model: model || "gemini-1.5-flash",
         contents,
         config
       });

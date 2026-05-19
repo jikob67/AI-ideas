@@ -41,13 +41,16 @@ service cloud.firestore {
     }
 
     function isValidProject(data) {
-      return data.keys().hasAll(['name', 'ownerUid', 'timestamp']) &&
-             data.name is string && data.name.size() <= 200 &&
-             data.ownerUid == request.auth.uid &&
-             data.timestamp is number &&
-             (data.get('description', '') is string) &&
-             (data.get('fileCount', 0) is number) &&
-             (data.get('messageCount', 0) is number);
+      let isCreating = request.method == 'create';
+      return (!isCreating || (data.keys().hasAll(['name', 'ownerUid', 'timestamp']))) &&
+             (!data.keys().hasAny(['name']) || data.name is string) &&
+             (!data.keys().hasAny(['ownerUid']) || data.ownerUid == request.auth.uid) &&
+             (!data.keys().hasAny(['timestamp']) || data.timestamp is number) &&
+             (!data.keys().hasAny(['description']) || data.description is string) &&
+             (!data.keys().hasAny(['isPublished']) || data.isPublished is bool) &&
+             (!data.keys().hasAny(['apkUrl']) || data.apkUrl is string) &&
+             (!data.keys().hasAny(['ipaUrl']) || data.ipaUrl is string) &&
+             (!data.keys().hasAny(['liveUrl']) || data.liveUrl is string);
     }
 
     function isValidFile(data) {
@@ -92,12 +95,15 @@ service cloud.firestore {
     }
 
     match /projects/{projectId} {
-      allow get: if isOwner(existing().ownerUid) || (existing().get('isShared', false) == true) || (existing().get('publicShareId', '') != '');
-      allow list: if (isSignedIn() && resource.data.ownerUid == request.auth.uid) || (resource.data.publicShareId != '');
+      allow get: if isOwner(existing().ownerUid) || (existing().get('isShared', false) == true) || (existing().get('publicShareId', '') != '') || (existing().get('isPublished', false) == true);
+      allow list: if (isSignedIn() && resource.data.ownerUid == request.auth.uid) || (resource.data.publicShareId != '') || (resource.data.get('isPublished', false) == true);
 
       allow create: if isSignedIn() && isValidProject(incoming());
-      allow update: if isOwner(existing().ownerUid) && isValidProject(incoming()) && (
-        incoming().ownerUid == existing().ownerUid
+      allow update: if (isOwner(existing().ownerUid) && isValidProject(incoming())) || (
+        existing().get('isPublished', false) == true &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['likes', 'views']) &&
+        (incoming().get('likes', 0) >= existing().get('likes', 0)) &&
+        (incoming().get('views', 0) >= existing().get('views', 0))
       );
       allow delete: if isOwner(existing().ownerUid);
 
