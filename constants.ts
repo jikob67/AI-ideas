@@ -112,9 +112,8 @@ export const SECTION_DEFINITIONS: { type: SectionType, name: string, description
     { type: SectionType.TEAM, name: 'إدارة الفريق', description: 'تنظيم مهام وصلاحيات أعضاء فريق التطوير.', defaultConfig: { members: [], roles: ['admin', 'editor'] } },
 ];
 
-export const PLAN_SECTIONS: { [key in 'free' | 'pro' | 'premium']: SectionType[] } = {
+export const PLAN_SECTIONS: { [key in 'free' | 'premium']: SectionType[] } = {
     free: [ SectionType.DESIGN, SectionType.HTML, SectionType.USERS, SectionType.CHAT, SectionType.STORE, SectionType.BLOG, SectionType.ADS, SectionType.MEDIA, SectionType.RSS, SectionType.FORM, SectionType.MAP, SectionType.AUTH, SectionType.DATABASE, SectionType.PAYMENTS, SectionType.NOTIFICATIONS ],
-    pro: [ SectionType.DESIGN, SectionType.HTML, SectionType.USERS, SectionType.CHAT, SectionType.STORE, SectionType.BLOG, SectionType.ADS, SectionType.MEDIA, SectionType.RSS, SectionType.FORM, SectionType.MAP, SectionType.AUTH, SectionType.DATABASE, SectionType.PAYMENTS, SectionType.NOTIFICATIONS, SectionType.ANALYTICS, SectionType.INTEGRATIONS, SectionType.COMMUNITY_FEED, SectionType.EVENTS ],
     premium: [ SectionType.DESIGN, SectionType.HTML, SectionType.USERS, SectionType.CHAT, SectionType.STORE, SectionType.BLOG, SectionType.ADS, SectionType.MEDIA, SectionType.RSS, SectionType.FORM, SectionType.MAP, SectionType.AUTH, SectionType.DATABASE, SectionType.PAYMENTS, SectionType.NOTIFICATIONS, SectionType.ANALYTICS, SectionType.INTEGRATIONS, SectionType.COMMUNITY_FEED, SectionType.EVENTS, SectionType.POINTS_REWARDS, SectionType.TEAM ]
 };
 
@@ -144,7 +143,7 @@ export const getInitialSectionsForTemplate = (template: 'blank' | 'store' | 'bus
 };
 
 
-export const getInitialSectionsForProjectType = (projectType: ProjectType, plan: 'free' | 'pro' | 'premium' = 'free', projectName: string): ProjectSection[] => {
+export const getInitialSectionsForProjectType = (projectType: ProjectType, plan: 'free' | 'premium' = 'free', projectName: string): ProjectSection[] => {
     const baseSections: ProjectSection[] = [
         { id: `sec-${Date.now()}-design`, type: SectionType.DESIGN, title: 'الهوية البصرية', config: SECTION_DEFINITIONS.find(d => d.type === SectionType.DESIGN)!.defaultConfig },
         { id: `sec-${Date.now()}-html`, type: SectionType.HTML, title: 'الواجهة الرئيسية', config: { htmlContent: `<h1>أهلاً بك في ${projectName}!</h1><p>تم بناء هذا الأساس باستخدام خوارزميات AI ideas المتقدمة.</p>` } },

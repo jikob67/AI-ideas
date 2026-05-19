@@ -55,7 +55,7 @@ export interface User {
   username: string; 
   email: string;
   profilePictureUrl?: string;
-  plan?: 'free' | 'pro' | 'premium';
+  plan?: 'free' | 'premium';
   walletAddress?: string; 
   selectedWalletType?: string;
   points?: number;
@@ -324,5 +324,6 @@ export interface AuthContextType {
   currentUser: User | null;
   loading: boolean;
   logout: () => Promise<void>;
-  // Add other necessary methods here if needed
+  updateUser: (updates: Partial<User>) => Promise<void>;
+  upgradePlan: (planId: PlanId) => Promise<void>;
 }

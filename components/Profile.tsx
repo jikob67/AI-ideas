@@ -100,7 +100,6 @@ const UsageDashboard: React.FC = () => {
     
     const getLimit = (key: ProjectType) => {
         if (currentUser?.plan === 'premium') return Infinity;
-        if (currentUser?.plan === 'pro') return PRO_LIMITS[key] || 0;
         return DAILY_LIMITS[key] || 0;
     };
 
@@ -476,10 +475,10 @@ const Profile: React.FC = () => {
 
             <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-2xl p-6 text-white shadow-xl relative overflow-hidden group">
                 <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-2xl group-hover:bg-white/20 transition-colors"></div>
-                <h3 className="text-xl font-bold relative z-10">الخطة الاحترافية</h3>
-                <p className="text-indigo-100 text-sm mt-1 relative z-10 mb-4">احصل على حدود أعلى وميزات حصرية.</p>
+                <h3 className="text-xl font-bold relative z-10">الباقة الشاملة (Ultimate)</h3>
+                <p className="text-indigo-100 text-sm mt-1 relative z-10 mb-4">احصل على وصول كامل وغير محدود لمدى الحياة.</p>
                 <button onClick={() => setUpgradeModalOpen(true)} className="relative z-10 bg-white text-indigo-600 hover:bg-indigo-50 font-bold py-2 px-4 rounded-lg text-sm flex items-center gap-2 transition-colors shadow-md">
-                    ترقية الآن <ArrowRightIcon className="w-4 h-4"/>
+                    امتلك النسخة الكاملة <ArrowRightIcon className="w-4 h-4"/>
                 </button>
             </div>
 

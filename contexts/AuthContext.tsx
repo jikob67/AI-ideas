@@ -295,7 +295,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const upgradePlan = async (plan: 'pro') => {
+  const upgradePlan = async (plan: PlanId) => {
     if (!currentUser) return;
     try {
       const userRef = doc(db, 'users', currentUser.uid);

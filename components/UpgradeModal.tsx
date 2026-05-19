@@ -299,21 +299,57 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose }) => {
         return (
           <>
             <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold text-white">الباقة النهائية (Ultimate)</h2>
-              <p className="text-slate-400 mt-2">ابدأ رحلتك البرمجية مع الأدوات المتطورة.</p>
+              <h2 className="text-2xl font-bold text-white">الباقة الكاملة والشاملة</h2>
+              <p className="text-slate-400 mt-2">امتلك أدوات المستقبل البرمجي في اشتراك واحد مدى الحياة.</p>
             </div>
             <div className="space-y-4">
-                <div className="bg-slate-700/50 border-2 border-purple-500 rounded-lg p-6 text-center relative">
-                    <h3 className="text-xl font-bold text-purple-400">الباقة النهائية (Ultimate)</h3>
-                    <p className="text-3xl font-bold my-2">$149 <span className="text-base font-normal text-slate-400">/ مدى الحياة</span></p>
-                    <ul className="text-slate-300 text-sm space-y-2 my-4 text-right pr-4 list-disc list-inside">
-                        <li>وصول كامل وغير محدود لكافة الأدوات الحالية والمستقبلية</li>
-                        <li>بدون علامة مائية نهائياً</li>
-                        <li>استخدام غير محدود لأدوات الذكاء الاصطناعي</li>
-                        <li>أدوات التصدير البرمجي المتقدمة</li>
-                        <li>تحديثات حصرية ونظام أولوية</li>
+                <div className="bg-slate-700/50 border-2 border-indigo-500 rounded-lg p-6 text-center relative overflow-hidden">
+                    <div className="absolute top-0 right-0 bg-indigo-500 text-white text-[10px] px-3 py-1 font-bold rounded-bl-lg">
+                        عرض حصري
+                    </div>
+                    <h3 className="text-xl font-bold text-indigo-400 mb-2">الباقة النهائية (Ultimate Bundle)</h3>
+                    <div className="flex items-center justify-center gap-2 my-4">
+                        <span className="text-slate-500 line-through text-lg">$499</span>
+                        <p className="text-4xl font-black text-white">$149</p>
+                    </div>
+                    <p className="text-sm text-indigo-300 font-medium mb-6">ادفع مرة واحدة.. امتلك للأبد</p>
+                    
+                    <ul className="text-slate-300 text-sm space-y-3 my-4 text-right pr-2 list-none">
+                        <li className="flex items-center gap-2 justify-end">
+                            <span>تحويل الصور والرسومات إلى أكواد برمجية حقيقية</span>
+                            <CheckIcon className="w-4 h-4 text-green-400" />
+                        </li>
+                        <li className="flex items-center gap-2 justify-end">
+                            <span>بناء مشاريع تطبيقية متكاملة (ويب وجوال) بالذكاء الاصطناعي</span>
+                            <CheckIcon className="w-4 h-4 text-green-400" />
+                        </li>
+                        <li className="flex items-center gap-2 justify-end">
+                            <span>تصدير المشاريع كملفات Flutter جاهزة للعمل على Android و iOS</span>
+                            <CheckIcon className="w-4 h-4 text-green-400" />
+                        </li>
+                        <li className="flex items-center gap-2 justify-end">
+                            <span>استخدام مفتوح لأدوات التسويق وتوليد الصور والفيديو والمحتوى</span>
+                            <CheckIcon className="w-4 h-4 text-green-400" />
+                        </li>
+                        <li className="flex items-center gap-2 justify-end">
+                            <span>استضافة سحابية دائمية وروابط مباشرة لمشاريعك المنشورة</span>
+                            <CheckIcon className="w-4 h-4 text-green-400" />
+                        </li>
+                        <li className="flex items-center gap-2 justify-end">
+                            <span>نظام تحليل بيانات متطور وتوثيق آلي لكافة أعمالك</span>
+                            <CheckIcon className="w-4 h-4 text-green-400" />
+                        </li>
+                        <li className="flex items-center gap-2 justify-end">
+                            <span>إزالة شعار المنصة من كافة التطبيقات والمشاريع المصدرة</span>
+                            <CheckIcon className="w-4 h-4 text-green-400" />
+                        </li>
                     </ul>
-                    <button onClick={() => handleSelectPlan('premium')} className="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-2 px-4 rounded-lg">شراء مدى الحياة</button>
+                    
+                    <button onClick={() => handleSelectPlan('premium')} className="w-full mt-6 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-indigo-900/40 transition-all transform hover:scale-[1.02] flex items-center justify-center gap-2">
+                        <SparklesIcon className="w-5 h-5" />
+                        تفعيل الوصول الكامل الآن
+                    </button>
+                    <p className="text-[10px] text-slate-500 mt-4 italic">ضمان فعال بنسبة 100% لكافة الميزات المذكورة</p>
                 </div>
             </div>
           </>

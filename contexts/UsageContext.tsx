@@ -75,13 +75,13 @@ export const UsageProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     if (currentUser.plan === 'premium') return false;
 
     // Check for monthly limits first
-    const monthlyLimit = currentUser.plan === 'pro' ? PRO_MONTHLY_LIMITS[feature] : MONTHLY_LIMITS[feature];
+    const monthlyLimit = MONTHLY_LIMITS[feature];
     if (monthlyLimit !== undefined) {
         return (monthlyUsage[feature] || 0) + amount > monthlyLimit;
     }
 
     // Fallback to daily limits
-    const dailyLimit = currentUser.plan === 'pro' ? PRO_LIMITS[feature] : DAILY_LIMITS[feature];
+    const dailyLimit = DAILY_LIMITS[feature];
     if (dailyLimit !== undefined) {
         return (dailyUsage[feature] || 0) + amount > dailyLimit;
     }

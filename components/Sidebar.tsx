@@ -482,23 +482,23 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, op
         
         {currentUser?.plan !== 'premium' ? (
           <div className="mt-auto p-4 bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 rounded-xl text-center flex-shrink-0">
-            <h4 className="font-bold text-white text-sm">باقة المحترفين (Pro)</h4>
+            <h4 className="font-bold text-white text-sm">الباقة الشاملة (Ultimate)</h4>
             <p className="text-[11px] text-slate-400 mt-1 mb-4">
-              استخدام غير محدود لكافة ميزات الذكاء الاصطناعي.
+              وصول غير محدود لعمليات بناء المشاريع، تصدير Flutter، واستضافة مباشرة.
             </p>
             <button 
               onClick={() => setUpgradeModalOpen(true)}
-              className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 rounded-lg transition-all transform hover:scale-105 flex items-center justify-center gap-2 text-xs shadow-lg shadow-indigo-900/40"
+              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold py-2 rounded-lg transition-all transform hover:scale-105 flex items-center justify-center gap-2 text-xs shadow-lg shadow-indigo-900/40"
             >
               <SparklesIcon className="w-4 h-4" />
-              <span>ترقية الحساب</span>
+              <span>امتلاك النسخة الكاملة</span>
             </button>
           </div>
         ) : (
-           <div className="mt-auto p-4 bg-green-500/10 border border-green-500/20 rounded-xl text-center flex-shrink-0">
-              <h4 className="font-bold text-white text-sm">عضوية دائمة!</h4>
-              <p className="text-[11px] text-green-300/80 mt-1">
-                تتمتع بكافة الميزات الحالية والمستقبلية.
+           <div className="mt-auto p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-center flex-shrink-0">
+              <h4 className="font-bold text-white text-sm">العضوية الشاملة مفعلة!</h4>
+              <p className="text-[11px] text-indigo-300/80 mt-1">
+                لديك وصول كامل لكافة ميزات الذكاء الاصطناعي.
               </p>
           </div>
         )}

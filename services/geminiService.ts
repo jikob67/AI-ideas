@@ -514,7 +514,7 @@ export class GeminiService {
         return projectCopy;
     }
 
-    async generateProjectFromDescription(projectName: string, projectDesc: string, projectType: ProjectType, plan: 'free' | 'pro' | 'premium'): Promise<ProjectSection[]> {
+    async generateProjectFromDescription(projectName: string, projectDesc: string, projectType: ProjectType, plan: 'free' | 'premium'): Promise<ProjectSection[]> {
         const availableSectionTypes = PLAN_SECTIONS[plan];
         const systemInstruction = `You are a software architect. Your task is to plan the sections for a new digital project based on user input.
         Based on the project name, description, and type, you must suggest an array of sections.
