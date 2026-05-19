@@ -221,7 +221,7 @@ const App: React.FC = () => {
       case 'trash':
         return <Trash navigate={navigate} />;
       case 'dataAnalysis':
-        return <DataAnalysis navigate={navigate} />;
+        return <DataAnalysis navigate={navigate} context={navigationContext} />;
       case 'aiContentDetector':
         return <AiContentDetector />;
       case 'changelog':
@@ -231,11 +231,11 @@ const App: React.FC = () => {
       case 'urlToCode':
         return <SoftwareProjectBuilder navigate={navigate} mode="url" context={navigationContext} />;
       case 'seoOptimizer':
-        return <SeoOptimizer />;
+        return <SeoOptimizer context={navigationContext} />;
       case 'showroom':
         return <Showroom navigate={navigate} />;
       case 'assetStudio':
-        return <AssetStudio />;
+        return <AssetStudio context={navigationContext} />;
       case 'flowDemo':
         return <FlowDemo />;
       default:

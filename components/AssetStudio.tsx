@@ -17,9 +17,9 @@ import { geminiService } from '../services/geminiService';
 
 type AssetType = 'icon' | 'pattern' | 'button' | 'card' | 'navbar';
 
-export const AssetStudio: React.FC = () => {
+export const AssetStudio: React.FC<{ context?: any }> = ({ context }) => {
   const [selectedType, setSelectedType] = useState<AssetType>('icon');
-  const [prompt, setPrompt] = useState('');
+  const [prompt, setPrompt] = useState(context?.project ? `مشروع ${context.project.name}: ${context.project.description}` : '');
   const [isGenerating, setIsGenerating] = useState(false);
   const [result, setResult] = useState<string | null>(null);
 

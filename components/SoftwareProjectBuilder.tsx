@@ -47,6 +47,8 @@ import {
   GlobeIcon,
   GlobeAltIcon,
   LoaderIcon,
+  PaintBrushIcon,
+  ChartPieIcon,
   UploadIcon as UploadIcon_v2,
   AlignLeftIcon
 } from './Icons';
@@ -200,7 +202,7 @@ export const SoftwareProjectBuilder: React.FC<{
 
     // Shared UI State
     const [activeFile, setActiveFile] = useState<string>('index.html');
-    const [sidebarTab, setSidebarTab] = useState<'files' | 'chat' | 'snapshots'>('chat');
+    const [sidebarTab, setSidebarTab] = useState<'files' | 'chat' | 'snapshots' | 'roadmap'>('chat');
     const [device, setDevice] = useState<'desktop' | 'mobile'>('desktop');
     const [isBuildModalOpen, setIsBuildModalOpen] = useState(false);
     const [isBuildInstructionsModalOpen, setIsBuildInstructionsModalOpen] = useState(false);
@@ -388,6 +390,67 @@ export const SoftwareProjectBuilder: React.FC<{
         }
     }, [currentUser, mode, context]);
 
+    const roadmapSteps = useMemo(() => [
+        { id: 'creation', label: 'التأسيس والبناء', icon: <RocketLaunchIcon className="w-5 h-5" />, status: 'completed', description: 'تم إنشاء الهيكل الأساسي للمشروع.' },
+        { id: 'design', label: 'الهوية والتصميم', icon: <PaintBrushIcon className="w-5 h-5" />, status: 'pending', target: 'assetStudio', description: 'إنشاء الأصول المرئية والأيقونات.' },
+        { id: 'data', label: 'تحليل البيانات', icon: <ChartPieIcon className="w-5 h-5" />, status: 'pending', target: 'dataAnalysis', description: 'تنظيم وتحليل بيانات المستخدمين.' },
+        { id: 'seo', label: 'تحسين المحركات', icon: <MagnifyingGlassIcon className="w-5 h-5" />, status: 'pending', target: 'seoOptimizer', description: 'تحسين ظهور مشروعك في البحث.' },
+        { id: 'marketing', label: 'التسويق والانتشار', icon: <SparklesIcon className="w-5 h-5" />, status: 'pending', target: 'marketing', description: 'خطة تسويقية شاملة لمشروعك.' },
+        { id: 'launch', label: 'النشر في المعرض', icon: <GlobeAltIcon className="w-5 h-5" />, status: 'pending', target: 'showroom', description: 'اعرض مشروعك للعالم واجمع الآراء.' },
+    ], []);
+
+    const renderRoadmapTab = () => (
+        <div className="flex flex-col h-full bg-slate-900/30 font-sans p-4 space-y-6 overflow-y-auto">
+            <div className="text-right">
+                <h4 className="text-white font-bold text-lg mb-1">خارطة الطريق</h4>
+                <p className="text-slate-400 text-xs">اتبع هذه الخطوات لتحويل فكرتك إلى مشروع ناجح متكامل.</p>
+            </div>
+
+            <div className="relative space-y-8 pr-2">
+                {/* Connecting Line */}
+                <div className="absolute top-2 bottom-2 right-4 w-[2px] bg-slate-800" />
+
+                {roadmapSteps.map((step, index) => (
+                    <motion.div 
+                        key={step.id} 
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                        className="relative pr-10 group"
+                    >
+                        {/* Step Marker */}
+                        <div className={`absolute top-0 right-1.5 w-6 h-6 rounded-full border-4 border-slate-900 z-10 flex items-center justify-center transition-all ${
+                            step.status === 'completed' ? 'bg-green-500 scale-110 shadow-lg shadow-green-500/20' : 'bg-slate-700 group-hover:bg-indigo-500'
+                        }`}>
+                            {step.status === 'completed' && <CheckIcon className="w-3 h-3 text-white" />}
+                        </div>
+
+                        <div className="bg-slate-800/40 border border-slate-700/50 rounded-2xl p-4 hover:border-indigo-500/50 hover:bg-slate-800/60 transition-all text-right group/card">
+                            <div className="flex items-center gap-3 justify-end mb-2">
+                                <span className={`text-xs font-bold ${step.status === 'completed' ? 'text-green-400' : 'text-slate-500'}`}>
+                                    {step.status === 'completed' ? 'مكتمل' : 'بانتظارك'}
+                                </span>
+                                <div className={`${step.status === 'completed' ? 'text-green-400' : 'text-indigo-400 opacity-70 group-hover/card:opacity-100 transition-opacity'}`}>
+                                    {step.id === 'creation' ? pageConfig.icon : step.icon}
+                                </div>
+                            </div>
+                            <h5 className="text-white font-bold text-sm mb-1">{step.label}</h5>
+                            <p className="text-slate-400 text-[10px] leading-relaxed mb-3">{step.description}</p>
+                            
+                            {step.target && (
+                                <button 
+                                    onClick={() => navigate(step.target as View, { project })}
+                                    className="w-full py-1.5 bg-indigo-600/20 hover:bg-indigo-600 border border-indigo-500/30 hover:border-indigo-500 text-indigo-400 hover:text-white rounded-lg text-[10px] font-bold transition-all"
+                                >
+                                    انتقل للقسم
+                                </button>
+                            )}
+                        </div>
+                    </motion.div>
+                ))}
+            </div>
+        </div>
+    );
     const [snapshots, setSnapshots] = useState<any[]>([]);
     const [isLoadingSnapshots, setIsLoadingSnapshots] = useState(false);
 
@@ -2130,9 +2193,11 @@ export const SoftwareProjectBuilder: React.FC<{
                         <button onClick={() => setSidebarTab('chat')} className={`flex-1 py-3 text-[11px] font-bold transition-all ${sidebarTab === 'chat' ? 'text-indigo-400 bg-indigo-500/5 border-b-2 border-indigo-500' : 'text-slate-500 hover:text-slate-300'}`}>الدردشة</button>
                         <button onClick={() => setSidebarTab('files')} className={`flex-1 py-3 text-[11px] font-bold transition-all ${sidebarTab === 'files' ? 'text-indigo-400 bg-indigo-500/5 border-b-2 border-indigo-500' : 'text-slate-500 hover:text-slate-300'}`}>الملفات</button>
                         <button onClick={() => setSidebarTab('snapshots')} className={`flex-1 py-3 text-[11px] font-bold transition-all ${sidebarTab === 'snapshots' ? 'text-indigo-400 bg-indigo-500/5 border-b-2 border-indigo-500' : 'text-slate-500 hover:text-slate-300'}`}>النسخ</button>
+                        <button onClick={() => setSidebarTab('roadmap')} className={`flex-1 py-3 text-[11px] font-bold transition-all ${sidebarTab === 'roadmap' ? 'text-indigo-400 bg-indigo-500/5 border-b-2 border-indigo-500' : 'text-slate-500 hover:text-slate-300'}`}>الخطة</button>
                     </div>
                     
                     <div className="flex-grow overflow-hidden relative">
+                        {sidebarTab === 'roadmap' && renderRoadmapTab()}
                         {sidebarTab === 'chat' && (
                             <div className="flex flex-col h-full bg-slate-900/30">
                                 <div className="flex-grow overflow-y-auto p-4 space-y-4 custom-scrollbar">

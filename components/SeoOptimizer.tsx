@@ -22,8 +22,17 @@ interface OptimizationResult {
   suggestedFixes: string;
 }
 
-export const SeoOptimizer: React.FC = () => {
-  const [code, setCode] = useState('');
+export const SeoOptimizer: React.FC<{ context?: any }> = ({ context }) => {
+  const initialCode = React.useMemo(() => {
+    if (context?.project?.files && context.project.files.length > 0) {
+      const htmlFile = context.project.files.find((f: any) => f.name === 'index.html');
+      if (htmlFile) return htmlFile.content;
+      return context.project.files[0].content;
+    }
+    return '';
+  }, [context]);
+
+  const [code, setCode] = useState(initialCode);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<OptimizationResult | null>(null);
   const [activeTab, setActiveTab] = useState<'seo' | 'perf' | 'access'>('seo');

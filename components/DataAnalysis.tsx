@@ -8,6 +8,7 @@ import UpgradeModal from './UpgradeModal';
 interface DataAnalysisProps {
     onComplete?: (message: Message) => void;
     navigate: (view: View, context?: any) => void;
+    context?: any;
 }
 
 interface AnalysisResult {
@@ -39,9 +40,9 @@ const SimpleBarChart: React.FC<{ data: { label: string, value: number }[] }> = (
 };
 
 
-const DataAnalysis: React.FC<DataAnalysisProps> = ({ onComplete, navigate }) => {
-    const [data, setData] = useState('');
-    const [query, setQuery] = useState('');
+const DataAnalysis: React.FC<DataAnalysisProps> = ({ onComplete, navigate, context }) => {
+    const [data, setData] = useState(context?.project?.description || '');
+    const [query, setQuery] = useState(context?.project ? `قم بتحليل نموذج العمل لمشروع: ${context.project.name}` : '');
     const [result, setResult] = useState<AnalysisResult | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
