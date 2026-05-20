@@ -30,9 +30,10 @@ export class GeminiService {
                 body: JSON.stringify({ model, contents, config })
             });
 
+            const contentType = response.headers.get('content-type');
+
             if (!response.ok) {
                 let errorMsg = 'Failed to generate content';
-                const contentType = response.headers.get('content-type');
                 
                 if (contentType && contentType.includes('application/json')) {
                     try {
@@ -57,9 +58,23 @@ export class GeminiService {
                 }
                 throw new Error(errorMsg);
             }
+
+            if (contentType && !contentType.includes('application/json')) {
+                const text = await response.text();
+                throw new Error(`Non-JSON response received (Status ${response.status}). Raw: ${text.slice(0, 150)}`);
+            }
+
             return await response.json();
         } catch (error: any) {
-            if ((error.message?.includes('429') || error.message?.includes('503')) && retries > 0) {
+            const isRetryable = error.message?.includes('429') || 
+                                error.message?.includes('503') || 
+                                error.message?.includes('UNAVAILABLE') ||
+                                error.message?.includes('Unexpected token') ||
+                                error.message?.includes('is not valid JSON') ||
+                                error.message?.includes('Non-JSON response');
+
+            if (isRetryable && retries > 0) {
+                console.warn(`[Client] Retrying generate due to temporary error: ${error.message}. (${retries} left)`);
                 await delay(3000 * (4 - retries));
                 return this.callGenerate(model, contents, config, retries - 1);
             }

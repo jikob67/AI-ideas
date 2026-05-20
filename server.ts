@@ -65,21 +65,40 @@ async function startServer() {
 
   app.post("/api/gemini/generate", async (req, res) => {
     const { model, contents, config } = req.body;
-    try {
-      const response = await ai.models.generateContent({
-        model: model || "gemini-flash-latest",
-        contents,
-        config
-      });
-      res.json({ response });
-    } catch (error: any) {
-      console.error("Gemini Generate Error:", error.message);
-      let status = error.status || 500;
-      if (!error.status) {
-        if (error.message?.includes('429')) status = 429;
-        else if (error.message?.includes('503')) status = 503;
+    const maxRetries = 3;
+    let attempt = 0;
+
+    while (true) {
+      try {
+        const response = await ai.models.generateContent({
+          model: model || "gemini-flash-latest",
+          contents,
+          config
+        });
+        return res.json({ response });
+      } catch (error: any) {
+        attempt++;
+        const errorMessage = error.message || "";
+        const errorStatus = error.status || 0;
+        const isRateLimitOrUnavailable = errorStatus === 429 || errorStatus === 503 ||
+                                         errorMessage.includes("429") || errorMessage.includes("503") ||
+                                         errorMessage.includes("UNAVAILABLE") || errorMessage.includes("RESOURCE_EXHAUSTED");
+                                         
+        if (isRateLimitOrUnavailable && attempt <= maxRetries) {
+          const waitTime = attempt * 2000 + Math.random() * 1000;
+          console.warn(`[Server Retry ${attempt}/${maxRetries}] Gemini API busy/rate-limit. Retrying in ${Math.round(waitTime)}ms... Error: ${errorMessage}`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          continue;
+        }
+        
+        console.error("Gemini Generate Error after all attempts:", errorMessage);
+        let status = errorStatus || 500;
+        if (!error.status) {
+          if (errorMessage.includes('429')) status = 429;
+          else if (errorMessage.includes('503')) status = 503;
+        }
+        return res.status(status).json({ error: errorMessage });
       }
-      res.status(status).json({ error: error.message });
     }
   });
 
