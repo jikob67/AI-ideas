@@ -267,8 +267,34 @@ export const SoftwareProjectBuilder: React.FC<{
     const [input, setInput] = useState('');
     const [isChatLoading, setIsChatLoading] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const chatContainerRef = useRef<HTMLDivElement>(null);
     const [chatImages, setChatImages] = useState<{ name: string; base64: string; mimeType: string; url: string }[]>([]);
     const chatFileInputRef = useRef<HTMLInputElement>(null);
+
+    // Auto-scroll chat to bottom when messages or typing status updates
+    useEffect(() => {
+        if (chatContainerRef.current) {
+            chatContainerRef.current.scrollTo({
+                top: chatContainerRef.current.scrollHeight,
+                behavior: 'smooth'
+            });
+        }
+    }, [messages, isChatLoading]);
+
+    const handleScrollChatToTop = () => {
+        if (chatContainerRef.current) {
+            chatContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    };
+
+    const handleScrollChatToBottom = () => {
+        if (chatContainerRef.current) {
+            chatContainerRef.current.scrollTo({
+                top: chatContainerRef.current.scrollHeight,
+                behavior: 'smooth'
+            });
+        }
+    };
 
     // Mode-specific state
     const [prompt, setPrompt] = useState('');
@@ -2477,8 +2503,8 @@ ${codeSnapshot}
                     <div className="flex-grow overflow-hidden relative">
                         {sidebarTab === 'roadmap' && renderRoadmapTab()}
                         {sidebarTab === 'chat' && (
-                            <div className="flex flex-col h-full bg-slate-900/30">
-                                <div className="flex-grow overflow-y-auto p-4 space-y-4 custom-scrollbar">
+                            <div className="flex flex-col h-full bg-slate-900/30 relative">
+                                <div ref={chatContainerRef} className="flex-grow overflow-y-auto p-4 space-y-4 custom-scrollbar">
                                     {messages.map(msg => (
                                         <div key={msg.id} className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}>
                                             <div className={`max-w-[90%] p-3 rounded-2xl text-xs leading-relaxed ${msg.sender === 'user' ? 'bg-indigo-600 text-white rounded-tr-none shadow-lg shadow-indigo-500/10' : 'bg-slate-800 text-slate-200 rounded-tl-none border border-slate-700'}`}>
@@ -2506,6 +2532,28 @@ ${codeSnapshot}
                                         </div>
                                     )}
                                     <div ref={messagesEndRef} />
+                                </div>
+
+                                {/* أزرار الانتقال للأعلى والأسفل */}
+                                <div className="absolute right-4 bottom-22 flex flex-col gap-2 z-30">
+                                    <button 
+                                        onClick={handleScrollChatToTop} 
+                                        title="انتقال لأعلى الدردشة" 
+                                        className="w-8 h-8 rounded-full bg-slate-800/95 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center border border-slate-700/60 backdrop-blur-md transition-all shadow-lg active:scale-95 group hover:border-slate-600 hover:shadow-indigo-500/10 hover:shadow-md"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4 transition-transform group-hover:-translate-y-0.5">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
+                                        </svg>
+                                    </button>
+                                    <button 
+                                        onClick={handleScrollChatToBottom} 
+                                        title="انتقال لأسفل الدردشة" 
+                                        className="w-8 h-8 rounded-full bg-slate-800/95 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center border border-slate-700/60 backdrop-blur-md transition-all shadow-lg active:scale-95 group hover:border-slate-600 hover:shadow-indigo-500/10 hover:shadow-md"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4 transition-transform group-hover:translate-y-0.5">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                                        </svg>
+                                    </button>
                                 </div>
                                 
                                 <div className="p-3 border-t border-slate-800 bg-slate-900/50">
