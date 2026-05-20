@@ -905,7 +905,8 @@ export const SoftwareProjectBuilder: React.FC<{
         setIsProcessingVisualEdit(true);
         onLog(`جاري تنفيذ التعديل المرئي على: <${commandBarState.tagName.toLowerCase()}>...`);
         try {
-            const { updatedProject, aiResponse } = await geminiService.modifyProjectWithAI(project, `Visual Edit for ${commandBarState.selector} (${commandBarState.tagName}): ${visualEditCommand}`);
+            const tempProjectWithFiles = { ...project, files: projectFiles };
+            const { updatedProject, aiResponse } = await geminiService.modifyProjectWithAI(tempProjectWithFiles as any, `Visual Edit for ${commandBarState.selector} (${commandBarState.tagName}): ${visualEditCommand}`);
             
             setProject(updatedProject);
             setProjectFiles((updatedProject as any).files);
@@ -952,7 +953,8 @@ ${codeSnapshot}
 4. تحسين تصميم الواجهة وكود CSS لتكون الصفحة متجاوبة بشكل رائع مع جميع مقاسات الشاشات والهواتف (Responsive layout).
 5. يرجى تزويدنا بكود كامل للملفات المعدلة دون حذف أو اختصار، ويجب أن تحتوي دائماً على الملفات الأساسية للمشروع (index.html, style.css, script.js).`;
 
-            const { updatedProject, aiResponse } = await geminiService.modifyProjectWithAI(project, prompt);
+            const tempProjectWithFiles = { ...project, files: projectFiles };
+            const { updatedProject, aiResponse } = await geminiService.modifyProjectWithAI(tempProjectWithFiles as any, prompt);
             
             const newFiles = (updatedProject as any).files || [];
             if (newFiles && newFiles.length > 0) {

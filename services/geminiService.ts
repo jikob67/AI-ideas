@@ -627,7 +627,7 @@ export class GeminiService {
         Your response should be professional yet friendly, befitting an 'Intelligent Project Engineer'.`;
 
         const parts: any[] = [{ text: "Here are the current project files:" }];
-        for (const file of (project as any).files) {
+        for (const file of ((project as any).files || [])) {
             parts.push({ text: `\n--- FILE: ${file.name} ---\n${file.content}` });
         }
 
@@ -670,7 +670,7 @@ export class GeminiService {
             const parsed = this.parseAIJson(jsonText) as { aiResponse: string, files: { name: string, content: string }[] };
             
             const updatedProject = { ...project } as any;
-            const updatedFiles = [...(project as any).files];
+            const updatedFiles = [...((project as any).files || [])];
 
             for (const updatedFile of parsed.files) {
                 const fileIndex = updatedFiles.findIndex(f => f.name === updatedFile.name);
