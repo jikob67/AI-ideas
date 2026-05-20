@@ -2296,6 +2296,18 @@ export const SoftwareProjectBuilder: React.FC<{
                                             </div>
                                         </div>
                                     ))}
+                                    {isChatLoading && (
+                                        <div className="flex flex-col items-start pb-2">
+                                            <div className="max-w-[90%] p-3 rounded-2xl rounded-tl-none bg-slate-800 text-slate-200 border border-slate-700 flex items-center gap-2 shadow-lg">
+                                                <span className="text-xs font-semibold text-slate-300">جاري تنفيذ التعديلات</span>
+                                                <div className="typing-indicator text-indigo-400">
+                                                    <span></span>
+                                                    <span></span>
+                                                    <span></span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                     <div ref={messagesEndRef} />
                                 </div>
                                 

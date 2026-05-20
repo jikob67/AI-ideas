@@ -102,7 +102,18 @@ const AiPanel: React.FC<AiPanelProps> = ({ project, onUpdateProject }) => {
                             </div>
                         </div>
                     ))}
-                    {isLoading && <div className="ai-message-block bot"><div className="ai-message bot"><div className="typing-indicator"><span></span><span></span><span></span></div></div></div>}
+                    {isLoading && (
+                        <div className="ai-message-block bot animate-pulse">
+                            <div className="ai-message bot flex items-center gap-2">
+                                <span className="text-xs font-semibold text-slate-300">جاري تنفيذ التعديلات</span>
+                                <div className="typing-indicator text-indigo-400">
+                                    <span></span>
+                                    <span></span>
+                                    <span></span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                     <div ref={messagesEndRef} />
                 </div>
             </div>
