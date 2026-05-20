@@ -12,6 +12,24 @@ async function startServer() {
 
   console.log("Starting server...");
 
+  function getFriendlyErrorMessage(errMessage: string): string {
+    if (!errMessage) return "عذرًا، حدث خطأ غير متوقع.";
+    
+    const msg = errMessage.toLowerCase();
+    
+    if (msg.includes("429") || msg.includes("quota") || msg.includes("limit") || msg.includes("exhausted") || msg.includes("resource_exhausted")) {
+      return "لقد تجاوزت الحصة المتاحة لطلب تعديلات الذكاء الاصطناعي (Quota Exceeded). يرجى مراجعة حد تراخيص مفتاح API المجاني أو المحاولة لاحقاً.";
+    }
+    if (msg.includes("503") || msg.includes("unavailable") || msg.includes("high demand") || msg.includes("busy")) {
+      return "الخدمة غير متوفرة حالياً بسبب الضغط العالي على خوادم الذكاء الاصطناعي. يرجى المحاولة وقت لاحق.";
+    }
+    if (msg.includes("key") && (msg.includes("invalid") || msg.includes("not found") || msg.includes("api_key_invalid"))) {
+      return "مفتاح API الخاص بالذكاء الاصطناعي غير صالح أو غير معرّف بشكل صحيح. يرجى التحقق من مفتاح الـ API الخاص بك.";
+    }
+    
+    return errMessage;
+  }
+
   // Initialize Gemini
   const ai = new GoogleGenAI({ 
     apiKey: process.env.GEMINI_API_KEY,
@@ -59,7 +77,7 @@ async function startServer() {
       res.json({ result: responseText });
     } catch (error: any) {
       console.error("Netlify Mock Error:", error.message);
-      res.status(error.status || 500).json({ error: error.message });
+      res.status(error.status || 500).json({ error: getFriendlyErrorMessage(error.message) });
     }
   });
 
@@ -97,7 +115,7 @@ async function startServer() {
           if (errorMessage.includes('429')) status = 429;
           else if (errorMessage.includes('503')) status = 503;
         }
-        return res.status(status).json({ error: errorMessage });
+        return res.status(status).json({ error: getFriendlyErrorMessage(errorMessage) });
       }
     }
   });
@@ -121,7 +139,7 @@ async function startServer() {
       res.end();
     } catch (error: any) {
       console.error("Gemini Stream Error:", error.message);
-      res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+      res.write(`data: ${JSON.stringify({ error: getFriendlyErrorMessage(error.message) })}\n\n`);
       res.end();
     }
   });

@@ -995,9 +995,10 @@ ${codeSnapshot}
             } else {
                 onLog("⚠️ لم يتم استرجاع ملفات مصححة جديدة، قد يكون الكود خالياً من الأخطاء العميقة.");
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error("Auto Repair failed", error);
-            onLog("✗ فشل تفعيل نظام الإصلاح التلقائي. يرجى المحاولة مرة أخرى.");
+            const errMsg = error?.message || "يرجى المحاولة مرة أخرى.";
+            onLog(`✗ فشل تفعيل نظام الإصلاح التلقائي: ${errMsg}`);
         } finally {
             setIsAutoRepairing(false);
         }
@@ -1391,8 +1392,9 @@ ${codeSnapshot}
             
             setProject(updatedProject); 
             setProjectFiles(updatedProject.files);
-        } catch (e) {
-            const errorMessage: Message = { id: `err-${Date.now()}`, text: 'عذرًا, حدث خطأ.', sender: 'ai' };
+        } catch (e: any) {
+            const apiError = e?.message || 'عذرًا، حدث خطأ أثناء الاتصال بالذكاء الاصطناعي.';
+            const errorMessage: Message = { id: `err-${Date.now()}`, text: apiError, sender: 'ai' };
             setMessages(prev => [...prev, errorMessage]);
         } finally {
             setIsChatLoading(false);
