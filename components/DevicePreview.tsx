@@ -13,6 +13,52 @@ const DevicePreview: React.FC<DevicePreviewProps> = ({ srcDoc, device, isVisualE
         <script>
             const isEditMode = ${isVisualEditMode};
             
+            // Intercept uncaught JavaScript errors
+            window.onerror = function(message, source, lineno, colno, error) {
+                window.parent.postMessage({
+                    type: 'IFRAME_ERROR_DETECTED',
+                    payload: { 
+                        message: String(message), 
+                        lineno: lineno || 0, 
+                        colno: colno || 0,
+                        type: 'runtime_error'
+                    }
+                }, '*');
+                return false;
+            };
+
+            // Intercept unhandled Promise rejections
+            window.addEventListener('unhandledrejection', function(event) {
+                window.parent.postMessage({
+                    type: 'IFRAME_ERROR_DETECTED',
+                    payload: { 
+                        message: event.reason ? String(event.reason.message || event.reason) : 'Unhandled promise rejection', 
+                        type: 'promise_rejection'
+                    }
+                }, '*');
+            });
+
+            // Intercept console.error calls
+            console.error = (function(oldError) {
+                return function() {
+                    oldError.apply(console, arguments);
+                    const msg = Array.from(arguments).map(arg => {
+                        if (typeof arg === 'object') {
+                            try { return JSON.stringify(arg); } catch(e) { return String(arg); }
+                        }
+                        return String(arg);
+                    }).join(' ');
+                    
+                    window.parent.postMessage({
+                        type: 'IFRAME_ERROR_DETECTED',
+                        payload: { 
+                            message: msg, 
+                            type: 'console_error'
+                        }
+                    }, '*');
+                };
+            })(console.error);
+
             function getUniqueSelector(el) {
                 if (!el || !el.tagName) return null;
                 if (el.id) return \`#\${el.id}\`;

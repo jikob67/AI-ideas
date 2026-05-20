@@ -683,7 +683,7 @@ const FileConverter: React.FC<{ navigate: (view: View, context?: any) => void; c
                                             onClick={() => setConversionGoal('code')}
                                             className={`py-2 px-3 rounded-lg text-sm font-medium border transition-all ${conversionGoal === 'code' ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-700 border-slate-600 text-slate-400 hover:bg-slate-600'}`}
                                         >
-                                            تحويل لمشروع برمجيم
+                                            تحويل لمشروع برمجي
                                         </button>
                                         <button 
                                             onClick={() => setConversionGoal('app')}

@@ -221,6 +221,11 @@ export const SoftwareProjectBuilder: React.FC<{
     const [isGenerating, setIsGenerating] = useState(false);
     const [error, setError] = useState('');
     const [saveStatus, setSaveStatus] = useState('');
+    
+    // --- Automatic Repair System States & Intelligence ---
+    const [iframeErrors, setIframeErrors] = useState<{message: string; lineno?: number; colno?: number; type?: string}[]>([]);
+    const [isAutoRepairing, setIsAutoRepairing] = useState(false);
+    const [showDetailedIssues, setShowDetailedIssues] = useState(false);
 
     // Wizard state
     const [wizardStep, setWizardStep] = useState(1);
@@ -283,6 +288,132 @@ export const SoftwareProjectBuilder: React.FC<{
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isSuggestingFeatures, setIsSuggestingFeatures] = useState(false);
     const [isAnalyzingUrl, setIsAnalyzingUrl] = useState(false);
+
+    const staticIssues = useMemo(() => {
+        const issues: { id: string; type: 'html' | 'css' | 'js'; text: string; severity: 'error' | 'vulnerability' | 'warning' }[] = [];
+        const hasStyleFile = (projectFiles || []).some(f => f.name === 'style.css');
+        const hasScriptFile = (projectFiles || []).some(f => f.name === 'script.js');
+
+        (projectFiles || []).forEach(f => {
+            if (f.name === 'index.html') {
+                if (hasStyleFile && !f.content.includes('style.css')) {
+                    issues.push({
+                        id: 'html-style-unlinked',
+                        type: 'html',
+                        text: 'ملف التنسيق style.css موجود ولكنه غير مربوط بملف index.html باستعمال <link>.',
+                        severity: 'warning'
+                    });
+                }
+                if (hasScriptFile && !f.content.includes('script.js')) {
+                    issues.push({
+                        id: 'html-script-unlinked',
+                        type: 'html',
+                        text: 'ملف التحكم والبرمجة script.js موجود ولكنه غير مربوط بملف index.html وباستعمال <script>.',
+                        severity: 'warning'
+                    });
+                }
+                if (f.content.includes('<script') && !f.content.includes('</script>')) {
+                    issues.push({
+                        id: 'html-script-unclosed',
+                        type: 'html',
+                        text: 'وسم برمجيات التفاعل <script> مفتوح ولكن غير مغلق بـ </script> بشكل سليم.',
+                        severity: 'error'
+                    });
+                }
+                if (f.content.includes('<style') && !f.content.includes('</style>')) {
+                    issues.push({
+                        id: 'html-style-unclosed',
+                        type: 'html',
+                        text: 'وسم أنماط التنسيق <style> مفتوح ولكن غير مغلق بـ </style> بشكل سليم.',
+                        severity: 'error'
+                    });
+                }
+                if (!f.content.includes('viewport')) {
+                    issues.push({
+                        id: 'html-viewport-missing',
+                        type: 'html',
+                        text: 'غياب وسم التجاوب والـ viewport يعيق ضبط الهيكل ليتناسب تلقائياً مع حجم الشاشات والهواتف.',
+                        severity: 'warning'
+                    });
+                }
+                if (f.content.includes('<html') && !f.content.includes('</html>')) {
+                    issues.push({
+                        id: 'html-tag-unclosed',
+                        type: 'html',
+                        text: 'وسم البداية للهيكل <html> مفتوح ولكن غير مغلق بـ </html> في نهاية الملف.',
+                        severity: 'error'
+                    });
+                }
+                if (f.content.includes('<body') && !f.content.includes('</body>')) {
+                    issues.push({
+                        id: 'html-body-unclosed',
+                        type: 'html',
+                        text: 'وسم <body> غير مغلق بالكامل بـ </body>.',
+                        severity: 'error'
+                    });
+                }
+            }
+            if (f.name === 'style.css') {
+                const openBraces = (f.content.match(/\{/g) || []).length;
+                const closeBraces = (f.content.match(/\}/g) || []).length;
+                if (openBraces !== closeBraces) {
+                    issues.push({
+                        id: 'css-braces-mismatch',
+                        type: 'css',
+                        text: `عدم تطابق الأقواس التنسيقية المنشأة { و } (${openBraces} مقابل ${closeBraces}) بملف الأنماط والتنسيق.`,
+                        severity: 'error'
+                    });
+                }
+                if (f.content.includes('width: 1000px') || f.content.includes('width: 1200px') || f.content.includes('width: 800px')) {
+                    issues.push({
+                        id: 'css-responsiveness-static',
+                        type: 'css',
+                        text: 'تثبيت عرض الصفحة بـ px بدلاً من المئوية % أو الحجم المرن يكسر تجاوب المظهر مع الشاشات المتنقلة.',
+                        severity: 'warning'
+                    });
+                }
+            }
+            if (f.name === 'script.js') {
+                if (f.content.includes('innerHTML') && !f.content.includes('textContent') && (f.content.includes('input.value') || f.content.includes('search') || f.content.includes('URL'))) {
+                    issues.push({
+                        id: 'js-xss-vulnerability',
+                        type: 'js',
+                        text: 'ثغرة حقن برمجية (XSS) باستخدام غير آمن لـ innerHTML لعرض المدخلات بدلاً من textContent الآمن.',
+                        severity: 'vulnerability'
+                    });
+                }
+                if (f.content.includes('fetch(') && !f.content.includes('catch')) {
+                    issues.push({
+                        id: 'js-fetch-unhandled',
+                        type: 'js',
+                        text: 'عقبات استرداد البيانات: نداء fetch يرسل طلبات ويب دون معالجة أخطاء try/catch أو catch دائم للإصدار.',
+                        severity: 'warning'
+                    });
+                }
+                const openBraces = (f.content.match(/\{/g) || []).length;
+                const closeBraces = (f.content.match(/\}/g) || []).length;
+                if (openBraces !== closeBraces) {
+                    issues.push({
+                        id: 'js-braces-mismatch',
+                        type: 'js',
+                        text: `عدم تطابق الأقواس البرمجية المعرفة للوظائف والأزرار { و } (${openBraces} مقابل ${closeBraces}) بملف البرمجة التفاعلية.`,
+                        severity: 'error'
+                    });
+                }
+                const openParens = (f.content.match(/\(/g) || []).length;
+                const closeParens = (f.content.match(/\)/g) || []).length;
+                if (openParens !== closeParens) {
+                    issues.push({
+                        id: 'js-parens-mismatch',
+                        type: 'js',
+                        text: `عدم تطابق الأقواس التمهيدية والدائرية ( و ) (${openParens} مقابل ${closeParens}) بملف البرمجة التفاعلية.`,
+                        severity: 'error'
+                    });
+                }
+            }
+        });
+        return issues;
+    }, [projectFiles]);
 
     const { incrementUsage, isLimitReached } = useUsage();
     const { currentUser, updateUser } = useAuth();
@@ -741,6 +872,15 @@ export const SoftwareProjectBuilder: React.FC<{
         const handleMessage = (event: MessageEvent) => {
             if (event.data === 'repair-project') {
                 handleRepairProject();
+            } else if (event.data.type === 'IFRAME_ERROR_DETECTED') {
+                const errorPayload = event.data.payload;
+                if (errorPayload && errorPayload.message) {
+                    setIframeErrors(prev => {
+                        // Avoid duplicates of same error messages
+                        if (prev.some(err => err.message === errorPayload.message)) return prev;
+                        return [...prev, errorPayload];
+                    });
+                }
             } else if (event.data.type === 'VISUAL_EDITOR_ELEMENT_CLICKED' && isVisualEditMode) {
                 const { rect, selector, tagName } = event.data.payload;
                 if (selector) {
@@ -777,6 +917,61 @@ export const SoftwareProjectBuilder: React.FC<{
         } finally {
             setIsProcessingVisualEdit(false);
             setCommandBarState(null);
+        }
+    };
+
+    const handleAutoRepair = async () => {
+        if (!project || !projectFiles || projectFiles.length === 0) return;
+        setIsAutoRepairing(true);
+        onLog("🚀 جاري بدء نظام الإصلاح التلقائي الشامل للمشروع...");
+        onLog("🔍 تحليل الأخطاء، وحل ثغرات الأمن وتأمين الكود من جذوره نهائياً...");
+        
+        try {
+            const allDetectedIssues = [
+                ...staticIssues.map(issue => `[كود ${issue.type.toUpperCase()}]: ${issue.text} (مستوى الخطورة: ${issue.severity})`),
+                ...iframeErrors.map(e => `خطأ وقت التشغيل: ${e.message}`)
+            ];
+
+            const issuesList = allDetectedIssues.length > 0 
+                ? allDetectedIssues.map((msg, i) => `${i + 1}. ${msg}`).join('\n') 
+                : "أخطاء عامة، مشاكل ومخاطر تقنية غير معروفة، أو فجوات أداء برمجية.";
+
+            const codeSnapshot = projectFiles.map(f => `=== اسم الملف: ${f.name} ===\n${f.content}\n=== نهاية الملف ===`).join('\n\n');
+
+            const prompt = `أنت مهندس برمجيات محترف وخبير في نظام الحماية والأمان الذاتي.
+لقد تم تفعيل نظام الإصلاح التلقائي المتقدم (Auto-Repair) لحل الأخطاء والمشاكل والثغرات التالية المكتشفة في مشروع المستخدم النهائي:
+${issuesList}
+
+إليك الأكواد البرمجية الحالية للمشروع:
+${codeSnapshot}
+
+المطلوب منك هو إصلاح كامل جذري ونهائي وشامل وتلقائي دون نقصان لأي مشكلة من المشاكل المذكورة أعلاه:
+1. تصحيح جميع أخطاء وقت التشغيل وأخطاء الترجمة وبنية الأكواد (JavaScript Syntax, logic errors, missing parameters).
+2. تأمين الأكواد بالكامل ضد أي ثغرة أمنية (مثل ثغرات XSS، وسد واستبدال innerHTML بأكواد آمنة مثل textContent أو استخدام طرق تصفية المدخلات الآمنة تماماً).
+3. معالجة كافة الأخطاء البرمجية المحتملة في طلبات الشبكة (fetch requests) بإحاطتها بكتل try-catch مخصصة لمعالجة الاستثناءات بشكل دائم.
+4. تحسين تصميم الواجهة وكود CSS لتكون الصفحة متجاوبة بشكل رائع مع جميع مقاسات الشاشات والهواتف (Responsive layout).
+5. يرجى تزويدنا بكود كامل للملفات المعدلة دون حذف أو اختصار، ويجب أن تحتوي دائماً على الملفات الأساسية للمشروع (index.html, style.css, script.js).`;
+
+            const { updatedProject, aiResponse } = await geminiService.modifyProjectWithAI(project, prompt);
+            
+            const newFiles = (updatedProject as any).files || [];
+            if (newFiles && newFiles.length > 0) {
+                if (currentUser?.uid) {
+                    for (const file of newFiles) {
+                        await persistenceService.saveFile(project.id, file);
+                    }
+                }
+                setProjectFiles(newFiles);
+                setIframeErrors([]); // Clear errors
+                onLog("✨ تم نجاح نظام الإصلاح التلقائي! تم حل المشاكل وتأمين الأكواد بالكامل من الجذور وبشكل نهائي.");
+            } else {
+                onLog("⚠️ لم يتم استرجاع ملفات مصححة جديدة، قد يكون الكود خالياً من الأخطاء العميقة.");
+            }
+        } catch (error) {
+            console.error("Auto Repair failed", error);
+            onLog("✗ فشل تفعيل نظام الإصلاح التلقائي. يرجى المحاولة مرة أخرى.");
+        } finally {
+            setIsAutoRepairing(false);
         }
     };
 
@@ -2389,6 +2584,33 @@ export const SoftwareProjectBuilder: React.FC<{
                                         </button>
                                     </div>
                                 )}
+
+                                <div className="mt-4 p-4 bg-slate-800/40 border border-slate-700/60 rounded-2xl relative space-y-2 text-right">
+                                    <div className="flex items-center gap-2 justify-end text-emerald-400">
+                                        <h5 className="font-bold text-xs font-sans">نظام الإصلاح ومكافحة الثغرات</h5>
+                                        <WrenchScrewdriverIcon className="w-4 h-4" />
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 leading-relaxed">
+                                        يكتشف هذا النموذج المشاكل، والخلل البنيوي بالأكواد، وثغرات XSS الأمنية، والمشاكل التقنية، ويعيد حلها بالكامل وبشكل جذري وتلقائي.
+                                    </p>
+                                    <button 
+                                        onClick={handleAutoRepair}
+                                        disabled={isAutoRepairing}
+                                        className="w-full flex items-center justify-center gap-2 py-2 px-3 bg-emerald-600/15 hover:bg-emerald-600/35 border border-emerald-500/20 text-emerald-300 rounded-xl text-xs font-bold transition-all disabled:opacity-50 shadow-inner"
+                                    >
+                                        {isAutoRepairing ? (
+                                            <>
+                                                <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />
+                                                <span>جاري الإصلاح وتأمين الأكواد...</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <SparklesIcon className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
+                                                <span>تفعيل الإصلاح التلقائي</span>
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
                             </div>
                         )}
                         {sidebarTab === 'snapshots' && (
@@ -2540,6 +2762,110 @@ export const SoftwareProjectBuilder: React.FC<{
                                 <button onClick={() => setDevice('mobile')} className={`p-1 rounded-md transition-all ${device === 'mobile' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}><DevicePhoneMobileIcon className="w-3.5 h-3.5"/></button>
                             </div>
                         </div>
+
+                        {/* نظام الإصلاح ومكافحة الثغرات التلقائي الذكي */}
+                        {(staticIssues.length > 0 || iframeErrors.length > 0 || isAutoRepairing) && (
+                            <div className="bg-rose-950/25 border-b border-rose-500/20 p-3 flex flex-col sm:flex-row items-center justify-between gap-3 animate-fade-in text-right">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-rose-500/10 rounded-xl text-rose-400 animate-pulse flex-shrink-0">
+                                        <WrenchScrewdriverIcon className="w-4 h-4" />
+                                    </div>
+                                    <div>
+                                        <h5 className="text-white text-xs font-bold font-sans">تم رصد أخطاء أو ثغرات برمجية في مشروعك!</h5>
+                                        <p className="text-[10px] text-slate-400 mt-0.5 leading-relaxed">
+                                            المشاكل المكتشفة: {staticIssues.length + iframeErrors.length} (تشمل {staticIssues.length} عيوب هيكلية/تأمين و {iframeErrors.length} أخطاء تشغيلية)
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                                    <button
+                                        onClick={() => setShowDetailedIssues(!showDetailedIssues)}
+                                        className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold rounded-lg transition-all"
+                                    >
+                                        <span>{showDetailedIssues ? 'إخفاء التفاصيل' : 'استعراض التفاصيل'}</span>
+                                    </button>
+                                    <button
+                                        onClick={handleAutoRepair}
+                                        disabled={isAutoRepairing}
+                                        className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold rounded-lg shadow-lg active:scale-95 transition-all text-center flex items-center justify-center gap-1.5 disabled:opacity-50"
+                                    >
+                                        {isAutoRepairing ? (
+                                            <>
+                                                <SpinnerIcon className="w-3 h-3 animate-spin" />
+                                                <span>جاري الإصلاح والتحصين...</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <SparklesIcon className="w-3 h-3 text-amber-300 animate-pulse" />
+                                                <span>إصلاح تلقائي للثغرات والأعطال فوراً</span>
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {showDetailedIssues && (staticIssues.length > 0 || iframeErrors.length > 0) && (
+                            <div className="bg-slate-900 border-b border-slate-800/80 p-3.5 space-y-2.5 animate-fade-in text-right">
+                                <span className="text-[10px] font-bold text-slate-400 block mb-1">تفاصيل الثغرات وعناصر الخلل المكتشفة في الكود (HTML و CSS و JavaScript):</span>
+                                <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
+                                    {staticIssues.map((issue, idx) => {
+                                        const typeStyles = {
+                                            html: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+                                            css: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+                                            js: 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                                        };
+                                        const typeLabels = {
+                                            html: 'هيكل HTML',
+                                            css: 'تنسيقات CSS',
+                                            js: 'تفاعل JS'
+                                        };
+                                        const severityLabels = {
+                                            error: 'خطأ برمجي',
+                                            vulnerability: 'ثغرة أمنية ⚠️',
+                                            warning: 'تنبيه/تحسين'
+                                        };
+                                        const severityColors = {
+                                            error: 'text-red-400 font-semibold',
+                                            vulnerability: 'text-rose-400 font-extrabold animate-pulse',
+                                            warning: 'text-amber-400'
+                                        };
+                                        return (
+                                            <div key={`static-${idx}`} className="flex items-start sm:items-center justify-between gap-3 bg-slate-800/30 border border-slate-800 rounded-xl p-2.5 transition-all hover:bg-slate-800/50">
+                                                <div className="flex items-start gap-2.5 text-[11px] justify-start">
+                                                    <span className="text-amber-500 mt-0.5">⚡</span>
+                                                    <div className="text-right">
+                                                        <span className="text-slate-200 leading-relaxed block">{issue.text}</span>
+                                                        <p className="flex items-center gap-1.5 mt-1">
+                                                            <span className="text-[10px] text-slate-500">حالة الخلل:</span>
+                                                            <span className={`text-[10px] ${severityColors[issue.severity]}`}>{severityLabels[issue.severity]}</span>
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <span className={`px-2.5 py-0.5 rounded-lg text-[9px] font-bold border flex-shrink-0 ${typeStyles[issue.type]}`}>
+                                                    {typeLabels[issue.type]}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                    {iframeErrors.map((err, idx) => (
+                                        <div key={`inline-${idx}`} className="flex items-start justify-between gap-3 bg-rose-500/5 border border-rose-500/10 rounded-xl p-2.5">
+                                            <div className="flex items-start gap-2.5 text-[11px] justify-start text-rose-400">
+                                                <span>❌</span>
+                                                <div className="text-right">
+                                                    <span className="leading-relaxed block font-semibold">خطأ تشغيلي (Runtime Error): {err.message}</span>
+                                                    {err.lineno ? <span className="text-[9px] text-rose-300/60 block mt-0.5">السطر: {err.lineno} | العمود: {err.colno}</span> : null}
+                                                </div>
+                                            </div>
+                                            <span className="px-2.5 py-0.5 rounded-lg text-[9px] font-bold border bg-rose-500/10 text-rose-400 border-rose-500/20 flex-shrink-0">
+                                                برمجة JS
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                         <div className={`flex-grow flex items-center justify-center p-3 relative ${device === 'mobile' ? 'bg-slate-900/20' : ''}`}>
                             <div className={`transition-all duration-500 shadow-2xl overflow-hidden ${device === 'mobile' ? 'w-[320px] h-[580px] border-8 border-slate-800 rounded-[35px] relative' : 'w-full h-full rounded-xl border border-slate-800 bg-white relative'}`}>
                                 <DevicePreview 
