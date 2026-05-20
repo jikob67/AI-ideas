@@ -48,6 +48,7 @@ const ArtConverter: React.FC<ArtConverterProps> = ({ navigate }) => {
     const [isUpgradeModalOpen, setUpgradeModalOpen] = useState(false);
     const [styleMode, setStyleMode] = useState<'text' | 'image'>('text');
     const { currentUser, updateUser } = useAuth();
+    const [isGeneratingFormula, setIsGeneratingFormula] = useState<string | null>(null);
 
     // ... (Effect and Handlers remain same as original file, simplified here for brevity) ...
     useEffect(() => {
@@ -124,6 +125,45 @@ const ArtConverter: React.FC<ArtConverterProps> = ({ navigate }) => {
             setError(`فشل العملية: ${e instanceof Error ? e.message : 'فشل في قراءة الملف أو إنشاء الصورة.'}`);
         } finally {
             setIsGenerating(false);
+        }
+    };
+
+    const handleGenerateFormula = async (stylePresetName: string, stylePresetPrompt: string) => {
+        if (!baseImage) {
+            setError('الرجاء رفع الصورة الأساسية أو الرسمة أولاً ليقوم الذكاء الاصطناعي بتحليلها وتوليد الصيغة المناسبة.');
+            return;
+        }
+
+        setIsGeneratingFormula(stylePresetName);
+        setError('');
+
+        const fileToB64 = (file: File) => new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = error => reject(error);
+        });
+
+        try {
+            const base64Data = await fileToB64(baseImage.file);
+            const isStyleMode = mode === 'style';
+            
+            const prompt = isStyleMode 
+                ? `قم بتحليل الصورة أو الرسمة المرفقة وموضوعها، واكتب صيغة ووصفاً تحويلياً دقيقاً واحترافياً باللغة العربية (والإنجليزية المرفقة كمصطلحات دقيقة) لتحويل هذه الرسمة/الصورة بالكامل إلى أسلوب "${stylePresetName}" (${stylePresetPrompt}). 
+                   صف كيف سيتم تحوير الخطوط الأصلية، وتوزيع الألوان والخلفية بطريقة مخصصة تناسب تفاصيل وموضوع عناصر صورتي بدقة وبراعة فنية.
+                   أرجع فقط النص النهائي المباشر للوصف الفني (الصيغة التحويلية) مخصصاً لإرساله كمدخل لنموذج توليد وتعديل الصور وبدون أي مقدمات أو شروحات جانبية وبدون تحيات.`
+                : `قم بتحليل السكتش أو الرسمة غير المكتملة المرفقة وموضوعها الأساسي، واكتب صيغة ووصفاً تفصيلياً واحترافياً باللغة العربية لإكمال هذه الرسمة وتلوينها وإعدادها كتحفة فنية متكاملة بأسلوب "${stylePresetName}".
+                   قم بوصف العناصر الإضافية المناسبة، الخلفية، والظلال والإضاءة بطريقة ذكية تجتاز خصائص وخطوط وتفاصيل السكتش الخاص بي بدقة.
+                   أرجع فقط النص النهائي المباشر للوصف الفني (الصيغة التحويلية) دون أي ترحيب أو مقدمات.`;
+
+            const generatedPrompt = await geminiService.analyzeImage(base64Data, baseImage.file.type, prompt);
+            setStyleText(generatedPrompt.trim());
+            setStyleMode('text');
+        } catch (e) {
+            console.error(e);
+            setError(`فشل توليد الصيغة التلقائية لأسلوب ${stylePresetName}: ${e instanceof Error ? e.message : 'حدث خطأ.'}`);
+        } finally {
+            setIsGeneratingFormula(null);
         }
     };
     
@@ -327,20 +367,81 @@ const ArtConverter: React.FC<ArtConverterProps> = ({ navigate }) => {
                     <div className="space-y-4">
                         <h3 className="text-lg font-semibold">{mode === 'style' ? '2. النمط الفني' : '2. خيارات الإكمال'}</h3>
                         
-                        <div className="space-y-2">
-                            <h4 className="text-sm font-semibold text-slate-400">اقتراحات سريعة</h4>
-                            <div className="grid grid-cols-3 gap-2">
-                                {(mode === 'style' ? presetStyles : completionPresets).map(style => (
-                                    <button 
-                                        key={style.name} 
-                                        onClick={() => { setStyleText(style.prompt); setStyleMode('text'); }} 
-                                        className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all ${styleText === style.prompt ? 'bg-indigo-600/20 border-indigo-500' : 'bg-slate-700/50 border-transparent hover:bg-slate-700'}`}
-                                        title={style.name}
-                                    >
-                                        <span className="text-xl">{style.icon}</span>
-                                        <span className="text-[10px] text-slate-300 truncate w-full text-center">{style.name}</span>
-                                    </button>
-                                ))}
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                                <h4 className="text-sm font-semibold text-slate-400">الاقتراحات السريعة والتوليد الذكي</h4>
+                                {baseImage && (
+                                    <span className="text-[10px] text-indigo-400 animate-pulse flex items-center gap-1 bg-indigo-500/10 px-2 py-0.5 rounded-full border border-indigo-500/20">
+                                        ● يحلل فنك الحالي
+                                    </span>
+                                )}
+                            </div>
+
+                            {/* زر التوليد الذكي بحسب فن ورسمة المستخدم */}
+                            <button
+                                type="button"
+                                onClick={() => handleGenerateFormula('صيغة فنية مخصصة بحسب رسمي', 'الأسلوب الأنسب للرسمة')}
+                                disabled={isGeneratingFormula !== null || !baseImage}
+                                className={`w-full py-3 px-4 rounded-xl flex items-center justify-center gap-2 border transition-all ${
+                                    baseImage 
+                                        ? 'bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 border-indigo-400 text-white shadow-lg cursor-pointer transform hover:-translate-y-0.5' 
+                                        : 'bg-slate-800/80 border-slate-700 text-slate-500 cursor-not-allowed'
+                                }`}
+                            >
+                                {isGeneratingFormula === 'صيغة فنية مخصصة بحسب رسمي' ? (
+                                    <SpinnerIcon className="w-4 h-4 animate-spin text-white" />
+                                ) : (
+                                    <SparklesIcon className="w-4 h-4 text-amber-300 animate-pulse" />
+                                )}
+                                <span className="text-xs font-bold font-sans">
+                                    {isGeneratingFormula === 'صيغة فنية مخصصة بحسب رسمي' ? 'جاري تحليل العمل الفني وتوليد الصيغة...' : '✨ توليد الصيغة التحويلية المناسبة لرسوم وفنون المستخدم ذكياً'}
+                                </span>
+                            </button>
+                            
+                            {!baseImage && (
+                                <p className="text-[11px] text-slate-500 text-center">
+                                    💡 ارفع صورة أو رسمة أولاً لتفعيل زر التوليد الذكي للجماليات الفنية المناسبة لها تلقائياً.
+                                </p>
+                            )}
+
+                            <div className="grid grid-cols-2 gap-2 mt-2">
+                                {(mode === 'style' ? presetStyles : completionPresets).map(style => {
+                                    const isCurrentPending = isGeneratingFormula === style.name;
+                                    return (
+                                        <button 
+                                            key={style.name} 
+                                            type="button"
+                                            onClick={() => {
+                                                if (baseImage) {
+                                                    handleGenerateFormula(style.name, style.prompt);
+                                                } else {
+                                                    setStyleText(style.prompt);
+                                                    setStyleMode('text');
+                                                }
+                                            }} 
+                                            disabled={isGeneratingFormula !== null}
+                                            className={`relative overflow-hidden flex items-center gap-2 p-2 rounded-xl border text-right transition-all cursor-pointer ${
+                                                styleText === style.prompt || (styleText && styleText.includes(style.name))
+                                                    ? 'bg-indigo-600/20 border-indigo-500 text-white' 
+                                                    : 'bg-slate-700/40 border-slate-700/60 hover:bg-slate-700/80 text-slate-300'
+                                            }`}
+                                            title={style.name}
+                                        >
+                                            <span className="text-lg bg-slate-800/80 p-1.5 rounded-lg flex-shrink-0">{style.icon}</span>
+                                            <div className="flex flex-col text-right w-full min-w-0">
+                                                <span className="text-[11px] font-bold truncate">{style.name}</span>
+                                                <span className="text-[9px] text-slate-500 truncate">
+                                                    {isCurrentPending ? 'جاري الصياغة...' : (baseImage ? 'تحليل وصياغة ذكية' : 'صيغة جاهزة')}
+                                                </span>
+                                            </div>
+                                            {isCurrentPending && (
+                                                <div className="absolute inset-0 bg-slate-900/80 flex items-center justify-center">
+                                                    <SpinnerIcon className="w-4 h-4 animate-spin text-indigo-400" />
+                                                </div>
+                                            )}
+                                        </button>
+                                    );
+                                })}
                             </div>
                         </div>
 
