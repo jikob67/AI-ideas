@@ -36,8 +36,12 @@ export const generateFlutterCode = async (project: any): Promise<string> => {
     
     const data = await response.json();
     let code = '';
-    if (data.text) {
+    if (data.response && data.response.text) {
+      code = data.response.text;
+    } else if (data.text) {
       code = data.text;
+    } else if (data.response && data.response.candidates && data.response.candidates[0] && data.response.candidates[0].content && data.response.candidates[0].content.parts && data.response.candidates[0].content.parts[0]) {
+      code = data.response.candidates[0].content.parts[0].text || '';
     } else if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0]) {
       code = data.candidates[0].content.parts[0].text || '';
     }
