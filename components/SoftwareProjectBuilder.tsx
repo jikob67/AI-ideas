@@ -244,6 +244,7 @@ export const SoftwareProjectBuilder: React.FC<{
 
     // Shared UI State
     const [activeFile, setActiveFile] = useState<string>('index.html');
+    const [isTrinityMultiView, setIsTrinityMultiView] = useState<boolean>(false);
     const [sidebarTab, setSidebarTab] = useState<'files' | 'chat' | 'snapshots' | 'roadmap' | 'build' | 'hybrid'>('chat');
     const [device, setDevice] = useState<'desktop' | 'mobile'>('desktop');
     const [isBuildModalOpen, setIsBuildModalOpen] = useState(false);
@@ -2812,19 +2813,111 @@ ${codeSnapshot}
 
                 <div className="flex-1 flex flex-col md:flex-row overflow-hidden bg-slate-950">
                     <div className="w-full md:w-1/2 flex flex-col min-h-0 border-r border-slate-800/80">
-                        <div className="bg-slate-900/80 px-4 py-2 flex items-center justify-between border-b border-slate-800/50">
-                            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em]">المحرر البرمجي</span>
-                            <span className="text-[10px] bg-indigo-500/10 text-indigo-400 px-2 py-0.5 rounded-full border border-indigo-500/20">{activeFile}</span>
+                        {/* Interactive File Selector Tabs */}
+                        <div className="bg-slate-900/95 border-b border-slate-800/60 p-1.5 flex flex-wrap items-center justify-between gap-1.5 font-sans">
+                            <div className="flex flex-wrap items-center gap-1">
+                                {[...projectFiles].sort((a, b) => {
+                                    const trinity = ['index.html', 'style.css', 'script.js'];
+                                    const aIdx = trinity.indexOf(a.name);
+                                    const bIdx = trinity.indexOf(b.name);
+                                    if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+                                    if (aIdx !== -1) return -1;
+                                    if (bIdx !== -1) return 1;
+                                    return a.name.localeCompare(b.name);
+                                }).map(file => (
+                                    <button
+                                        key={file.name}
+                                        onClick={() => {
+                                            setActiveFile(file.name);
+                                            setIsTrinityMultiView(false);
+                                        }}
+                                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${(!isTrinityMultiView && activeFile === file.name) ? 'bg-indigo-600 text-white font-bold shadow-md shadow-indigo-500/20' : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'}`}
+                                    >
+                                        <FileIcon lang={file.language}/>
+                                        <span>{file.name}</span>
+                                    </button>
+                                ))}
+                            </div>
+                            
+                            {/* Trinity View Toggle Tab */}
+                            <button
+                                onClick={() => {
+                                    setIsTrinityMultiView(!isTrinityMultiView);
+                                }}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${isTrinityMultiView ? 'bg-gradient-to-r from-emerald-600 to-indigo-600 text-white shadow-md shadow-indigo-500/10' : 'text-emerald-400 border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 hover:text-emerald-300'}`}
+                            >
+                                <SparklesIcon className="w-3.5 h-3.5" />
+                                <span>العرض الثلاثي المدمج 🌟</span>
+                            </button>
                         </div>
-                        <textarea 
-                            className="flex-grow bg-slate-950 p-6 font-mono text-[13px] leading-relaxed resize-none focus:outline-none text-slate-300 custom-scrollbar selection:bg-indigo-500/30"
-                            spellCheck="false"
-                            value={projectFiles.find(f => f.name === activeFile)?.content || ''}
-                            onChange={(e) => {
-                                const newContent = e.target.value;
-                                setProjectFiles(prev => prev.map(f => f.name === activeFile ? { ...f, content: newContent } : f));
-                            }}
-                        />
+
+                        {/* Banner for Single View index.html inviting to Multi View */}
+                        {!isTrinityMultiView && activeFile === 'index.html' && (
+                            <div className="bg-indigo-500/5 border-b border-indigo-500/10 px-4 py-2 text-right flex items-center justify-between gap-2 text-xs">
+                                <span className="text-indigo-300 font-sans flex items-center gap-1.5">
+                                    <SparklesIcon className="w-3.5 h-3.5 text-indigo-400" />
+                                    متاح الآن: عرض وتعديل الأكواد الثلاثة (HTML, CSS, JS) معاً في نفس الوقت!
+                                </span>
+                                <button
+                                    onClick={() => setIsTrinityMultiView(true)}
+                                    className="px-2.5 py-1 bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-600 hover:text-white transition-all rounded-md font-bold text-[10px]"
+                                >
+                                    تفعيل العرض الثلاثي المشترك ⚡
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Editor workspace pane */}
+                        {isTrinityMultiView ? (
+                            <div className="flex-grow flex flex-col overflow-y-auto bg-slate-950 p-3 space-y-3.5 custom-scrollbar text-right">
+                                {[
+                                    { name: 'index.html', title: 'HTML (index.html)', lang: 'html', color: 'border-orange-500/20 hover:border-orange-500/40' },
+                                    { name: 'style.css', title: 'CSS (style.css)', lang: 'css', color: 'border-cyan-500/20 hover:border-cyan-500/40' },
+                                    { name: 'script.js', title: 'JavaScript (script.js)', lang: 'javascript', color: 'border-yellow-500/20 hover:border-yellow-500/40' }
+                                ].map((trinityFile) => {
+                                    const fileData = projectFiles.find(f => f.name === trinityFile.name);
+                                    const content = fileData?.content || '';
+                                    return (
+                                        <div key={trinityFile.name} className={`flex flex-col border rounded-xl bg-slate-900/40 overflow-hidden transition-all ${trinityFile.color}`}>
+                                            <div className="bg-slate-900/80 px-4 py-1.5 flex items-center justify-between border-b border-slate-800/80">
+                                                <button
+                                                    onClick={() => {
+                                                        navigator.clipboard.writeText(content);
+                                                    }}
+                                                    className="text-[10px] bg-slate-800 hover:bg-slate-700 px-2.5 py-1 text-slate-300 rounded transition-colors font-sans"
+                                                >
+                                                    نسخ الكود
+                                                </button>
+                                                <span className="text-[11px] font-bold text-slate-300 flex items-center gap-2">
+                                                    <FileIcon lang={trinityFile.lang as any} />
+                                                    {trinityFile.title}
+                                                </span>
+                                            </div>
+                                            <textarea
+                                                className="w-full h-48 bg-slate-950 p-4 font-mono text-[12px] leading-relaxed resize-none focus:outline-none text-slate-300 custom-scrollbar focus:ring-1 focus:ring-indigo-500/30 selection:bg-indigo-500/20"
+                                                spellCheck="false"
+                                                value={content}
+                                                onChange={(e) => {
+                                                    const newContent = e.target.value;
+                                                    setProjectFiles(prev => prev.map(f => f.name === trinityFile.name ? { ...f, content: newContent } : f));
+                                                }}
+                                                placeholder={`أدخل كود ${trinityFile.title} هنا...`}
+                                            />
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <textarea
+                                className="flex-grow bg-slate-950 p-6 font-mono text-[13px] leading-relaxed resize-none focus:outline-none text-slate-300 custom-scrollbar selection:bg-indigo-500/30"
+                                spellCheck="false"
+                                value={projectFiles.find(f => f.name === activeFile)?.content || ''}
+                                onChange={(e) => {
+                                    const newContent = e.target.value;
+                                    setProjectFiles(prev => prev.map(f => f.name === activeFile ? { ...f, content: newContent } : f));
+                                }}
+                            />
+                        )}
                     </div>
                     
                     <div className="w-full md:w-1/2 flex flex-col min-h-0 relative">

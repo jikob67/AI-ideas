@@ -1135,6 +1135,56 @@ ${ipProtection ? ipProtectionInstruction : ''}
         }
     }
 
+    async generateProfessionalTemplatePage(project: Project, theme: any, templateCategory: string, fontPair: { heading: string; body: string }, pageName: string, pageTitle: string): Promise<string> {
+        const googleFontLink = `https://fonts.googleapis.com/css2?family=${fontPair.heading.replace(' ', '+')}:wght@700&family=${fontPair.body.replace(' ', '+')}:wght@400;700&display=swap`;
+    
+        const systemInstruction = `You are an expert front-end developer and UI/UX designer. Your task is to generate a beautiful, modern, and responsive sub-page for a professional template.
+        
+        **Project Details:**
+        - Main Project Name: "${project.name}"
+        - Sub-page Filename: "${pageName}"
+        - Sub-page Title: "${pageTitle}"
+        - Template Category: "${templateCategory}"
+        
+        **Design Tokens:**
+        - Primary Color: ${theme.primary}
+        - Secondary Color: ${theme.secondary}
+        - Background Color: ${theme.background}
+        - Text Color: ${theme.text}
+        - Heading Font: "${fontPair.heading}"
+        - Body Font: "${fontPair.body}"
+        
+        **Instructions:**
+        1. Generate ONLY a clean, complete, and rich HTML string for the requested sub-page.
+        2. Ensure the content matches the page title ("${pageTitle}") and is highly relevant to "${project.name}".
+        3. Do NOT include <link rel="stylesheet"> or <script src="script.js"> tags as they are injected automatically.
+        4. Style it beautifully using TailwindCSS utility classes directly.
+        5. Use custom CSS variables or arbitrary tailwind classes if needed to align colors with the design tokens.
+        6. Return ONLY the HTML block. Your output MUST be a valid JSON object with a single key "html" containing the raw HTML content string so it parses correctly.`;
+
+        const responseSchema = {
+            type: Type.OBJECT,
+            properties: {
+                html: { type: Type.STRING, description: "The full content of the generated HTML page." }
+            },
+            required: ["html"]
+        };
+
+        try {
+            const result = await this.callGenerate('gemini-flash-latest', [{ role: 'user', parts: [{ text: `Generate the HTML page for "${pageTitle}" (${pageName}).` }] }], {
+                systemInstruction,
+                responseMimeType: 'application/json',
+                responseSchema
+            });
+            const jsonText = result.response.candidates[0].content.parts[0].text;
+            const parsed = this.parseAIJson(jsonText);
+            return parsed.html;
+        } catch (e) {
+            console.error("Error in generateProfessionalTemplatePage:", e);
+            throw new Error("Failed to generate custom subpage from AI.");
+        }
+    }
+
     async getTemplateThemeSuggestion(): Promise<{ primary: string; secondary: string; background: string; text: string; fontPair: { heading: string, body: string } }> {
         const systemInstruction = `You are a UI/UX design expert. Generate a harmonious and modern theme for a web template.
         Your output MUST be a valid JSON object containing:

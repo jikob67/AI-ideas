@@ -5,7 +5,8 @@ import { geminiService } from '../services/geminiService';
 import {
     SparklesIcon, SpinnerIcon, CheckIcon, CopyIcon, CodeIcon, ArrowDownTrayIcon, LightBulbIcon,
     BriefcaseIcon, RocketLaunchIcon, NewspaperIcon, ShoppingCartIcon, SaveIcon, Share2Icon, PlusIcon, ArrowLeftIcon, TrashIcon,
-    WrenchScrewdriverIcon, UsersGroupIcon, DevicePhoneMobileIcon, UserCircleIcon, ArrowPathIcon, MagnifyingGlassIcon, UploadIcon
+    WrenchScrewdriverIcon, UsersGroupIcon, DevicePhoneMobileIcon, UserCircleIcon, ArrowPathIcon, MagnifyingGlassIcon, UploadIcon,
+    XMarkIcon
 } from './Icons';
 import { SECTION_DEFINITIONS } from '../constants';
 // FIX: Changed to named import as ProjectCard does not have a default export.
@@ -63,6 +64,17 @@ const ProfessionalTemplateGenerator: React.FC<ProfessionalTemplateGeneratorProps
     const convertMenuRef = useRef<HTMLDivElement>(null);
     // --- End New State ---
     
+    // --- Pages & Sub-pages Feature States ---
+    const [templatePages, setTemplatePages] = useState<{ name: string; title: string; content: string }[]>([]);
+    const [selectedPageName, setSelectedPageName] = useState<string>('index.html');
+    const [globalCss, setGlobalCss] = useState<string>('');
+    const [globalJs, setGlobalJs] = useState<string>('');
+    const [isAddPageModalOpen, setIsAddPageModalOpen] = useState(false);
+    const [newPageName, setNewPageName] = useState('');
+    const [newPageTitle, setNewPageTitle] = useState('');
+    const [newPageLayout, setNewPageLayout] = useState<'blank' | 'about' | 'contact' | 'services' | 'pricing' | 'faq'>('about');
+    const [isGeneratingPage, setIsGeneratingPage] = useState(false);
+    
     const [theme, setTheme] = useState({
         primary: '#6366f1',
         secondary: '#a855f7',
@@ -73,6 +85,35 @@ const ProfessionalTemplateGenerator: React.FC<ProfessionalTemplateGeneratorProps
     const [generatedCode, setGeneratedCode] = useState<{ html: string; css: string; js: string } | null>(null);
     const [activeTab, setActiveTab] = useState<'preview' | 'html' | 'css' | 'js'>('preview');
     const [copied, setCopied] = useState(false);
+
+    // Auto-load project pages and files if editing an existing template project
+    useEffect(() => {
+        if (selectedProject && selectedProject.creationMode === 'professionalTemplateGenerator') {
+            if (selectedProject.files && selectedProject.files.length > 0) {
+                const pages = selectedProject.files
+                    .filter(f => f.name.endsWith('.html'))
+                    .map(f => ({
+                        name: f.name,
+                        title: f.name === 'index.html' ? 'الصفحة الرئيسية' : f.name.replace('.html', ''),
+                        content: f.content
+                    }));
+                const cssFile = selectedProject.files.find(f => f.language === 'css');
+                const jsFile = selectedProject.files.find(f => f.language === 'javascript' || f.language === 'typescript');
+                
+                if (pages.length > 0) {
+                    setTemplatePages(pages);
+                    setGlobalCss(cssFile?.content || '');
+                    setGlobalJs(jsFile?.content || '');
+                    setSelectedPageName('index.html');
+                    setGeneratedCode({
+                        html: pages.find(p => p.name === 'index.html')?.content || '',
+                        css: cssFile?.content || '',
+                        js: jsFile?.content || ''
+                    });
+                }
+            }
+        }
+    }, [selectedProjectId, selectedProject]);
 
      useEffect(() => {
         if (!currentUser?.email) return;
@@ -335,6 +376,12 @@ const ProfessionalTemplateGenerator: React.FC<ProfessionalTemplateGeneratorProps
         try {
             const code = await geminiService.generateProfessionalTemplate(selectedProject, theme, templateCategory, fontPair);
             setGeneratedCode(code);
+            setGlobalCss(code.css);
+            setGlobalJs(code.js);
+            setTemplatePages([
+                { name: 'index.html', title: 'الصفحة الرئيسية', content: code.html }
+            ]);
+            setSelectedPageName('index.html');
             setActiveTab('preview');
         } catch (e) {
             setError('فشل في إنشاء القالب. حاول مرة أخرى.');
@@ -363,14 +410,17 @@ const ProfessionalTemplateGenerator: React.FC<ProfessionalTemplateGeneratorProps
     };
 
     const handleDownload = () => {
-        if (!generatedCode || !selectedProject) return;
-        const fullHtml = generatedCode.html.replace('<link rel="stylesheet" href="style.css">', `<style>${generatedCode.css}</style>`);
+        const activePage = templatePages.find(p => p.name === selectedPageName) || templatePages[0];
+        if (!activePage || !selectedProject) return;
+        const fullHtml = activePage.content
+            .replace('<link rel="stylesheet" href="style.css">', `<style>${globalCss}</style>`)
+            .replace('<script src="script.js" defer></script>', `<script>${globalJs}</script>`);
 
         const blob = new Blob([fullHtml], { type: 'text/html' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `${selectedProject.name.replace(/\s+/g, '_')}-template.html`;
+        a.download = `${selectedProject.name.replace(/\s+/g, '_')}-${activePage.name}`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -378,27 +428,30 @@ const ProfessionalTemplateGenerator: React.FC<ProfessionalTemplateGeneratorProps
     };
 
     const handleShare = async () => {
-        if (!generatedCode || !selectedProject) return;
+        const activePage = templatePages.find(p => p.name === selectedPageName) || templatePages[0];
+        if (!activePage || !selectedProject) return;
         if (!navigator.share) {
             alert('متصفحك لا يدعم ميزة المشاركة.');
             return;
         }
 
         try {
-            const fullHtml = generatedCode.html.replace('<link rel="stylesheet" href="style.css">', `<style>${generatedCode.css}</style>`);
+            const fullHtml = activePage.content
+                .replace('<link rel="stylesheet" href="style.css">', `<style>${globalCss}</style>`)
+                .replace('<script src="script.js" defer></script>', `<script>${globalJs}</script>`);
             const blob = new Blob([fullHtml], { type: 'text/html' });
-            const file = new File([blob], `${selectedProject.name.replace(/\s+/g, '_')}.html`, { type: 'text/html' });
+            const file = new File([blob], `${selectedProject.name.replace(/\s+/g, '_')}-${activePage.name}`, { type: 'text/html' });
 
             if (navigator.canShare && navigator.canShare({ files: [file] })) {
                 await navigator.share({
                     files: [file],
-                    title: `قالب ${selectedProject.name}`,
+                    title: `قالب ${selectedProject.name} - صفحة ${activePage.title}`,
                     text: `تحقق من هذا القالب الذي تم إنشاؤه بواسطة AI ideas!`,
                 });
             } else {
                 // Fallback to text share
                 await navigator.share({
-                    title: `قالب ${selectedProject.name}`,
+                    title: `قالب ${selectedProject.name} - صفحة ${activePage.title}`,
                     text: `تحقق من هذا القالب الذي تم إنشاؤه بواسطة AI ideas! يمكنك تنزيل ملف HTML لرؤيته.`,
                 });
             }
@@ -419,17 +472,23 @@ const ProfessionalTemplateGenerator: React.FC<ProfessionalTemplateGeneratorProps
         const newProjectName = prompt('أدخل اسمًا للمشروع الجديد:', `${selectedProject.name} - قالب`);
         if (!newProjectName) return;
     
+        const filesToSave = [
+            ...templatePages.map(page => ({
+                name: page.name,
+                language: 'html' as const,
+                content: page.content
+            })),
+            { name: 'style.css', language: 'css' as const, content: globalCss },
+            { name: 'script.js', language: 'javascript' as const, content: globalJs }
+        ];
+
         const newProject: any = {
             id: `proj-tmpl-${Date.now()}`,
             name: newProjectName,
-            description: `قالب تم إنشاؤه لمشروع '${selectedProject.name}' بفئة '${templateCategory}'.`,
+            description: `قالب تم إنشاؤه لمشروع '${selectedProject.name}' بفئة '${templateCategory}' ويحتوي على ${templatePages.length} صفحة.`,
             type: ProjectType.WEBSITE,
             creationMode: 'professionalTemplateGenerator',
-            files: [
-                { name: 'index.html', language: 'html', content: generatedCode.html },
-                { name: 'style.css', language: 'css', content: generatedCode.css },
-                { name: 'script.js', language: 'javascript', content: generatedCode.js }
-            ],
+            files: filesToSave,
             sections: [],
             timestamp: Date.now(),
             isPublished: false,
@@ -444,7 +503,10 @@ const ProfessionalTemplateGenerator: React.FC<ProfessionalTemplateGeneratorProps
 
     const srcDoc = useMemo(() => {
         if (!generatedCode) return '';
-        const { html, css, js } = generatedCode;
+        const activePage = templatePages.find(p => p.name === selectedPageName) || templatePages[0];
+        if (!activePage) return '';
+
+        const pageHtml = activePage.content;
 
         const liveUpdateScript = `
             <script>
@@ -486,21 +548,21 @@ const ProfessionalTemplateGenerator: React.FC<ProfessionalTemplateGeneratorProps
                 });
             </script>
         `;
-        let finalHtml = html
+        let finalHtml = pageHtml
             .replace('</head>', `${liveUpdateScript}</head>`)
-            .replace('<link rel="stylesheet" href="style.css">', `<style>${css}</style>`);
+            .replace('<link rel="stylesheet" href="style.css">', `<style>${globalCss}</style>`);
             
         const scriptTagRegex = /<script\s+src="script.js"\s*(defer)?\s*><\/script>/;
         if (scriptTagRegex.test(finalHtml)) {
-            finalHtml = finalHtml.replace(scriptTagRegex, `<script>${js}</script>`);
+            finalHtml = finalHtml.replace(scriptTagRegex, `<script>${globalJs}</script>`);
         } else if (finalHtml.includes('</body>')) {
-            finalHtml = finalHtml.replace('</body>', `<script>${js}</script></body>`);
+            finalHtml = finalHtml.replace('</body>', `${globalJs ? '<script>' + globalJs + '</script>' : ''}</body>`);
         } else {
-            finalHtml += `<script>${js}</script>`;
+            finalHtml += globalJs ? `<script>${globalJs}</script>` : '';
         }
             
         return finalHtml;
-    }, [generatedCode, theme, fontPair]);
+    }, [generatedCode, templatePages, selectedPageName, globalCss, globalJs, theme, fontPair]);
 
     useEffect(() => {
         const iframe = iframeRef.current;
@@ -514,9 +576,121 @@ const ProfessionalTemplateGenerator: React.FC<ProfessionalTemplateGeneratorProps
         }
     }, [theme, fontPair, generatedCode]);
 
+    const handleAddPage = async () => {
+        if (!newPageName || !newPageTitle) {
+            alert('الرجاء إدخال اسم الصفحة وعنوانها.');
+            return;
+        }
+
+        // Validate page name ends with .html and only has lowercase characters, numbers or hyphen/dots
+        let formattedName = newPageName.trim().toLowerCase();
+        if (!formattedName.endsWith('.html')) {
+            formattedName += '.html';
+        }
+        
+        if (templatePages.some(p => p.name === formattedName)) {
+            alert('اسم ملف الصفحة موجود بالفعل!');
+            return;
+        }
+
+        setIsGeneratingPage(true);
+        try {
+            let pageContent = '';
+            
+            // Layout generation
+            if (newPageLayout === 'blank') {
+                pageContent = `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${newPageTitle}</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-[var(--background-color)] text-[var(--text-color)] min-h-screen font-sans">
+    <header class="p-6 border-b border-slate-800">
+        <div class="max-w-6xl mx-auto flex items-center justify-between font-sans">
+            <h1 class="text-xl font-bold font-heading text-[var(--primary-color)]">${selectedProject?.name || 'قالب'}</h1>
+            <a href="index.html" class="text-sm px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg">العودة للرئيسية</a>
+        </div>
+    </header>
+    <main class="max-w-6xl mx-auto py-16 px-6 text-center">
+        <h2 class="text-3xl font-extrabold font-heading mb-4 text-[var(--primary-color)]">${newPageTitle}</h2>
+        <p class="text-slate-400 max-w-2xl mx-auto">محتوى صفحة ${newPageTitle} فارغ حالياً. يمكنك تعديله وإضافة عناصر إضافية هنا.</p>
+    </main>
+    <footer class="p-6 border-t border-slate-800 text-center text-sm text-slate-500">
+        &copy; ${new Date().getFullYear()} ${selectedProject?.name || 'قالب'}
+    </footer>
+    <script src="script.js" defer></script>
+</body>
+</html>`;
+            } else {
+                // Call Gemini to generate a stunning custom layout in Arabic that suits the project perfectly!
+                pageContent = await geminiService.generateProfessionalTemplatePage(
+                    selectedProject!,
+                    theme,
+                    templateCategory,
+                    fontPair,
+                    formattedName,
+                    newPageTitle
+                );
+            }
+
+            setTemplatePages(prev => [
+                ...prev,
+                { name: formattedName, title: newPageTitle, content: pageContent }
+            ]);
+            setSelectedPageName(formattedName);
+            setIsAddPageModalOpen(false);
+            alert(`تم إنشاء صفحة "${newPageTitle}" بنجاح!`);
+        } catch (e) {
+            console.error(e);
+            alert('فشل في إنشاء الصفحة بمستوى كامل. جاري إنشاء صفحة مبدئية بدلاً من ذلك...');
+            // Fallback content on failure
+            const fallbackCont = `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${newPageTitle}</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-[var(--background-color)] text-[var(--text-color)] min-h-screen">
+    <main class="max-w-3xl mx-auto py-16 px-6 text-center">
+        <h1 class="text-3xl font-extrabold mb-4">${newPageTitle}</h1>
+        <p class="text-slate-400 mb-8">مرحباً بك في صفحة ${newPageTitle}.</p>
+        <a href="index.html" class="px-4 py-2 bg-indigo-600 rounded">الرئيسية</a>
+    </main>
+</body>
+</html>`;
+            setTemplatePages(prev => [
+                ...prev,
+                { name: formattedName, title: newPageTitle, content: fallbackCont }
+            ]);
+            setSelectedPageName(formattedName);
+            setIsAddPageModalOpen(false);
+        } finally {
+            setIsGeneratingPage(false);
+        }
+    };
+
+    const handleRemovePage = (pageName: string) => {
+        if (pageName === 'index.html') {
+            alert('لا يمكن حذف الصفحة الرئيسية!');
+            return;
+        }
+        if (confirm(`هل أنت متأكد من حذف صفحة "${pageName}"؟`)) {
+            setTemplatePages(prev => prev.filter(p => p.name !== pageName));
+            if (selectedPageName === pageName) {
+                setSelectedPageName('index.html');
+            }
+        }
+    };
+
     const handleCopy = () => {
         if (!generatedCode) return;
-        const codeToCopy = activeTab === 'html' ? generatedCode.html : activeTab === 'css' ? generatedCode.css : generatedCode.js;
+        const activePage = templatePages.find(p => p.name === selectedPageName) || templatePages[0];
+        const codeToCopy = activeTab === 'html' ? (activePage?.content || '') : activeTab === 'css' ? globalCss : globalJs;
         navigator.clipboard.writeText(codeToCopy.trim());
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
@@ -716,7 +890,7 @@ const ProfessionalTemplateGenerator: React.FC<ProfessionalTemplateGeneratorProps
                         <div className="flex-shrink-0 bg-slate-800 border-b border-slate-700 flex items-center justify-between p-2 flex-wrap gap-2">
                             <div className="flex items-center gap-1">
                                 <button onClick={() => setActiveTab('preview')} className={`px-3 py-1 text-xs rounded-md ${activeTab === 'preview' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:bg-slate-600'}`}>المعاينة</button>
-                                <button onClick={() => setActiveTab('html')} className={`px-3 py-1 text-xs rounded-md ${activeTab === 'html' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:bg-slate-600'}`}>HTML</button>
+                                <button onClick={() => setActiveTab('html')} className={`px-3 py-1 text-xs rounded-md ${activeTab === 'html' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:bg-slate-600'}`}>{selectedPageName}</button>
                                 <button onClick={() => setActiveTab('css')} className={`px-3 py-1 text-xs rounded-md ${activeTab === 'css' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:bg-slate-600'}`}>CSS</button>
                                 <button onClick={() => setActiveTab('js')} className={`px-3 py-1 text-xs rounded-md ${activeTab === 'js' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:bg-slate-600'}`}>JS</button>
                             </div>
@@ -735,10 +909,11 @@ const ProfessionalTemplateGenerator: React.FC<ProfessionalTemplateGeneratorProps
                                                 <button
                                                     key={target.view}
                                                     onClick={() => {
-                                                        const tempProject = { ...selectedProject, id: `temp-${Date.now()}`, files: [ { name: 'index.html', language: 'html', content: generatedCode.html }, { name: 'style.css', language: 'css', content: generatedCode.css }, { name: 'script.js', language: 'javascript', content: generatedCode.js } ] };
+                                                        const activePage = templatePages.find(p => p.name === selectedPageName) || templatePages[0];
+                                                        const tempProject = { ...selectedProject, id: `temp-${Date.now()}`, files: [ { name: activePage?.name || 'index.html', language: 'html', content: activePage?.content || '' }, { name: 'style.css', language: 'css', content: globalCss }, { name: 'script.js', language: 'javascript', content: globalJs } ] };
                                                         navigate(target.view, { project: tempProject });
                                                         setIsConvertMenuOpen(false);
-                                                    }}
+                                                     }}
                                                     className="w-full text-right block px-3 py-1.5 text-sm hover:bg-slate-700"
                                                 >{target.label}</button>
                                             ))}
@@ -760,29 +935,86 @@ const ProfessionalTemplateGenerator: React.FC<ProfessionalTemplateGeneratorProps
                             </div>
                         </div>
 
+                        {/* Project Pages Management Toolbar */}
+                        <div className="bg-slate-800/60 border-b border-slate-750 px-4 py-2 flex items-center justify-between gap-4 flex-wrap select-none text-right font-sans" dir="rtl">
+                            <div className="flex items-center gap-2 overflow-hidden max-w-full">
+                                <span className="text-xs font-bold text-slate-400 flex-shrink-0">صفحات المشروع 📄:</span>
+                                <div className="flex items-center gap-1.5 overflow-x-auto max-w-full custom-scrollbar py-1">
+                                    {templatePages.map(page => (
+                                        <div
+                                            key={page.name}
+                                            className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all flex-shrink-0 ${selectedPageName === page.name ? 'bg-indigo-600 text-white font-bold shadow-md shadow-indigo-500/10' : 'bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-750 hover:text-white'}`}
+                                        >
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setSelectedPageName(page.name);
+                                                    if (activeTab !== 'preview') {
+                                                        setActiveTab('html');
+                                                    }
+                                                }}
+                                                className="focus:outline-none"
+                                            >
+                                                <span>{page.title}</span>
+                                            </button>
+                                            {page.name !== 'index.html' && (
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleRemovePage(page.name);
+                                                    }}
+                                                    title="حذف الصفحة"
+                                                    className="p-0.5 rounded hover:bg-red-500/20 text-red-400 hover:text-red-300 transition-colors"
+                                                >
+                                                    <TrashIcon className="w-3.5 h-3.5" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setNewPageName('');
+                                    setNewPageTitle('');
+                                    setNewPageLayout('about');
+                                    setIsAddPageModalOpen(true);
+                                }}
+                                className="text-xs bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 font-bold px-3 py-1.5 rounded-lg border border-indigo-500/20 transition-all flex items-center gap-1 flex-shrink-0 cursor-pointer"
+                            >
+                                <PlusIcon className="w-3.5 h-3.5" />
+                                <span>صفحة جديدة +</span>
+                            </button>
+                        </div>
+
                         <div className="flex-grow bg-[#0d1117] relative">
                             {activeTab === 'preview' && <iframe ref={iframeRef} title="Preview" srcDoc={srcDoc} className="w-full h-full border-0" sandbox="allow-scripts"/>}
                             {activeTab === 'html' && (
                                 <textarea
-                                    value={generatedCode.html}
-                                    readOnly
-                                    className="w-full h-full p-4 bg-[#0d1117] font-mono text-sm text-slate-300 border-none focus:outline-none resize-none leading-relaxed"
+                                    value={templatePages.find(p => p.name === selectedPageName)?.content || ''}
+                                    onChange={(e) => {
+                                        const newContent = e.target.value;
+                                        setTemplatePages(prev => prev.map(p => p.name === selectedPageName ? { ...p, content: newContent } : p));
+                                    }}
+                                    className="w-full h-full p-4 bg-[#0d1117] font-mono text-sm text-[var(--text-color)] border-none focus:outline-none resize-none leading-relaxed select-text"
                                     spellCheck="false"
                                 />
                             )}
                             {activeTab === 'css' && (
                                 <textarea
-                                    value={generatedCode.css}
-                                    readOnly
-                                    className="w-full h-full p-4 bg-[#0d1117] font-mono text-sm text-slate-300 border-none focus:outline-none resize-none leading-relaxed"
+                                    value={globalCss}
+                                    onChange={(e) => setGlobalCss(e.target.value)}
+                                    className="w-full h-full p-4 bg-[#0d1117] font-mono text-sm text-slate-300 border-none focus:outline-none resize-none leading-relaxed select-text"
                                     spellCheck="false"
                                 />
                             )}
                             {activeTab === 'js' && (
                                 <textarea
-                                    value={generatedCode.js}
-                                    readOnly
-                                    className="w-full h-full p-4 bg-[#0d1117] font-mono text-sm text-slate-300 border-none focus:outline-none resize-none leading-relaxed"
+                                    value={globalJs}
+                                    onChange={(e) => setGlobalJs(e.target.value)}
+                                    className="w-full h-full p-4 bg-[#0d1117] font-mono text-sm text-slate-300 border-none focus:outline-none resize-none leading-relaxed select-text"
                                     spellCheck="false"
                                 />
                             )}
@@ -796,6 +1028,90 @@ const ProfessionalTemplateGenerator: React.FC<ProfessionalTemplateGeneratorProps
                 projects={projects.filter(p => p.creationMode !== 'professionalTemplateGenerator')}
                 onApply={handleApplyToProject}
             />
+
+            {/* Add Page Modal */}
+            {isAddPageModalOpen && (
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 text-right" dir="rtl">
+                    <div className="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-md overflow-hidden shadow-2xl">
+                        <div className="bg-slate-750 px-6 py-4 border-b border-slate-700 flex items-center justify-between">
+                            <h3 className="text-lg font-bold text-white font-sans">إضافة صفحة فرعية جديدة</h3>
+                            <button onClick={() => setIsAddPageModalOpen(false)} className="text-slate-400 hover:text-slate-200">
+                                <XMarkIcon className="w-5 h-5"/>
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-4 font-sans">
+                            <div className="space-y-1">
+                                <label className="text-sm font-semibold text-slate-300 block">اسم ملف الصفحة (بالإنجليزي):</label>
+                                <input
+                                    type="text"
+                                    placeholder="e.g., about, contact, pricing"
+                                    value={newPageName}
+                                    onChange={(e) => setNewPageName(e.target.value)}
+                                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-left ltr"
+                                />
+                                <span className="text-xs text-slate-400 block mt-1">سيتم إضافة امتداد .html تلقائيًا.</span>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-sm font-semibold text-slate-300 block">عنوان الصفحة (بالعربي):</label>
+                                <input
+                                    type="text"
+                                    placeholder="e.g., من نحن، اتصل بنا، الأسعار"
+                                    value={newPageTitle}
+                                    onChange={(e) => setNewPageTitle(e.target.value)}
+                                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-sm font-semibold text-slate-300 block">نموذج تخطيط الصفحة (Layout):</label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {[
+                                        { id: 'blank', label: 'صفحة فارغة 📄' },
+                                        { id: 'about', label: 'عن الشركة / من نحن 🏢' },
+                                        { id: 'contact', label: 'اتصل بنا 📞' },
+                                        { id: 'services', label: 'خدماتنا تميز ✨' },
+                                        { id: 'pricing', label: 'خطط الدفع والأسعار 💰' },
+                                        { id: 'faq', label: 'الأسئلة الشائعة ❓' }
+                                    ].map(opt => (
+                                        <button
+                                            key={opt.id}
+                                            type="button"
+                                            onClick={() => setNewPageLayout(opt.id as any)}
+                                            className={`p-2.5 rounded-lg border text-xs font-semibold text-center transition-all ${newPageLayout === opt.id ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300' : 'bg-slate-900 border-slate-700 text-slate-400 hover:bg-slate-850 hover:text-slate-200'}`}
+                                        >
+                                            {opt.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                        <div className="bg-slate-900 px-6 py-4 flex items-center justify-end gap-2 border-t border-slate-800">
+                            <button
+                                onClick={() => setIsAddPageModalOpen(false)}
+                                className="px-4 py-2 text-sm text-slate-300 hover:text-white"
+                            >
+                                إلغاء
+                            </button>
+                            <button
+                                onClick={handleAddPage}
+                                disabled={isGeneratingPage}
+                                className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm px-5 py-2 rounded-lg flex items-center gap-2 disabled:bg-slate-700 disabled:text-slate-500"
+                            >
+                                {isGeneratingPage ? (
+                                    <>
+                                        <SpinnerIcon className="w-4 h-4 animate-spin"/>
+                                        <span>جاري الإنشاء بالذكاء الاصطناعي...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <SparklesIcon className="w-4 h-4"/>
+                                        <span>إنشاء الصفحة ✨</span>
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

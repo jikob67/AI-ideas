@@ -95,11 +95,24 @@ async function startServer() {
     const { model, contents, config } = req.body;
     const maxRetries = 3;
     let attempt = 0;
+    
+    // Define fallback models if we hit a 429 RESOURCE_EXHAUSTED / Quota Exceeded error
+    const requestedModel = model || "gemini-flash-latest";
+    const modelQueue = [requestedModel];
+    
+    // If the requested model is 'gemini-3.5-flash' or 'gemini-flash-latest', let's add alternative flash models to fall back to
+    if (requestedModel === "gemini-3.5-flash" || requestedModel === "gemini-flash-latest") {
+      modelQueue.push("gemini-2.5-flash");
+      modelQueue.push("gemini-2.0-flash-exp");
+    }
 
-    while (true) {
+    let modelIndex = 0;
+
+    while (modelIndex < modelQueue.length) {
+      const currentModel = modelQueue[modelIndex];
       try {
         const response = await getAi().models.generateContent({
-          model: model || "gemini-flash-latest",
+          model: currentModel,
           contents,
           config
         });
@@ -108,18 +121,33 @@ async function startServer() {
         attempt++;
         const errorMessage = error.message || "";
         const errorStatus = error.status || 0;
-        const isRateLimitOrUnavailable = errorStatus === 429 || errorStatus === 503 ||
-                                         errorMessage.includes("429") || errorMessage.includes("503") ||
-                                         errorMessage.includes("UNAVAILABLE") || errorMessage.includes("RESOURCE_EXHAUSTED");
-                                         
-        if (isRateLimitOrUnavailable && attempt <= maxRetries) {
+        
+        const isQuotaExceeded = errorStatus === 429 || 
+                                errorMessage.includes("429") || 
+                                errorMessage.includes("quota") || 
+                                errorMessage.includes("RESOURCE_EXHAUSTED");
+        const isRetryable = isQuotaExceeded || errorStatus === 503 ||
+                            errorMessage.includes("503") ||
+                            errorMessage.includes("UNAVAILABLE");
+
+        // If it's a quota exceeded error status, check if we have a fallback model available
+        if (isQuotaExceeded && modelIndex < modelQueue.length - 1) {
+          modelIndex++;
+          attempt = 0; // Reset attempts for the fallback model
+          console.warn(`[Client/Server Fallback] Quota exceeded for model ${currentModel}. Falling back to model ${modelQueue[modelIndex]}...`);
+          // Let's print the fallback warning and wait 300ms before retrying on the new model
+          await new Promise(resolve => setTimeout(resolve, 300));
+          continue;
+        }
+
+        if (isRetryable && attempt <= maxRetries) {
           const waitTime = attempt * 2000 + Math.random() * 1000;
-          console.warn(`[Server Retry ${attempt}/${maxRetries}] Gemini API busy/rate-limit. Retrying in ${Math.round(waitTime)}ms... Error: ${errorMessage}`);
+          console.warn(`[Server Retry ${attempt}/${maxRetries}] Gemini API busy/rate-limit for ${currentModel}. Retrying in ${Math.round(waitTime)}ms... Error: ${errorMessage}`);
           await new Promise(resolve => setTimeout(resolve, waitTime));
           continue;
         }
         
-        console.error("Gemini Generate Error after all attempts:", errorMessage);
+        console.error(`Gemini Generate Error on model ${currentModel} after all attempts:`, errorMessage);
         let status = errorStatus || 500;
         if (!error.status) {
           if (errorMessage.includes('429')) status = 429;
@@ -132,25 +160,61 @@ async function startServer() {
 
   app.post("/api/gemini/stream", async (req, res) => {
     const { model, contents, config } = req.body;
-    try {
-      const response = await getAi().models.generateContentStream({
-        model: model || "gemini-flash-latest",
-        contents,
-        config
-      });
+    
+    const requestedModel = model || "gemini-flash-latest";
+    const modelQueue = [requestedModel];
+    if (requestedModel === "gemini-3.5-flash" || requestedModel === "gemini-flash-latest") {
+      modelQueue.push("gemini-2.5-flash");
+      modelQueue.push("gemini-2.0-flash-exp");
+    }
 
-      res.setHeader('Content-Type', 'text/event-stream');
-      res.setHeader('Cache-Control', 'no-cache');
-      res.setHeader('Connection', 'keep-alive');
+    let modelIndex = 0;
+    while (modelIndex < modelQueue.length) {
+      const currentModel = modelQueue[modelIndex];
+      try {
+        const response = await getAi().models.generateContentStream({
+          model: currentModel,
+          contents,
+          config
+        });
 
-      for await (const chunk of response) {
-        res.write(`data: ${JSON.stringify({ response: chunk })}\n\n`);
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+
+        for await (const chunk of response) {
+          res.write(`data: ${JSON.stringify({ response: chunk })}\n\n`);
+        }
+        res.end();
+        return; // Successful streaming completion!
+      } catch (error: any) {
+        const errorMessage = error.message || "";
+        const errorStatus = error.status || 0;
+        
+        const isQuotaExceeded = errorStatus === 429 || 
+                                errorMessage.includes("429") || 
+                                errorMessage.includes("quota") || 
+                                errorMessage.includes("RESOURCE_EXHAUSTED");
+
+        if (isQuotaExceeded && modelIndex < modelQueue.length - 1) {
+          modelIndex++;
+          console.warn(`[Client/Server Stream Fallback] Quota exceeded for model ${currentModel}. Falling back to model ${modelQueue[modelIndex]}...`);
+          await new Promise(resolve => setTimeout(resolve, 300));
+          continue;
+        }
+
+        console.error(`Gemini Stream Error on model ${currentModel}:`, errorMessage);
+        try {
+          if (!res.headersSent) {
+            res.setHeader('Content-Type', 'text/event-stream');
+          }
+          res.write(`data: ${JSON.stringify({ error: getFriendlyErrorMessage(errorMessage) })}\n\n`);
+          res.end();
+        } catch (writeErr) {
+          console.error("Failed to write stream error response:", writeErr);
+        }
+        return;
       }
-      res.end();
-    } catch (error: any) {
-      console.error("Gemini Stream Error:", error.message);
-      res.write(`data: ${JSON.stringify({ error: getFriendlyErrorMessage(error.message) })}\n\n`);
-      res.end();
     }
   });
 

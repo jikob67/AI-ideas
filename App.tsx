@@ -168,6 +168,7 @@ const App: React.FC = () => {
         }
 
         return <SoftwareProjectBuilder 
+                  key={`editApp-${projectForEditor.id}`}
                   navigate={navigate} 
                   mode={builderModeForEdit} 
                   context={{ project: projectForEditor }} 
@@ -188,59 +189,59 @@ const App: React.FC = () => {
       case 'contact':
         return <ContactUs />;
       case 'artConverter':
-        return <ArtConverter navigate={navigate} />;
+        return <ArtConverter key="artConverter" navigate={navigate} />;
       case 'professionalTemplateGenerator':
-        return <ProfessionalTemplateGenerator navigate={navigate} />;
+        return <ProfessionalTemplateGenerator key="professionalTemplateGenerator" navigate={navigate} />;
       case 'support':
-        return <Support navigate={navigate} />;
+        return <Support key="support" navigate={navigate} />;
       case 'marketing':
-        return <Marketing context={navigationContext} navigate={navigate} />;
+        return <Marketing key="marketing" context={navigationContext} navigate={navigate} />;
       case 'profitSource':
-        return <ProfitSource navigate={navigate} />;
+        return <ProfitSource key="profitSource" navigate={navigate} />;
       case 'ideaToCode':
-        return <SoftwareProjectBuilder navigate={navigate} mode="idea" context={navigationContext} />;
+        return <SoftwareProjectBuilder key="ideaToCode" navigate={navigate} mode="idea" context={navigationContext} />;
       case 'textToCode':
-        return <SoftwareProjectBuilder navigate={navigate} mode="text" context={navigationContext} />;
+        return <SoftwareProjectBuilder key="textToCode" navigate={navigate} mode="text" context={navigationContext} />;
       case 'screenToCode':
-        return <SoftwareProjectBuilder navigate={navigate} mode="screen" context={navigationContext} />;
+        return <SoftwareProjectBuilder key="screenToCode" navigate={navigate} mode="screen" context={navigationContext} />;
       case 'uiRecognizer':
-        return <SoftwareProjectBuilder navigate={navigate} mode="recognizer" context={navigationContext} />;
+        return <SoftwareProjectBuilder key="uiRecognizer" navigate={navigate} mode="recognizer" context={navigationContext} />;
       case 'drawToCode':
-        return <DrawToCode navigate={navigate} context={navigationContext} />;
+        return <DrawToCode key="drawToCode" navigate={navigate} context={navigationContext} />;
       case 'fileConverter':
-        return <FileConverter navigate={navigate} />;
+        return <FileConverter key="fileConverter" navigate={navigate} />;
       case 'projectWizard':
-        return <SoftwareProjectBuilder navigate={navigate} mode="wizard" context={navigationContext} />;
+        return <SoftwareProjectBuilder key="projectWizard" navigate={navigate} mode="wizard" context={navigationContext} />;
       case 'linkWizard':
-        return <SoftwareProjectBuilder navigate={navigate} mode="url" context={navigationContext} />;
+        return <SoftwareProjectBuilder key="linkWizard" navigate={navigate} mode="url" context={navigationContext} />;
       case 'trash':
-        return <Trash navigate={navigate} />;
+        return <Trash key="trash" navigate={navigate} />;
       case 'dataAnalysis':
-        return <DataAnalysis navigate={navigate} context={navigationContext} />;
+        return <DataAnalysis key="dataAnalysis" navigate={navigate} context={navigationContext} />;
       case 'aiContentDetector':
-        return <AiContentDetector />;
+        return <AiContentDetector key="aiContentDetector" />;
       case 'changelog':
-        return <Changelog />;
+        return <Changelog key="changelog" />;
       case 'live':
-        return <LiveConversation />;
+        return <LiveConversation key="live" />;
       case 'urlToCode':
-        return <SoftwareProjectBuilder navigate={navigate} mode="url" context={navigationContext} />;
+        return <SoftwareProjectBuilder key="urlToCode" navigate={navigate} mode="url" context={navigationContext} />;
       case 'seoOptimizer':
-        return <SeoOptimizer context={navigationContext} />;
+        return <SeoOptimizer key="seoOptimizer" context={navigationContext} />;
       case 'showroom':
-        return <Showroom navigate={navigate} context={navigationContext} />;
+        return <Showroom key="showroom" navigate={navigate} context={navigationContext} />;
       case 'assetStudio':
-        return <AssetStudio context={navigationContext} />;
+        return <AssetStudio key="assetStudio" context={navigationContext} />;
       case 'preview':
-        return <ProjectPreview navigate={navigate} context={navigationContext} />;
+        return <ProjectPreview key="preview" navigate={navigate} context={navigationContext} />;
       case 'guide':
-        return <GuideBoard />;
+        return <GuideBoard key="guide" />;
       case 'flowDemo':
-        return <FlowDemo />;
+        return <FlowDemo key="flowDemo" />;
       case 'promptRefiner':
-        return <PromptRefiner navigate={navigate} />;
+        return <PromptRefiner key="promptRefiner" navigate={navigate} />;
       default:
-        return <SoftwareProjectBuilder navigate={navigate} mode="idea" context={navigationContext} />;
+        return <SoftwareProjectBuilder key="default" navigate={navigate} mode="idea" context={navigationContext} />;
     }
   };
 
