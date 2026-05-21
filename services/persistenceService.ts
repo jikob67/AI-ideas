@@ -65,10 +65,10 @@ class PersistenceService {
         let storageUrl = '';
         let content = file.content;
 
-        // If content is huge, move to storage
+        // If content is huge, move to storage safely supporting Arabic and UTF-8 characters without btoa crash
         if (this.calculateSize(content) > 500 * 1024) { // > 500KB
             const storagePath = `projects/${projectId}/files/${file.name}`;
-            storageUrl = await storageService.uploadBase64(storagePath, btoa(content), 'text/plain');
+            storageUrl = await storageService.uploadText(storagePath, content, 'text/plain');
             content = ''; // Clear content if stored in Storage
         }
 

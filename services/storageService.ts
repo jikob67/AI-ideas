@@ -8,6 +8,11 @@ class StorageService {
         return getDownloadURL(snapshot.ref);
     }
 
+    async uploadText(path: string, text: string, mimeType: string = 'text/plain'): Promise<string> {
+        const blob = new Blob([text], { type: mimeType });
+        return this.uploadFile(path, blob);
+    }
+
     async uploadBase64(path: string, base64: string, mimeType: string): Promise<string> {
         const byteCharacters = atob(base64);
         const byteNumbers = new Array(byteCharacters.length);

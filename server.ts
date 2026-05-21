@@ -30,15 +30,25 @@ async function startServer() {
     return errMessage;
   }
 
-  // Initialize Gemini
-  const ai = new GoogleGenAI({ 
-    apiKey: process.env.GEMINI_API_KEY,
-    httpOptions: {
-      headers: {
-        'User-Agent': 'aistudio-build',
+  // Initialize Gemini lazily
+  let aiClient: GoogleGenAI | null = null;
+  function getAi(): GoogleGenAI {
+    if (!aiClient) {
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        throw new Error("api_key_invalid: مفتاح API للذكاء الاصطناعي (GEMINI_API_KEY) غير معرّف في الخادم. يرجى توفير مفتاح الـ API الخاص بـ Gemini في الإعدادات.");
       }
+      aiClient = new GoogleGenAI({ 
+        apiKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          }
+        }
+      });
     }
-  });
+    return aiClient;
+  }
 
   app.set('trust proxy', 1);
   app.use(express.json({ limit: '50mb' }));
@@ -67,7 +77,7 @@ async function startServer() {
 
     try {
       console.log("Mock Netlify Function triggered with prompt:", prompt);
-      const response = await ai.models.generateContent({
+      const response = await getAi().models.generateContent({
         model: "gemini-flash-latest",
         contents: [{ role: "user", parts: [{ text: prompt }] }]
       });
@@ -88,7 +98,7 @@ async function startServer() {
 
     while (true) {
       try {
-        const response = await ai.models.generateContent({
+        const response = await getAi().models.generateContent({
           model: model || "gemini-flash-latest",
           contents,
           config
@@ -123,7 +133,7 @@ async function startServer() {
   app.post("/api/gemini/stream", async (req, res) => {
     const { model, contents, config } = req.body;
     try {
-      const response = await ai.models.generateContentStream({
+      const response = await getAi().models.generateContentStream({
         model: model || "gemini-flash-latest",
         contents,
         config
@@ -148,7 +158,7 @@ async function startServer() {
   app.post("/api/gemini/generate-video", async (req, res) => {
     const { model, prompt, image, config } = req.body;
     try {
-      const operation = await ai.models.generateVideos({
+      const operation = await getAi().models.generateVideos({
         model: model || 'veo-3.1-lite-generate-preview',
         prompt,
         ...(image && { image: { imageBytes: image.base64, mimeType: image.mimeType } }),
@@ -167,7 +177,7 @@ async function startServer() {
       const { GenerateVideosOperation } = await import('@google/genai');
       const op = new GenerateVideosOperation();
       op.name = operationName;
-      const updated = await ai.operations.getVideosOperation({ operation: op });
+      const updated = await getAi().operations.getVideosOperation({ operation: op });
       res.json(updated);
     } catch (error: any) {
       console.error("Gemini Video Status Error:", error.message);
@@ -182,13 +192,16 @@ async function startServer() {
       const { GenerateVideosOperation } = await import('@google/genai');
       const op = new GenerateVideosOperation();
       op.name = operationName;
-      const updated = await ai.operations.getVideosOperation({ operation: op });
+      const updated = await getAi().operations.getVideosOperation({ operation: op });
       const uri = updated.response?.generatedVideos?.[0]?.video?.uri;
       
       if (!uri) return res.status(404).json({ error: "Video not found or not ready" });
 
+      const key = process.env.GEMINI_API_KEY;
+      if (!key) throw new Error("GEMINI_API_KEY is required");
+
       const videoRes = await fetch(uri, {
-        headers: { 'x-goog-api-key': process.env.GEMINI_API_KEY! },
+        headers: { 'x-goog-api-key': key },
       });
 
       res.setHeader('Content-Type', 'video/mp4');
