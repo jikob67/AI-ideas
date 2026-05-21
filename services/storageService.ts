@@ -33,7 +33,14 @@ class StorageService {
     async saveBlob(id: string, blob: Blob): Promise<string> {
         try {
             const storageRef = ref(storage, `blobs/${id}`);
-            const snapshot = await uploadBytes(storageRef, blob);
+            
+            // Timeout after 3.5 seconds to avoid freezing the UI if Firebase Storage is unconfigured or blocked
+            const uploadPromise = uploadBytes(storageRef, blob);
+            const timeoutPromise = new Promise<never>((_, reject) => 
+                setTimeout(() => reject(new Error('Upload timeout')), 3500)
+            );
+            
+            const snapshot = await Promise.race([uploadPromise, timeoutPromise]);
             return await getDownloadURL(snapshot.ref);
         } catch (error: any) {
             console.warn('[StorageService] Firebase Storage upload failed, falling back to local Object URL:', error);

@@ -19,6 +19,7 @@ import {
 } from '../../Icons';
 import { generateFlutterCode, simulateFullBuild, generateFlutterProjectZip } from '../../../services/flutterService';
 import { saveBlob } from '../../../services/storageService';
+import JSZip from 'jszip';
 
 declare global {
     interface Window {
@@ -178,7 +179,7 @@ export const BuildModal: React.FC<BuildModalProps> = ({ isOpen, onClose, project
             
             // Build the source code ZIP
             addLog('📂 تجميع الملفات وبناء الأرشيف الـ ZIP المنظم...');
-            const zip = new (window as any).JSZip();
+            const zip = new JSZip();
             if (project.files && project.files.length > 0) {
                 project.files.forEach(file => {
                     zip.file(file.name, file.content);
