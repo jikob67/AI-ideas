@@ -4,7 +4,8 @@ import { storage } from '../firebase';
 class StorageService {
     async uploadFile(path: string, blob: Blob): Promise<string> {
         const storageRef = ref(storage, path);
-        const snapshot = await uploadBytes(storageRef, blob);
+        const metadata = { contentType: blob.type || 'application/octet-stream' };
+        const snapshot = await uploadBytes(storageRef, blob, metadata);
         return getDownloadURL(snapshot.ref);
     }
 
@@ -33,11 +34,12 @@ class StorageService {
     async saveBlob(id: string, blob: Blob): Promise<string> {
         try {
             const storageRef = ref(storage, `blobs/${id}`);
+            const metadata = { contentType: blob.type || 'application/octet-stream' };
             
             // Timeout after 3.5 seconds to avoid freezing the UI if Firebase Storage is unconfigured or blocked
-            const uploadPromise = uploadBytes(storageRef, blob);
+            const uploadPromise = uploadBytes(storageRef, blob, metadata);
             const timeoutPromise = new Promise<never>((_, reject) => 
-                setTimeout(() => reject(new Error('Upload timeout')), 3500)
+                setTimeout(() => reject(new Error('Upload timeout')), 3.5 * 1000)
             );
             
             const snapshot = await Promise.race([uploadPromise, timeoutPromise]);

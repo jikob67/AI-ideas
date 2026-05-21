@@ -48,6 +48,11 @@ export const BuildModal: React.FC<BuildModalProps> = ({ isOpen, onClose, project
     const [ipaUrl, setIpaUrl] = useState<string | null>(project.ipaUrl || null);
     const [srcZipUrl, setSrcZipUrl] = useState<string | null>(project.flutterProjectUrl || null);
     
+    // Local in-memory Blobs for robust direct download bypassing CORS / Firebase limits
+    const [localWebZipBlob, setLocalWebZipBlob] = useState<Blob | null>(null);
+    const [localFlutterZipBlob, setLocalFlutterZipBlob] = useState<Blob | null>(null);
+    const [showInstructions, setShowInstructions] = useState(false);
+    
     const [error, setError] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
     const [buildEnv, setBuildEnv] = useState<string>('HTML/CSS/JS Standard Canvas');
@@ -190,19 +195,22 @@ export const BuildModal: React.FC<BuildModalProps> = ({ isOpen, onClose, project
             
             const zipBlob = await zip.generateAsync({ type: 'blob' });
             addLog('✔ تم ضغط ملفات التطبيق بنجاح.');
+            setLocalWebZipBlob(zipBlob);
 
             // Support Mobile Packaging (APK/IPA Simulator)
-            addLog('📱 بدء تكامل تطبيقات الهاتف المحمول Native Packager...');
+            addLog('📱 بدء تكامل تطبيقات الهاتف المحمول وتوليد شفرة Flutter الأصيلة...');
             const dartCode = await generateFlutterCode(project);
             const { apkBlob, ipaBlob, projectZip } = await simulateFullBuild(project);
-            addLog('☕ جاري البناء النظيف لمشروع Flutter...');
-            addLog('📦 Compiling Android target to production-ready APK using Gradle...');
-            addLog('🍎 Compiling iOS target to production-ready IPA using Xcodebuild...');
+            setLocalFlutterZipBlob(projectZip);
+            
+            addLog('☕ جاري توليف وتصدير مشروع Flutter المصدري المنظم...');
+            addLog('📦 إعداد ملفات Gradle وتجهيز هيكلية أندرويد لـ Android Studio (build.gradle, Manifest)...');
+            addLog('🍎 إعداد ترويسات Xcode وصياغة الحزم لـ iOS...');
             await new Promise(r => setTimeout(r, 1500));
 
             // STEP 5: DEPLOYING
             setPhase('deploying');
-            addLog('☁️ جاري رفع وتثبيت الملفات النهائية في السحابة واستبقاء الروابط...');
+            addLog('☁️ جاري رفع وتثبيت الملفات النهائية لتطبيق الويب واستبقاء الروابط الحقيقية...');
             
             const timestamp = Date.now();
             const liveId = `live-${project.id}-${timestamp}.html`;
@@ -215,7 +223,7 @@ export const BuildModal: React.FC<BuildModalProps> = ({ isOpen, onClose, project
             
             setResultLink(liveUrlResult);
             setSrcZipUrl(sourceZipUrlResult);
-            setApkUrl(flutterZipUrlResult); // Simulating actual secure binary artifact
+            setApkUrl(flutterZipUrlResult);
             setIpaUrl(flutterZipUrlResult);
 
             addLog('🚀 تم الانتهاء من دورة الـ CI/CD بنجاح بنسبة 100%!');
@@ -245,13 +253,45 @@ export const BuildModal: React.FC<BuildModalProps> = ({ isOpen, onClose, project
     };
 
     const handleDownloadZip = () => {
-        if (!srcZipUrl) return;
-        const link = document.createElement('a');
-        link.href = srcZipUrl;
-        link.download = `${project.name.replace(/\s+/g, '_')}_source.zip`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        const blobToDownload = localWebZipBlob;
+        if (blobToDownload) {
+            const url = URL.createObjectURL(blobToDownload);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `${project.name.replace(/\s+/g, '_')}_web_source.zip`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            setTimeout(() => URL.revokeObjectURL(url), 100);
+        } else if (srcZipUrl) {
+            const link = document.createElement('a');
+            link.href = srcZipUrl;
+            link.download = `${project.name.replace(/\s+/g, '_')}_web_source.zip`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    };
+
+    const handleDownloadFlutterZip = () => {
+        const blobToDownload = localFlutterZipBlob;
+        if (blobToDownload) {
+            const url = URL.createObjectURL(blobToDownload);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `${project.name.replace(/\s+/g, '_')}_flutter_project.zip`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            setTimeout(() => URL.revokeObjectURL(url), 100);
+        } else if (apkUrl) {
+            const link = document.createElement('a');
+            link.href = apkUrl;
+            link.download = `${project.name.replace(/\s+/g, '_')}_flutter_project.zip`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
     };
 
     const handleCopyLink = () => {
@@ -424,36 +464,81 @@ export const BuildModal: React.FC<BuildModalProps> = ({ isOpen, onClose, project
                             </div>
 
                             {/* NATIVE APK / IPA BUILD */}
-                            <div className="p-4 bg-slate-800/30 border border-slate-800 rounded-2xl flex flex-col justify-between md:col-span-2">
-                                <div className="flex items-center justify-between pointer-events-none mb-3">
-                                    <span className="text-[9px] font-mono text-purple-400 px-2 py-0.5 bg-purple-500/10 rounded-full font-bold">NATIVE PIPELINE READY</span>
+                            <div className="p-5 bg-slate-800/40 border border-slate-800 rounded-3xl flex flex-col justify-between md:col-span-2 space-y-4 text-right">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[10px] font-mono text-purple-400 px-3 py-1 bg-purple-500/10 rounded-full font-bold">NATIVE PIPELINE READY</span>
                                     <div className="flex items-center gap-2">
                                         <div className="text-right">
-                                            <h4 className="text-white font-bold text-xs">تطبيقات الهواتف الذكية</h4>
-                                            <p className="text-[9px] text-slate-500">تجميع Flutter & Capacitor</p>
+                                            <h4 className="text-white font-bold text-sm">كود تطبيقات الهاتف المحمول</h4>
+                                            <p className="text-[10px] text-slate-400 mt-0.5">مشروع Flutter متكامل 100%</p>
                                         </div>
-                                        <div className="p-2 bg-purple-500/10 rounded-lg text-purple-400">
-                                            <DevicePhoneMobileIcon className="w-4 h-4" />
+                                        <div className="p-2.5 bg-purple-500/10 rounded-xl text-purple-400">
+                                            <DevicePhoneMobileIcon className="w-5 h-5" />
                                         </div>
                                     </div>
                                 </div>
-                                
-                                <div className="grid grid-cols-2 gap-3">
-                                    <a href={apkUrl || '#'} download={`${project.name}.apk`} className={`py-2 text-center rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
-                                        apkUrl 
-                                            ? 'bg-purple-600/20 hover:bg-purple-600/30 text-purple-400 border border-purple-500/20' 
-                                            : 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-50'
-                                    }`}>
-                                        تحميل APK للاندرويد
-                                    </a>
-                                    <a href={ipaUrl || '#'} download={`${project.name}.ipa`} className={`py-2 text-center rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
-                                        ipaUrl 
-                                            ? 'bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/20' 
-                                            : 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-50'
-                                    }`}>
-                                        تحميل IPA للايفون
-                                    </a>
+
+                                <div className="bg-slate-900/80 p-3.5 rounded-2xl text-[12px] text-slate-300 leading-relaxed space-y-2 border border-slate-800">
+                                    <p className="font-semibold text-purple-400">🚨 تنبيه فني حول تجميع الـ APK والـ IPA:</p>
+                                    <p>
+                                        بناء تطبيقات الهواتف الذكية وتصديرها بصيغة <span className="font-mono text-white text-xs">APK</span> أو <span className="font-mono text-white text-xs">IPA</span> حقيقية قابلة للتثبيت يتطلب تشفيرًا برمجيًا وتوقيعًا رقميًا رسميين (وهي ميزة تتطلب نظام Gradle للاندرويد أو بيئة Xcode للايفون لحماية خصوصية الكود الخاص بك).
+                                    </p>
+                                    <p className="text-slate-400">
+                                        نهجنا هو الشفافية التامة؛ بدلاً من تسليم ملفات تالفة أو وهمية، نوفر لك **الكود المصدري الأصلي الكامل لمشروع Flutter جاهزاً تماماً للتشغيل** والبناء على جهازك بضغطة زر!
+                                    </p>
                                 </div>
+
+                                <div className="flex flex-col sm:flex-row gap-3">
+                                    <button 
+                                        onClick={handleDownloadFlutterZip}
+                                        disabled={!localFlutterZipBlob && !apkUrl}
+                                        className={`flex-1 py-3 text-center rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+                                            localFlutterZipBlob || apkUrl
+                                                ? 'bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-900/20' 
+                                                : 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-50'
+                                        }`}
+                                    >
+                                        <ArrowDownTrayIcon className="w-4 h-4" />
+                                        تحميل الكود المصدري الكامل لـ Flutter (ZIP)
+                                    </button>
+
+                                    <button 
+                                        onClick={() => setShowInstructions(!showInstructions)}
+                                        className={`py-3 px-6 text-center rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                                            showInstructions 
+                                                ? 'bg-slate-700 text-white border border-slate-600'
+                                                : 'bg-slate-800/60 hover:bg-slate-800 text-slate-300 border border-slate-800'
+                                        }`}
+                                    >
+                                        <CommandLineIcon className="w-4 h-4 text-indigo-400" />
+                                        {showInstructions ? 'إخفاء أوامر التجميع' : 'طريقة البناء خطوة بخطوة'}
+                                    </button>
+                                </div>
+
+                                {showInstructions && (
+                                    <div className="bg-black/95 rounded-2xl p-4 font-mono text-xs text-indigo-300 border border-slate-800 space-y-3 animate-fade-in text-left">
+                                        <div className="flex items-center justify-between border-b border-slate-800 pb-2 text-slate-500">
+                                            <span>Flutter Pipeline Quickstart Console</span>
+                                            <span className="text-[10px] bg-slate-900 px-2 py-0.5 rounded text-slate-400">DART</span>
+                                        </div>
+                                        <p className="text-slate-400 text-right text-[11px] mb-2 font-sans">
+                                            بعد فك الضغط عن الملف المحمل، افتح نافذة الأوامر Terminal داخل المجلد ونفذ التالي:
+                                        </p>
+                                        <div className="space-y-1.5 leading-relaxed">
+                                            <p className="text-emerald-400 text-right"># 1. تنزيل المكتبات والاعتماديات الخاصة بـ Flutter</p>
+                                            <p className="text-white bg-slate-900 p-2 rounded select-all font-mono">flutter pub get</p>
+                                            
+                                            <p className="text-emerald-400 mt-3 text-right"># 2. بناء ملف أندرويد APK حقيقي جاهز للرفع على الهواتف</p>
+                                            <p className="text-white bg-slate-900 p-2 rounded select-all font-mono">flutter build apk --release</p>
+                                            
+                                            <p className="text-emerald-450 mt-3 text-right"># 3. بناء ملف آيفون IPA للتجريب والرفع على متجر آبل</p>
+                                            <p className="text-white bg-slate-900 p-2 rounded select-all font-mono">flutter build ios --release</p>
+                                        </div>
+                                        <p className="text-[10px] text-slate-500 font-sans text-right pt-2 border-t border-slate-900">
+                                            * ملاحظة: يتطلب بناء الـ IPA حاسوب Mac مثبت عليه Xcode رسميًا.
+                                        </p>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
