@@ -413,8 +413,8 @@ self.addEventListener('fetch', event => {
   });
 
   // Serve the published files
-  app.get("/published/:projectId/:filename?", (req, res) => {
-    const { projectId } = req.params;
+  app.get(["/published/:projectId", "/published/:projectId/:filename"], (req, res) => {
+    const projectId = req.params.projectId as string;
     const filename = (req.params as any).filename || "index.html";
 
     const safeFilename = path.basename(filename);

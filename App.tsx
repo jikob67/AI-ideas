@@ -252,10 +252,15 @@ const App: React.FC = () => {
     <UsageProvider>
       <div className="flex h-screen bg-gray-900 text-gray-100 font-sans">
         {currentUser && (
-          <Sidebar activeView={activeView} setActiveView={navigate} isOpen={isSidebarOpen} openOnboarding={() => setShowOnboarding(true)} />
+          <Sidebar activeView={activeView} setActiveView={navigate} isOpen={isSidebarOpen} openOnboarding={() => setShowOnboarding(true)} navigationContext={navigationContext} />
         )}
         <div className="flex-1 flex flex-col min-w-0">
-          <Header toggleSidebar={currentUser ? toggleSidebar : undefined} />
+          <Header 
+            toggleSidebar={currentUser ? toggleSidebar : undefined} 
+            navigate={navigate}
+            activeView={activeView}
+            navigationContext={navigationContext}
+          />
           <main className={`flex-grow ${isFullScreen ? 'flex flex-col overflow-hidden' : 'container mx-auto p-4 md:p-6 lg:p-8 overflow-y-auto'}`}>
             {!currentUser && publicViews.includes(activeView) && (
               <div className="mb-6">

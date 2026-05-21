@@ -38,12 +38,14 @@ import {
 import { View } from '../types';
 import { useAuth } from '../hooks/useAuth';
 import UpgradeModal from './UpgradeModal';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface SidebarProps {
   activeView: View;
   setActiveView: (view: View, context?: any) => void;
   isOpen: boolean;
   openOnboarding: () => void;
+  navigationContext?: any;
 }
 
 interface FeedbackItem {
@@ -278,10 +280,46 @@ const NavHeader: React.FC<{ label: string }> = ({ label }) => (
   </div>
 );
 
-const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, openOnboarding }) => {
+const SECTIONS = [
+  { id: 'projectWizard', label: 'خطوات إلى كود', desc: 'أداة خطوة بخطوة لبناء وتوجيه الكود فورا', Icon: RocketLaunchIcon, color: 'text-indigo-400', bg: 'bg-indigo-500/10' },
+  { id: 'assetStudio', label: 'استوديو الأصول', desc: 'توليد الرسومات والشعارات والأصول الإبداعية', Icon: SquaresPlusIcon, color: 'text-pink-400', bg: 'bg-pink-500/10' },
+  { id: 'seoOptimizer', label: 'محلل SEO الذكي', desc: 'تحسين تصدر محركات البحث للمحتوى البرمجي', Icon: MagnifyingGlassIcon, color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+  { id: 'linkWizard', label: 'رابط إلى كود', desc: 'تحويل أي رابط موقع خارجي لكود مصدري نظيف', Icon: GlobeIcon, color: 'text-sky-400', bg: 'bg-sky-500/10' },
+  { id: 'ideaToCode', label: 'فكرة إلى كود', desc: 'تحويل وصف وأفكار المشروع إلى تطبيق ويب كامل', Icon: LightBulbIcon, color: 'text-yellow-400', bg: 'bg-yellow-500/10' },
+  { id: 'textToCode', label: 'نص إلى كود', desc: 'تطوير الكود مباشرة بناء على أوامر نصية مخصصة', Icon: CommandLineIcon, color: 'text-slate-400', bg: 'bg-slate-500/10' },
+  { id: 'screenToCode', label: 'شاشة إلى كود', desc: 'تصميم وبناء الواجهات من صور لقطات الشاشة', Icon: CameraIcon, color: 'text-cyan-400', bg: 'bg-cyan-500/10' },
+  { id: 'drawToCode', label: 'من المخطط للكود', desc: 'رسم مخطط هيكلي وتحويله لكود واجهة حقيقي', Icon: PencilSquareIcon, color: 'text-blue-400', bg: 'bg-blue-500/10' },
+  { id: 'uiRecognizer', label: 'محلل الواجهات', desc: 'تحليل هندسة ومكونات الواجهات بذكاء واقتراح كود', Icon: BeakerIcon, color: 'text-purple-400', bg: 'bg-purple-500/10' },
+  { id: 'flowDemo', label: 'تجربة التدفق', desc: 'محاكاة كاملة لتدفق تجربة المستخدم وحركة التطبيقات', Icon: RocketLaunchIcon, color: 'text-orange-500', bg: 'bg-orange-500/10' },
+  { id: 'marketing', label: 'المحتوى التسويقي', desc: 'إنشاء حملات ومحتوى تسويق واحترافي لمنتجاتك', Icon: FireIcon, color: 'text-orange-400', bg: 'bg-orange-400/10' },
+  { id: 'showroom', label: 'معرض المجتمع', desc: 'استعراض ونشر واستلهام مشاريع مذهلة من المبدعين', Icon: TrophyIcon, color: 'text-yellow-500', bg: 'bg-yellow-500/10' },
+  { id: 'preview', label: 'المعاينة والتحقق', desc: 'معاينة المشروع ومراجعته ببيئة حية تفاعلية', Icon: ShieldCheckIcon, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
+  { id: 'promptRefiner', label: 'نقل الطلب وتطوير الفكرة', desc: 'تحسين وهندسة الأوامر بدقة لأفضل مخرجات برمجية', Icon: SparklesIcon, color: 'text-indigo-400', bg: 'bg-indigo-400/10' },
+  { id: 'professionalTemplateGenerator', label: 'قوالب احترافية', desc: 'قوالب برمجية مصممة مسبقا وجاهزة للإطلاق المباشر', Icon: TemplateIcon, color: 'text-violet-400', bg: 'bg-violet-500/10' },
+  { id: 'fileConverter', label: 'مركز تحويل الملفات', desc: 'تحويل الأكواد والملفات البرمجية لعديد الصيغ بسهولة', Icon: WrenchScrewdriverIcon, color: 'text-amber-600', bg: 'bg-amber-600/10' },
+  { id: 'dataAnalysis', label: 'تحليل البيانات', desc: 'تحميل ملفات وإجراء تحليلات إحصائية ورسومات تفاعلية', Icon: ChartPieIcon, color: 'text-teal-400', bg: 'bg-teal-500/10' },
+  { id: 'profitSource', label: 'مصدر ربح', desc: 'منظومة استثمار واستكشاف مصادر الدخل والأرباح للمشروع', Icon: DollarSignIcon, color: 'text-green-400', bg: 'bg-green-500/10' },
+  { id: 'trash', label: 'سلة المحذوفات', desc: 'إدارة واستعادة العناصر والأفكار المحذوفة الخاصة بك', Icon: TrashIcon, color: 'text-gray-500', bg: 'bg-gray-500/10' },
+  { id: 'support', label: 'الدعم الفني', desc: 'تقديم الإجابة على استفساراتك وحل المشكلات الفنية فوراً', Icon: SupportIcon, color: 'text-indigo-300', bg: 'bg-indigo-300/10' }
+];
+
+const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, openOnboarding, navigationContext }) => {
   const { currentUser } = useAuth();
   const [isUpgradeModalOpen, setUpgradeModalOpen] = useState(false);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
+  const [isTransferOpen, setIsTransferOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const handleTransfer = (sectionId: string) => {
+    setActiveView(sectionId as View, navigationContext);
+    setIsTransferOpen(false);
+    setSearchQuery('');
+  };
+
+  const filteredSections = SECTIONS.filter(section =>
+    section.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    section.desc.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <>
@@ -292,6 +330,15 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, op
           </div>
         </div>
         <nav className="flex flex-col gap-1 flex-grow overflow-y-auto custom-scrollbar pr-1">
+          {/* Transfer Context Button */}
+          <button
+            onClick={() => setIsTransferOpen(true)}
+            className="flex items-center justify-center w-full gap-2 px-3 py-2.5 mb-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs transition-all shadow-md active:scale-95 duration-200"
+            title="نقل المشروع أو سياق العمل إلى قسم فني آخر مفيد"
+            id="sidebar-transfer-trigger"
+          >
+            <span className="font-sans">نقل إلى قسم آخر</span>
+          </button>
           
           <NavHeader label="تطوير واجهات وأكواد" />
           <NavButton
@@ -506,6 +553,116 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, op
       </aside>
       <UpgradeModal isOpen={isUpgradeModalOpen} onClose={() => setUpgradeModalOpen(false)} />
       <FeedbackModal isOpen={isFeedbackModalOpen} onClose={() => setIsFeedbackModalOpen(false)} />
+
+      {/* Transfer System Modal */}
+      <AnimatePresence>
+        {isTransferOpen && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4" id="transfer-modal-overlay" dir="rtl" onClick={() => setIsTransferOpen(false)}>
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-5xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden" 
+              onClick={e => e.stopPropagation()}
+              id="transfer-modal-card"
+            >
+              {/* Header */}
+              <div className="p-6 border-b border-slate-800/80 bg-slate-950/40 flex flex-col md:flex-row md:items-center justify-between gap-4 text-right">
+                <div>
+                  <h3 className="text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 flex items-center gap-2">
+                    <span className="text-xl">🔄</span> نظام النقل الذكي بين الأقسام
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-1 leading-relaxed font-sans">
+                    هل ترغب في تغيير طريقتك؟ يمكنك مواصلة العمل على نفس المحتوى والسياق الحالي لكن عبر الانتقال فورا إلى ميزة أو قسم فني آخر.
+                  </p>
+                </div>
+                <button 
+                  onClick={() => setIsTransferOpen(false)} 
+                  className="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-full transition-all self-start md:self-auto"
+                  id="close-transfer-btn"
+                >
+                  <CloseIcon className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Search Control */}
+              <div className="p-4 bg-slate-900 border-b border-slate-800/60">
+                <div className="relative max-w-md mx-auto">
+                  <span className="absolute inset-y-0 right-3 flex items-center text-slate-500">
+                    <MagnifyingGlassIcon className="w-5 h-5" />
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="ابحث عن القسم أو الأداة..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-indigo-500/80 rounded-2xl py-3 pr-10 pl-4 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/15 transition-all text-right font-sans"
+                    id="transfer-search-input"
+                  />
+                  {searchQuery && (
+                    <button 
+                      onClick={() => setSearchQuery('')}
+                      className="absolute inset-y-0 left-3 flex items-center text-slate-500 hover:text-white"
+                    >
+                      مسح
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Grid of Sections */}
+              <div className="p-6 overflow-y-auto max-h-[60vh] custom-scrollbar bg-slate-900/40 text-right">
+                {filteredSections.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" id="transfer-sections-grid">
+                    {filteredSections.map((section) => {
+                      const IconComponent = section.Icon;
+                      const isCurrent = activeView === section.id;
+                      
+                      return (
+                        <button
+                          key={section.id}
+                          onClick={() => handleTransfer(section.id)}
+                          className={`group text-right p-4 rounded-2xl border text-slate-300 transition-all flex flex-col justify-between h-[135px] duration-300 ${
+                            isCurrent 
+                              ? 'bg-indigo-600/10 border-indigo-500 ring-2 ring-indigo-500/20' 
+                              : 'bg-slate-950/40 border-slate-800/80 hover:border-slate-700 hover:bg-slate-950/80 hover:-translate-y-1'
+                          }`}
+                          id={`transfer-item-${section.id}`}
+                        >
+                          <div className="flex items-center justify-between w-full">
+                            <div className={`p-2 rounded-xl ${section.bg} ${section.color} group-hover:scale-110 transition-transform duration-300`}>
+                              <IconComponent className="w-5 h-5" />
+                            </div>
+                            {isCurrent && (
+                              <span className="text-[10px] px-2 py-0.5 bg-indigo-500/20 text-indigo-300 rounded-full font-bold">القسم الحالي</span>
+                            )}
+                          </div>
+                          
+                          <div className="mt-3">
+                            <h4 className="text-white font-bold text-xs group-hover:text-indigo-300 transition-colors font-sans">{section.label}</h4>
+                            <p className="text-[10px] text-slate-500 leading-normal mt-1 line-clamp-2 group-hover:text-slate-400 transition-colors font-sans">{section.desc}</p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-12" id="no-sections-found">
+                    <p className="text-slate-500 text-sm">عذراً، لم نتمكن من العثور على أي قسم يطابق بحثك.</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer Banner */}
+              <div className="bg-slate-950 p-4 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-500 font-sans">
+                <span>نظام نقل السياق الذكي v1.1</span>
+                <span>اختر القسم لتوجيه فكرتك أو كودك الحالي إليه فوراً</span>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </>
   );
 };
