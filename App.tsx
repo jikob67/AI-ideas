@@ -38,6 +38,7 @@ import AppealPage from './components/AppealPage';
 // Added ArrowLeftIcon to fix ReferenceError at line 234
 import { SpinnerIcon, ArrowLeftIcon } from './components/Icons';
 import OnboardingModal from './components/OnboardingModal';
+import ErrorBoundary from './components/ErrorBoundary';
 
 import { ProjectPreview } from './components/ProjectPreview';
 import { GuideBoard } from './components/GuideBoard';
@@ -278,7 +279,9 @@ const App: React.FC = () => {
                  </button>
               </div>
             )}
-            {renderContent()}
+            <ErrorBoundary componentName={activeView}>
+              {renderContent()}
+            </ErrorBoundary>
           </main>
           {!isFullScreen && <Footer navigate={navigate} />}
         </div>

@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import { AuthProvider } from './contexts/AuthContext';
 import { SharedProjectViewer } from './components/SharedProjectViewer';
+import ErrorBoundary from './components/ErrorBoundary';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -15,14 +16,18 @@ const path = window.location.pathname;
 if (path.startsWith('/share/')) {
   root.render(
     <React.StrictMode>
-      <SharedProjectViewer />
+      <ErrorBoundary componentName="SharedProjectViewer">
+        <SharedProjectViewer />
+      </ErrorBoundary>
     </React.StrictMode>
   );
 } else {
   root.render(
     <React.StrictMode>
       <AuthProvider>
-        <App />
+        <ErrorBoundary componentName="AppRoot">
+          <App />
+        </ErrorBoundary>
       </AuthProvider>
     </React.StrictMode>
   );

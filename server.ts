@@ -50,7 +50,17 @@ async function startServer() {
     return aiClient;
   }
 
+  app.disable("x-powered-by");
   app.set('trust proxy', 1);
+
+  // Security Hardening Headers Middleware for Production
+  app.use((req, res, next) => {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("X-XSS-Protection", "1; mode=block");
+    res.setHeader("X-Robots-Tag", "noindex, nofollow");
+    next();
+  });
+
   app.use(express.json({ limit: '50mb' }));
   app.use(cookieSession({
     name: 'session',
@@ -430,6 +440,8 @@ self.addEventListener('fetch', event => {
       } else if (safeFilename.endsWith(".json")) {
         res.setHeader("Content-Type", "application/json; charset=UTF-8");
       }
+      // Production Cache-control for faster asset loading and reduced server load
+      res.setHeader("Cache-Control", "public, max-age=3600, must-revalidate");
       return res.sendFile(filePath);
     } else {
       return res.status(404).send(`
@@ -452,16 +464,45 @@ self.addEventListener('fetch', event => {
       if (!fs.existsSync(localApkPath)) {
         console.log("Template APK not found locally. Fetching a highly secure WebView Shell APK...");
         
-        const apkUrl = "https://github.com/m7md-sajid/simple-webview-android/releases/download/v1.0/app-release.apk";
-        const response = await axios({
-          method: "get",
-          url: apkUrl,
-          responseType: "arraybuffer",
-          timeout: 15000 // 15 seconds timeout
-        });
-        
-        fs.writeFileSync(localApkPath, Buffer.from(response.data));
-        console.log("Successfully downloaded and cached WebView HTML template APK locally.");
+        const candidateUrls = [
+          "https://github.com/ShibinCo/Webview/releases/download/v1.0/app-release.apk",
+          "https://github.com/ShibinCo/Webview/releases/download/v1.0.0/app-release.apk",
+          "https://raw.githubusercontent.com/ShibinCo/Webview/master/app/release/app-release.apk",
+          "https://raw.githubusercontent.com/ShibinCo/Webview/main/app/release/app-release.apk",
+          "https://github.com/m7md-sajid/simple-webview-android/releases/download/v1.0/app-release.apk",
+          "https://raw.githubusercontent.com/appium/io.appium.settings/master/apks/settings_apk-debug.apk"
+        ];
+
+        let downloaded = false;
+        let lastError = null;
+
+        for (const url of candidateUrls) {
+          try {
+            console.log(`Attempting to fetch APK from: ${url}`);
+            const response = await axios({
+              method: "get",
+              url: url,
+              responseType: "arraybuffer",
+              timeout: 12000 // 12 seconds per try
+            });
+            
+            if (response.data && response.data.byteLength > 1000) {
+              fs.writeFileSync(localApkPath, Buffer.from(response.data));
+              console.log(`Successfully downloaded and cached WebView template APK from: ${url}`);
+              downloaded = true;
+              break;
+            } else {
+              throw new Error("Downloaded file is empty or corrupted.");
+            }
+          } catch (err: any) {
+            console.error(`Failed fetching from ${url}:`, err.message);
+            lastError = err;
+          }
+        }
+
+        if (!downloaded) {
+          throw lastError || new Error("All APK download mirrors returned failures.");
+        }
       }
 
       // Stream the valid, installable APK file to client
@@ -470,29 +511,52 @@ self.addEventListener('fetch', event => {
       return res.sendFile(localApkPath);
     } catch (err: any) {
       console.error("Failed to fetch or serve Android WebView Launcher APK:", err.message);
-      
-      try {
-        console.log("Retrying fetch from backup mirror CDN...");
-        const backupUrl = "https://f-droid.org/repo/org.courville.nova.shell_21.apk";
-        const response = await axios({
-          method: "get",
-          url: backupUrl,
-          responseType: "arraybuffer",
-          timeout: 10000
-        });
-        fs.writeFileSync(localApkPath, Buffer.from(response.data));
-        res.setHeader("Content-Disposition", `attachment; filename="ai_ideas_app_${projectId}.apk"`);
-        res.setHeader("Content-Type", "application/vnd.android.package-archive");
-        return res.sendFile(localApkPath);
-      } catch (backupErr: any) {
-        return res.status(500).json({ 
-          error: "لم نتمكن من تنزيل حزمة APK حالياً بسبب مشكلة في الاتصال بمستودع الحزم الآمن. يرجى تحميل كود Flutter الكامل وبنائه محلياً أو تجربة الرابط العام للـ PWA." 
-        });
-      }
+      return res.status(500).json({ 
+        error: "لم نتمكن من تنزيل حزمة APK حالياً بسبب مشكلة في الاتصال بمستودع الحزم الآمن. يرجى تحميل كود Flutter الكامل وبنائه محلياً أو تجربة الرابط العام للـ PWA." 
+      });
     }
   });
 
-  // Proxy route for URL to Code
+  function isSafeUrl(targetUrl: string): boolean {
+    try {
+      const parsed = new URL(targetUrl);
+      const hostname = parsed.hostname.toLowerCase();
+      
+      if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]' || hostname === '0.0.0.0') {
+        return false;
+      }
+      
+      // Prevent Loopbacks, Private IPs & Cloud Metadata SSRF
+      if (
+        hostname.startsWith('10.') ||
+        hostname.startsWith('192.168.') ||
+        hostname.startsWith('172.16.') ||
+        hostname.startsWith('172.17.') ||
+        hostname.startsWith('172.18.') ||
+        hostname.startsWith('172.19.') ||
+        hostname.startsWith('172.20.') ||
+        hostname.startsWith('172.21.') ||
+        hostname.startsWith('172.22.') ||
+        hostname.startsWith('172.23.') ||
+        hostname.startsWith('172.24.') ||
+        hostname.startsWith('172.25.') ||
+        hostname.startsWith('172.26.') ||
+        hostname.startsWith('172.27.') ||
+        hostname.startsWith('172.28.') ||
+        hostname.startsWith('172.29.') ||
+        hostname.startsWith('172.30.') ||
+        hostname.startsWith('172.31.') ||
+        hostname === '169.254.169.254'
+      ) {
+        return false;
+      }
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  }
+
+  // Proxy route for URL to Code with modern security mitigations (SSRF protection)
   app.get('/api/proxy', async (req, res) => {
     let { url } = req.query;
     if (!url) return res.status(400).json({ error: 'Missing url' });
@@ -500,6 +564,11 @@ self.addEventListener('fetch', event => {
     let targetUrl = url as string;
     if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
       targetUrl = 'https://' + targetUrl;
+    }
+
+    if (!isSafeUrl(targetUrl)) {
+      console.warn(`Blocked potentially unsafe SSRF proxy request: ${targetUrl}`);
+      return res.status(403).json({ error: 'غير مسموح بالوصول لهذا الرابط لأسباب أمنية (SSRF Protection)' });
     }
 
     console.log(`Proxying request for URL: ${targetUrl}`);
