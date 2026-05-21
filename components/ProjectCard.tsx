@@ -5,12 +5,14 @@ import { Project, SectionType } from '../types';
 import { 
     BriefcaseIcon, CodeIcon, DotsVerticalIcon, TrashIcon, RectangleStackIcon, 
     ArrowDownTrayIcon, ArrowRightIcon, Share2Icon, FlutterIcon, FolderPlusIcon,
-    PencilIcon, LinkIcon, UserIcon, GlobeAltIcon
+    PencilIcon, LinkIcon, UserIcon, GlobeAltIcon, CloseIcon, MagnifyingGlassIcon
 } from './Icons';
 import { useAuth } from '../hooks/useAuth';
 import { persistenceService } from '../services/persistenceService';
 import { generateFlutterCode, simulateFullBuild } from '../services/flutterService';
 import { getBlob, deleteBlob, saveBlob } from '../services/storageService';
+import { SECTIONS } from './Sidebar';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface ProjectCardProps {
     project: Project;
@@ -205,12 +207,11 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onDelete, onE
     const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     const [isFlutterLoading, setIsFlutterLoading] = useState(false);
-    const [isCategoryMenuOpen, setIsCategoryMenuOpen] = useState(false);
-    const [newCategoryName, setNewCategoryName] = useState('');
+    const [isTransferOpen, setIsTransferOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
     const [apkUrl, setApkUrl] = useState<string | undefined>(project.apkUrl);
     const [ipaUrl, setIpaUrl] = useState<string | undefined>(project.ipaUrl);
     const menuRef = useRef<HTMLDivElement>(null);
-    const categoryMenuRef = useRef<HTMLDivElement>(null);
     const { currentUser, updateUser } = useAuth();
 
     useEffect(() => {
@@ -231,9 +232,6 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onDelete, onE
         const handleClickOutside = (event: MouseEvent) => {
             if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
                 setIsMenuOpen(false);
-            }
-            if (categoryMenuRef.current && !categoryMenuRef.current.contains(event.target as Node)) {
-                setIsCategoryMenuOpen(false);
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
@@ -404,20 +402,21 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onDelete, onE
         }
     };
 
-    const handleMoveToCategory = (category: string) => {
-        onUpdate({ ...project, category });
-        setIsCategoryMenuOpen(false);
-        setIsMenuOpen(false);
+    const handleTransfer = (sectionId: string) => {
+        const globalNavigate = (window as any).__appNavigate;
+        if (globalNavigate) {
+            globalNavigate(sectionId, { project: project });
+        }
+        setIsTransferOpen(false);
+        setSearchQuery('');
     };
 
-    const handleCreateAndMoveToCategory = () => {
-        if (!newCategoryName) return;
-        onAddCategory(newCategoryName);
-        onUpdate({ ...project, category: newCategoryName });
-        setNewCategoryName('');
-        setIsCategoryMenuOpen(false);
-        setIsMenuOpen(false);
-    };
+    const filteredSections = useMemo(() => {
+        return SECTIONS.filter(section =>
+            section.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            section.desc.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+    }, [searchQuery]);
 
     const sectionsCount = useMemo(() => {
         return project.sections?.length || 0;
@@ -451,30 +450,15 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onDelete, onE
                                         <FlutterIcon className="w-4 h-4"/>
                                         {isFlutterLoading ? 'جاري التحويل...' : 'تحويل إلى تطبيق (Flutter)'}
                                     </button>
-                                    <div className="relative" ref={categoryMenuRef}>
-                                        <button onClick={() => setIsCategoryMenuOpen(!isCategoryMenuOpen)} className="kebab-menu-item w-full">
-                                            <FolderPlusIcon className="w-4 h-4"/>نقل إلى قسم
-                                        </button>
-                                        {isCategoryMenuOpen && (
-                                            <div className="absolute left-full top-0 ml-2 bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-2 w-48 z-[70]">
-                                                {categories.map(cat => (
-                                                    <button key={cat} onClick={() => handleMoveToCategory(cat)} className="w-full text-right px-3 py-2 hover:bg-slate-700 rounded-md text-sm truncate">
-                                                        {cat}
-                                                    </button>
-                                                ))}
-                                                <div className="mt-2 pt-2 border-t border-slate-700">
-                                                    <input 
-                                                        type="text" 
-                                                        value={newCategoryName}
-                                                        onChange={e => setNewCategoryName(e.target.value)}
-                                                        placeholder="قسم جديد..."
-                                                        className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs mb-1"
-                                                    />
-                                                    <button onClick={handleCreateAndMoveToCategory} className="w-full bg-indigo-600 py-1 rounded text-xs font-bold">إضافة ونقل</button>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
+                                    <button 
+                                        onClick={() => {
+                                            setIsMenuOpen(false);
+                                            setIsTransferOpen(true);
+                                        }} 
+                                        className="kebab-menu-item w-full"
+                                    >
+                                        <FolderPlusIcon className="w-4 h-4"/>نقل إلى قسم
+                                    </button>
                                     <button onClick={handleShare} className="kebab-menu-item"><Share2Icon className="w-4 h-4"/>مشاركة</button>
                                     <div className="my-1 h-px bg-slate-700"></div>
                                     <button onClick={handleDeleteClick} className="kebab-menu-item text-red-400"><TrashIcon className="w-4 h-4"/>حذف</button>
@@ -532,6 +516,121 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onDelete, onE
                 title={`حذف "${project.name}"`}
                 message="هل أنت متأكد؟ سيتم نقل المشروع إلى سلة المهملات."
             />
+            {/* Transfer System Modal */}
+            <AnimatePresence>
+                {isTransferOpen && (
+                    <div 
+                        className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[100] p-4 font-sans text-right" 
+                        id={`transfer-modal-overlay-${project.id}`} 
+                        dir="rtl" 
+                        onClick={() => setIsTransferOpen(false)}
+                    >
+                        <motion.div 
+                            initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 15 }}
+                            transition={{ duration: 0.2, ease: 'easeOut' }}
+                            className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-5xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden text-right" 
+                            onClick={e => e.stopPropagation()}
+                            id={`transfer-modal-card-${project.id}`}
+                        >
+                            {/* Header */}
+                            <div className="p-6 border-b border-slate-800/80 bg-slate-950/40 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                <div>
+                                    <h3 className="text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 flex items-center gap-2">
+                                        نظام النقل الذكي بين الأقسام
+                                    </h3>
+                                    <p className="text-xs text-slate-400 mt-1 leading-relaxed font-sans">
+                                        هل ترغب في تغيير طريقتك؟ يمكنك مواصلة العمل على نفس المحتوى والسياق الحالي لكن عبر الانتقال فورا إلى ميزة أو قسم فني آخر.
+                                    </p>
+                                </div>
+                                <button 
+                                    onClick={() => setIsTransferOpen(false)} 
+                                    className="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-full transition-all self-start md:self-auto"
+                                    id={`close-transfer-btn-${project.id}`}
+                                >
+                                    <CloseIcon className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            {/* Search Control */}
+                            <div className="p-4 bg-slate-900 border-b border-slate-800/60">
+                                <div className="relative max-w-md mx-auto">
+                                    <span className="absolute inset-y-0 right-3 flex items-center text-slate-500">
+                                        <MagnifyingGlassIcon className="w-5 h-5" />
+                                    </span>
+                                    <input
+                                        type="text"
+                                        placeholder="ابحث عن القسم أو الأداة..."
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-indigo-500/80 rounded-2xl py-3 pr-10 pl-4 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/15 transition-all text-right font-sans"
+                                        id={`transfer-search-input-${project.id}`}
+                                    />
+                                    {searchQuery && (
+                                        <button 
+                                            onClick={() => setSearchQuery('')}
+                                            className="absolute inset-y-0 left-3 flex items-center text-slate-500 hover:text-white text-xs"
+                                        >
+                                            مسح
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Grid of Sections */}
+                            <div className="p-6 overflow-y-auto max-h-[60vh] custom-scrollbar bg-slate-900/40">
+                                {filteredSections.length > 0 ? (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" id={`transfer-sections-grid-${project.id}`}>
+                                        {filteredSections.map((section) => {
+                                            const IconComponent = section.Icon;
+                                            const activeView = (window as any).__activeView || '';
+                                            const isCurrent = activeView === section.id;
+                                            
+                                            return (
+                                                <button
+                                                    key={section.id}
+                                                    onClick={() => handleTransfer(section.id)}
+                                                    className={`group text-right p-4 rounded-2xl border text-slate-300 transition-all flex flex-col justify-between h-[135px] duration-300 ${
+                                                        isCurrent 
+                                                            ? 'bg-indigo-600/10 border-indigo-500 ring-2 ring-indigo-500/20' 
+                                                            : 'bg-slate-950/40 border-slate-800/80 hover:border-slate-700 hover:bg-slate-950/80 hover:-translate-y-1'
+                                                    }`}
+                                                    id={`transfer-item-${section.id}-${project.id}`}
+                                                >
+                                                    <div className="flex items-center justify-between w-full">
+                                                        <div className={`p-2 rounded-xl ${section.bg} ${section.color} group-hover:scale-110 transition-transform duration-300`}>
+                                                            <IconComponent className="w-5 h-5" />
+                                                        </div>
+                                                        {isCurrent && (
+                                                            <span className="text-[10px] px-2 py-0.5 bg-indigo-500/20 text-indigo-300 rounded-full font-bold">القسم الحالي</span>
+                                                        )}
+                                                    </div>
+                                                    
+                                                    <div className="mt-3">
+                                                        <h4 className="text-white font-bold text-xs group-hover:text-indigo-300 transition-colors font-sans">{section.label}</h4>
+                                                        <p className="text-[10px] text-slate-500 leading-normal mt-1 line-clamp-2 group-hover:text-slate-400 transition-colors font-sans">{section.desc}</p>
+                                                    </div>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-12" id="no-sections-found">
+                                        <p className="text-slate-500 text-sm font-sans">عذراً، لم نتمكن من العثور على أي قسم يطابق بحثك.</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Footer Banner */}
+                            <div className="bg-slate-950 p-4 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-500 font-sans">
+                                <span>نظام نقل السياق الذكي v1.1</span>
+                                <span>اختر القسم لتوجيه فكرتك أو كودك الحالي إليه فوراً</span>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
         </>
     );
 };

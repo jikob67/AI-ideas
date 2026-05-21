@@ -280,7 +280,7 @@ const NavHeader: React.FC<{ label: string }> = ({ label }) => (
   </div>
 );
 
-const SECTIONS = [
+export const SECTIONS = [
   { id: 'projectWizard', label: 'خطوات إلى كود', desc: 'أداة خطوة بخطوة لبناء وتوجيه الكود فورا', Icon: RocketLaunchIcon, color: 'text-indigo-400', bg: 'bg-indigo-500/10' },
   { id: 'assetStudio', label: 'استوديو الأصول', desc: 'توليد الرسومات والشعارات والأصول الإبداعية', Icon: SquaresPlusIcon, color: 'text-pink-400', bg: 'bg-pink-500/10' },
   { id: 'seoOptimizer', label: 'محلل SEO الذكي', desc: 'تحسين تصدر محركات البحث للمحتوى البرمجي', Icon: MagnifyingGlassIcon, color: 'text-emerald-400', bg: 'bg-emerald-500/10' },

@@ -57,6 +57,15 @@ const App: React.FC = () => {
   }, []);
 
   React.useEffect(() => {
+    (window as any).__appNavigate = navigate;
+    (window as any).__activeView = activeView;
+    return () => {
+      delete (window as any).__appNavigate;
+      delete (window as any).__activeView;
+    };
+  }, [navigate, activeView]);
+
+  React.useEffect(() => {
       if (currentUser?.isNewUser) {
           setShowOnboarding(true);
       }
