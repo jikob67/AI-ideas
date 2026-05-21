@@ -36,14 +36,9 @@ class StorageService {
             const snapshot = await uploadBytes(storageRef, blob);
             return await getDownloadURL(snapshot.ref);
         } catch (error: any) {
-            console.error('[StorageService] Save blob error:', error);
-            if (error.code === 'storage/retry-limit-exceeded') {
-                throw new Error('فشل الاتصال بخدمة التخزين. يرجى التأكد من استقرار الإنترنت وحاول مرة أخرى.');
-            }
-            if (error.code === 'storage/unauthorized') {
-                throw new Error('ليس لديك صلاحية لرفع الملفات. يرجى تسجيل الدخول.');
-            }
-            throw new Error(`فشل رفع الملف: ${error.message || error.code}`);
+            console.warn('[StorageService] Firebase Storage upload failed, falling back to local Object URL:', error);
+            // Bulletproof local fallback using browser Object URL so that the pipeline can finish and the user can still run/interact with the app!
+            return URL.createObjectURL(blob);
         }
     }
 

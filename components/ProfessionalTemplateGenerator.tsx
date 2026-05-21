@@ -86,6 +86,8 @@ const ProfessionalTemplateGenerator: React.FC<ProfessionalTemplateGeneratorProps
     const [activeTab, setActiveTab] = useState<'preview' | 'html' | 'css' | 'js'>('preview');
     const [copied, setCopied] = useState(false);
 
+    const selectedProject = useMemo(() => projects.find(p => p.id === selectedProjectId), [projects, selectedProjectId]);
+
     // Auto-load project pages and files if editing an existing template project
     useEffect(() => {
         if (selectedProject && selectedProject.creationMode === 'professionalTemplateGenerator') {
@@ -142,8 +144,6 @@ const ProfessionalTemplateGenerator: React.FC<ProfessionalTemplateGeneratorProps
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
-
-    const selectedProject = useMemo(() => projects.find(p => p.id === selectedProjectId), [projects, selectedProjectId]);
 
     const handleImportProjects = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
