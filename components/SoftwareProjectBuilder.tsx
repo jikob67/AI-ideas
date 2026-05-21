@@ -63,6 +63,7 @@ import { useAuth } from '../hooks/useAuth';
 import QualityAnalysisModal from './builder/modals/QualityAnalysisModal';
 import { ProjectCard } from './ProjectCard';
 import ProjectDetailModal from './ProjectDetailModal';
+import { HybridBridgeSuite } from './HybridBridgeSuite';
 import { db } from '../firebase';
 import { 
   collection, 
@@ -243,7 +244,7 @@ export const SoftwareProjectBuilder: React.FC<{
 
     // Shared UI State
     const [activeFile, setActiveFile] = useState<string>('index.html');
-    const [sidebarTab, setSidebarTab] = useState<'files' | 'chat' | 'snapshots' | 'roadmap' | 'build'>('chat');
+    const [sidebarTab, setSidebarTab] = useState<'files' | 'chat' | 'snapshots' | 'roadmap' | 'build' | 'hybrid'>('chat');
     const [device, setDevice] = useState<'desktop' | 'mobile'>('desktop');
     const [isBuildModalOpen, setIsBuildModalOpen] = useState(false);
     const [isBuildInstructionsModalOpen, setIsBuildInstructionsModalOpen] = useState(false);
@@ -2493,13 +2494,14 @@ ${codeSnapshot}
             </div>
             
             <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-                <div className="w-full md:w-[320px] flex flex-col min-h-0 border-r border-slate-700 bg-slate-800/20">
-                    <div className="flex bg-slate-800/50 border-b border-slate-700">
-                        <button onClick={() => setSidebarTab('chat')} className={`flex-1 py-3 text-[11px] font-bold transition-all ${sidebarTab === 'chat' ? 'text-indigo-400 bg-indigo-500/5 border-b-2 border-indigo-500' : 'text-slate-500 hover:text-slate-300'}`}>الدردشة</button>
-                        <button onClick={() => setSidebarTab('files')} className={`flex-1 py-3 text-[11px] font-bold transition-all ${sidebarTab === 'files' ? 'text-indigo-400 bg-indigo-500/5 border-b-2 border-indigo-500' : 'text-slate-500 hover:text-slate-300'}`}>الملفات</button>
-                        <button onClick={() => setSidebarTab('snapshots')} className={`flex-1 py-3 text-[11px] font-bold transition-all ${sidebarTab === 'snapshots' ? 'text-indigo-400 bg-indigo-500/5 border-b-2 border-indigo-500' : 'text-slate-500 hover:text-slate-300'}`}>النسخ</button>
-                        <button onClick={() => setSidebarTab('build')} className={`flex-1 py-3 text-[11px] font-bold transition-all ${sidebarTab === 'build' ? 'text-indigo-400 bg-indigo-500/5 border-b-2 border-indigo-500' : 'text-slate-500 hover:text-slate-300'}`}>بناء</button>
-                        <button onClick={() => setSidebarTab('roadmap')} className={`flex-1 py-3 text-[11px] font-bold transition-all ${sidebarTab === 'roadmap' ? 'text-indigo-400 bg-indigo-500/5 border-b-2 border-indigo-500' : 'text-slate-500 hover:text-slate-300'}`}>الخطة</button>
+                <div className={`w-full ${sidebarTab === 'hybrid' ? 'md:w-[50%] lg:w-[600px]' : 'md:w-[320px]'} flex flex-col min-h-0 border-r border-slate-700 bg-slate-800/20 transition-all duration-300`}>
+                    <div className="flex bg-slate-800/40 border-b border-slate-700 overflow-x-auto custom-scrollbar">
+                        <button onClick={() => setSidebarTab('chat')} className={`flex-shrink-0 px-3 py-3 text-[11px] font-bold transition-all ${sidebarTab === 'chat' ? 'text-indigo-400 bg-indigo-500/5 border-b-2 border-indigo-500' : 'text-slate-500 hover:text-slate-300'}`}>الدردشة</button>
+                        <button onClick={() => setSidebarTab('files')} className={`flex-shrink-0 px-3 py-3 text-[11px] font-bold transition-all ${sidebarTab === 'files' ? 'text-indigo-400 bg-indigo-500/5 border-b-2 border-indigo-500' : 'text-slate-500 hover:text-slate-300'}`}>الملفات</button>
+                        <button onClick={() => setSidebarTab('snapshots')} className={`flex-shrink-0 px-3 py-3 text-[11px] font-bold transition-all ${sidebarTab === 'snapshots' ? 'text-indigo-400 bg-indigo-500/5 border-b-2 border-indigo-500' : 'text-slate-500 hover:text-slate-300'}`}>النسخ</button>
+                        <button onClick={() => setSidebarTab('build')} className={`flex-shrink-0 px-3 py-3 text-[11px] font-bold transition-all ${sidebarTab === 'build' ? 'text-indigo-400 bg-indigo-500/5 border-b-2 border-indigo-500' : 'text-slate-500 hover:text-slate-300'}`}>بناء</button>
+                        <button onClick={() => setSidebarTab('hybrid')} className={`flex-shrink-0 px-3 py-3 text-[11px] font-bold transition-all ${sidebarTab === 'hybrid' ? 'text-indigo-400 bg-indigo-500/5 border-b-2 border-indigo-500' : 'text-slate-500 hover:text-slate-300'}`}>المعمارية الهجينة ⚡</button>
+                        <button onClick={() => setSidebarTab('roadmap')} className={`flex-shrink-0 px-3 py-3 text-[11px] font-bold transition-all ${sidebarTab === 'roadmap' ? 'text-indigo-400 bg-indigo-500/5 border-b-2 border-indigo-500' : 'text-slate-500 hover:text-slate-300'}`}>الخطة</button>
                     </div>
                     
                     <div className="flex-grow overflow-hidden relative">
@@ -2784,6 +2786,25 @@ ${codeSnapshot}
                                         <strong>ملاحظة:</strong> يتم تجميع ملفات HTML و CSS و JavaScript تلقائياً لتعمل كأداة متكاملة فور التحميل أو النشر.
                                     </p>
                                 </div>
+                            </div>
+                        )}
+                        {sidebarTab === 'hybrid' && (
+                            <div className="h-full bg-slate-900/30 overflow-hidden">
+                                <HybridBridgeSuite
+                                    project={project!}
+                                    projectFiles={projectFiles}
+                                    onUpdateProjectFiles={(updatedFiles) => {
+                                        setProjectFiles(updatedFiles);
+                                        updatedFiles.forEach(async (f) => {
+                                            await persistenceService.saveFile(project!.id, f);
+                                        });
+                                    }}
+                                    onUpdateProjectMetadata={async (updatedMetadata) => {
+                                        const newProj = { ...project!, ...updatedMetadata };
+                                        setProject(newProj);
+                                        await persistenceService.saveProjectMetadata(newProj);
+                                    }}
+                                />
                             </div>
                         )}
                     </div>
