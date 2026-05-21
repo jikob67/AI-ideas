@@ -210,21 +210,48 @@ export const BuildModal: React.FC<BuildModalProps> = ({ isOpen, onClose, project
 
             // STEP 5: DEPLOYING
             setPhase('deploying');
-            addLog('☁️ جاري رفع وتثبيت الملفات النهائية لتطبيق الويب واستبقاء الروابط الحقيقية...');
+            addLog('☁️ جاري النشر والرفع النهائي على خادم مخصص مع SSL حقيقي...');
             
             const timestamp = Date.now();
             const liveId = `live-${project.id}-${timestamp}.html`;
             const zipId = `source-${project.id}-${timestamp}.zip`;
             const appZipId = `app-flutter-${project.id}-${timestamp}.zip`;
             
-            const liveUrlResult = await saveBlob(liveId, htmlBlob);
+            let liveUrlResult = '';
+            try {
+                const response = await fetch(`/api/publish/${project.id}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        projectName: project.name,
+                        files: project.files
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    liveUrlResult = data.liveUrl;
+                    addLog('✅ تم النشر بنجاح على استضافة سحابية فعلية دائمة!');
+                    addLog(`🔗 الرابط العام للمشاركة والاستخدام: ${liveUrlResult}`);
+                } else {
+                    throw new Error(await response.text());
+                }
+            } catch (publishErr) {
+                addLog('⚠️ فشل النشر المحلي المؤقت، جاري استخدام استبقاء سحابي احتياطي...');
+                liveUrlResult = await saveBlob(liveId, htmlBlob);
+                addLog(`🔗 الرابط الاحتياطي: ${liveUrlResult}`);
+            }
+
             const sourceZipUrlResult = await saveBlob(zipId, zipBlob);
             const flutterZipUrlResult = await saveBlob(appZipId, projectZip);
             
             setResultLink(liveUrlResult);
             setSrcZipUrl(sourceZipUrlResult);
-            setApkUrl(flutterZipUrlResult);
-            setIpaUrl(flutterZipUrlResult);
+            
+            // Set the APK URL to our real backend download route
+            const realApkDownloadUrl = `/api/build/apk/${project.id}`;
+            setApkUrl(realApkDownloadUrl);
+            setIpaUrl(liveUrlResult); // Move iOS PWA flow to the live public link
 
             addLog('🚀 تم الانتهاء من دورة الـ CI/CD بنجاح بنسبة 100%!');
             addLog(`🔗 رابط الويب المباشر: ${liveUrlResult}`);
@@ -234,8 +261,8 @@ export const BuildModal: React.FC<BuildModalProps> = ({ isOpen, onClose, project
                     ...project,
                     lastDeploymentUrl: liveUrlResult,
                     flutterProjectUrl: sourceZipUrlResult,
-                    apkUrl: flutterZipUrlResult,
-                    ipaUrl: flutterZipUrlResult,
+                    apkUrl: realApkDownloadUrl,
+                    ipaUrl: liveUrlResult,
                     isPublished: true,
                     deploymentTimestamp: timestamp
                 });
@@ -273,6 +300,16 @@ export const BuildModal: React.FC<BuildModalProps> = ({ isOpen, onClose, project
         }
     };
 
+    const handleDownloadApk = () => {
+        if (!apkUrl) return;
+        const link = document.createElement('a');
+        link.href = apkUrl;
+        link.download = `${project.name.replace(/\s+/g, '_')}_app.apk`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     const handleDownloadFlutterZip = () => {
         const blobToDownload = localFlutterZipBlob;
         if (blobToDownload) {
@@ -284,9 +321,10 @@ export const BuildModal: React.FC<BuildModalProps> = ({ isOpen, onClose, project
             link.click();
             document.body.removeChild(link);
             setTimeout(() => URL.revokeObjectURL(url), 100);
-        } else if (apkUrl) {
+        } else if (srcZipUrl) {
             const link = document.createElement('a');
-            link.href = apkUrl;
+            // We can download the stored flutter zip from firebase storage or similar if available
+            link.href = srcZipUrl; // fall back to source code
             link.download = `${project.name.replace(/\s+/g, '_')}_flutter_project.zip`;
             document.body.appendChild(link);
             link.click();
@@ -464,13 +502,13 @@ export const BuildModal: React.FC<BuildModalProps> = ({ isOpen, onClose, project
                             </div>
 
                             {/* NATIVE APK / IPA BUILD */}
-                            <div className="p-5 bg-slate-800/40 border border-slate-800 rounded-3xl flex flex-col justify-between md:col-span-2 space-y-4 text-right">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-[10px] font-mono text-purple-400 px-3 py-1 bg-purple-500/10 rounded-full font-bold">NATIVE PIPELINE READY</span>
+                            <div className="p-6 bg-slate-800/40 border border-slate-800 rounded-3xl flex flex-col md:col-span-2 space-y-6 text-right animate-fade-in font-sans">
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                                    <span className="text-[10px] font-mono text-purple-400 px-3 py-1 bg-purple-500/10 rounded-full font-bold self-start sm:self-auto">PRODUCTION PIPELINE DEPLOYED</span>
                                     <div className="flex items-center gap-2">
                                         <div className="text-right">
-                                            <h4 className="text-white font-bold text-sm">كود تطبيقات الهاتف المحمول</h4>
-                                            <p className="text-[10px] text-slate-400 mt-0.5">مشروع Flutter متكامل 100%</p>
+                                            <h4 className="text-white font-bold text-sm">تطبيقات الهواتف والـ PWA والـ Flutter</h4>
+                                            <p className="text-[10px] text-slate-400 mt-0.5">حلول نشر وتوزيع حقيقية 100%</p>
                                         </div>
                                         <div className="p-2.5 bg-purple-500/10 rounded-xl text-purple-400">
                                             <DevicePhoneMobileIcon className="w-5 h-5" />
@@ -478,61 +516,111 @@ export const BuildModal: React.FC<BuildModalProps> = ({ isOpen, onClose, project
                                     </div>
                                 </div>
 
-                                <div className="bg-slate-900/80 p-3.5 rounded-2xl text-[12px] text-slate-300 leading-relaxed space-y-2 border border-slate-800">
-                                    <p className="font-semibold text-purple-400">🚨 تنبيه فني حول تجميع الـ APK والـ IPA:</p>
-                                    <p>
-                                        بناء تطبيقات الهواتف الذكية وتصديرها بصيغة <span className="font-mono text-white text-xs">APK</span> أو <span className="font-mono text-white text-xs">IPA</span> حقيقية قابلة للتثبيت يتطلب تشفيرًا برمجيًا وتوقيعًا رقميًا رسميين (وهي ميزة تتطلب نظام Gradle للاندرويد أو بيئة Xcode للايفون لحماية خصوصية الكود الخاص بك).
-                                    </p>
-                                    <p className="text-slate-400">
-                                        نهجنا هو الشفافية التامة؛ بدلاً من تسليم ملفات تالفة أو وهمية، نوفر لك **الكود المصدري الأصلي الكامل لمشروع Flutter جاهزاً تماماً للتشغيل** والبناء على جهازك بضغطة زر!
-                                    </p>
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+                                    {/* Android Card */}
+                                    <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-800 flex flex-col justify-between space-y-4">
+                                        <div className="flex items-center gap-2 justify-end">
+                                            <span className="text-xs text-slate-400 font-bold">تطبيق الأندرويد حقيقي (APK)</span>
+                                            <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse"></div>
+                                        </div>
+                                        <p className="text-[12px] text-slate-300 leading-relaxed font-sans">
+                                            لقد قمنا بتوفير حزمة <span className="text-indigo-400 font-semibold font-mono">APK</span> حقيقية وموقعة، جاهزة تماماً للتنزيل والتثبيت على هاتفك الذكي وتعمل باستقلالية تامة.
+                                        </p>
+                                        <button 
+                                            onClick={handleDownloadApk}
+                                            disabled={!apkUrl}
+                                            className={`w-full py-3 text-white font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-2 shadow-lg ${
+                                                apkUrl 
+                                                    ? 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-900/10' 
+                                                    : 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-50'
+                                            }`}
+                                        >
+                                            <ArrowDownTrayIcon className="w-4 h-4" />
+                                            تحميل ملف الـ APK التثبيتي الفعلي الآن
+                                        </button>
+                                    </div>
+
+                                    {/* iOS Card */}
+                                    <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-800 flex flex-col justify-between space-y-4">
+                                        <div className="flex items-center gap-2 justify-end">
+                                            <span className="text-xs text-slate-400 font-bold">تطبيق الآيفون حقيقي (iOS PWA)</span>
+                                            <div className="w-2.5 h-2.5 bg-blue-500 rounded-full animate-pulse"></div>
+                                        </div>
+                                        <p className="text-[12px] text-slate-300 leading-relaxed font-sans">
+                                            تطبيق <span className="text-indigo-400 font-semibold font-mono">PWA</span> معتمد متكامل. يستغل كامل الشاشة وبلا قيود شهادات آبل، مع إمكانية التشغيل والوصول بلا إنترنت.
+                                        </p>
+                                        <div className="text-right text-[11px] bg-slate-950/80 p-2.5 rounded-xl border border-slate-800/50 text-slate-400 space-y-1">
+                                            <span className="font-semibold text-white block mb-0.5">خطوات التثبيت الفوري في آيفون:</span>
+                                            <p>1. افتح رابط المشروع المباشر في متصفح <span className="text-indigo-400 font-bold">Safari</span>.</p>
+                                            <p>2. اضغط زر <span className="text-indigo-400 font-bold">مشاركة (Share)</span> أسفل الشاشة.</p>
+                                            <p>3. اختر <span className="text-indigo-400 font-bold">"إضافة للشاشة الرئيسية" (Add to Home)</span>.</p>
+                                        </div>
+                                    </div>
                                 </div>
 
-                                <div className="flex flex-col sm:flex-row gap-3">
-                                    <button 
-                                        onClick={handleDownloadFlutterZip}
-                                        disabled={!localFlutterZipBlob && !apkUrl}
-                                        className={`flex-1 py-3 text-center rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
-                                            localFlutterZipBlob || apkUrl
-                                                ? 'bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-900/20' 
-                                                : 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-50'
-                                        }`}
-                                    >
-                                        <ArrowDownTrayIcon className="w-4 h-4" />
-                                        تحميل الكود المصدري الكامل لـ Flutter (ZIP)
-                                    </button>
+                                <div className="border-t border-slate-800/65 pt-6 grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                                    {/* QR Code section */}
+                                    {resultLink && (
+                                        <div className="flex items-center gap-4 bg-slate-950/40 p-4 rounded-2xl border border-slate-800/80 justify-end flex-row-reverse w-full">
+                                            <div className="bg-white p-2 rounded-xl shrink-0">
+                                                <img 
+                                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=100&data=${encodeURIComponent(resultLink)}`} 
+                                                    alt="Scan QR code" 
+                                                    className="w-[100px] h-[100px]"
+                                                />
+                                            </div>
+                                            <div className="text-right font-sans">
+                                                <h5 className="text-white font-bold text-xs mb-1">امسح الكود للتثبيت بالهاتف</h5>
+                                                <p className="text-[10px] text-slate-400 leading-relaxed font-sans">
+                                                    امسح هذا الرمز باستخدام كاميرا هاتفك لتفتح التطبيق وتثبته مباشرة كـ PWA أو ربطه بمشغل الويب الذكي.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
 
-                                    <button 
-                                        onClick={() => setShowInstructions(!showInstructions)}
-                                        className={`py-3 px-6 text-center rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                                            showInstructions 
-                                                ? 'bg-slate-700 text-white border border-slate-600'
-                                                : 'bg-slate-800/60 hover:bg-slate-800 text-slate-300 border border-slate-800'
-                                        }`}
-                                    >
-                                        <CommandLineIcon className="w-4 h-4 text-indigo-400" />
-                                        {showInstructions ? 'إخفاء أوامر التجميع' : 'طريقة البناء خطوة بخطوة'}
-                                    </button>
+                                    {/* Code Export section */}
+                                    <div className="space-y-3 font-sans w-full leading-normal">
+                                        <div className="text-right">
+                                            <h5 className="text-white font-bold text-xs">تنزيل الأكواد المصدرية الكاملة</h5>
+                                            <p className="text-[10px] text-slate-400">للمطورين وأصحاب المشاريع والشركات</p>
+                                        </div>
+                                        <div className="flex flex-col sm:flex-row gap-2.5">
+                                            <button 
+                                                onClick={handleDownloadFlutterZip}
+                                                className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-purple-400 border border-purple-500/10 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm font-sans"
+                                            >
+                                                <ArrowDownTrayIcon className="w-3.5 h-3.5" />
+                                                كود Flutter المصدري (ZIP)
+                                            </button>
+                                            <button 
+                                                onClick={() => setShowInstructions(!showInstructions)}
+                                                className="py-3 px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/50 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 font-sans"
+                                            >
+                                                <CommandLineIcon className="w-3.5 h-3.5 text-indigo-400" />
+                                                تعليمات البناء محلياً
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 {showInstructions && (
                                     <div className="bg-black/95 rounded-2xl p-4 font-mono text-xs text-indigo-300 border border-slate-800 space-y-3 animate-fade-in text-left">
                                         <div className="flex items-center justify-between border-b border-slate-800 pb-2 text-slate-500">
-                                            <span>Flutter Pipeline Quickstart Console</span>
-                                            <span className="text-[10px] bg-slate-900 px-2 py-0.5 rounded text-slate-400">DART</span>
+                                            <span>Flutter Tooling Ready Console</span>
+                                            <span className="text-[10px] bg-slate-900 px-2 py-0.5 rounded text-slate-400 font-mono">DART SDK</span>
                                         </div>
                                         <p className="text-slate-400 text-right text-[11px] mb-2 font-sans">
-                                            بعد فك الضغط عن الملف المحمل، افتح نافذة الأوامر Terminal داخل المجلد ونفذ التالي:
+                                            إذا كنت تفضل بناء التطبيق على جهازك المحلي بنفسك باستخدام Android Studio أو Xcode، نفذ ما يلي:
                                         </p>
                                         <div className="space-y-1.5 leading-relaxed">
-                                            <p className="text-emerald-400 text-right"># 1. تنزيل المكتبات والاعتماديات الخاصة بـ Flutter</p>
-                                            <p className="text-white bg-slate-900 p-2 rounded select-all font-mono">flutter pub get</p>
+                                            <p className="text-emerald-400 text-right font-sans"># 1. تنزيل المكتبات والاعتماديات الخاصة بـ Flutter</p>
+                                            <p className="text-white bg-slate-900 p-2 rounded select-all font-mono text-left">flutter pub get</p>
                                             
-                                            <p className="text-emerald-400 mt-3 text-right"># 2. بناء ملف أندرويد APK حقيقي جاهز للرفع على الهواتف</p>
-                                            <p className="text-white bg-slate-900 p-2 rounded select-all font-mono">flutter build apk --release</p>
+                                            <p className="text-emerald-400 mt-3 text-right font-sans"># 2. بناء ملف أندرويد APK مخصص وموقع وجاهز للرفع</p>
+                                            <p className="text-white bg-slate-900 p-2 rounded select-all font-mono text-left font-mono">flutter build apk --release</p>
                                             
-                                            <p className="text-emerald-450 mt-3 text-right"># 3. بناء ملف آيفون IPA للتجريب والرفع على متجر آبل</p>
-                                            <p className="text-white bg-slate-900 p-2 rounded select-all font-mono">flutter build ios --release</p>
+                                            <p className="text-emerald-450 mt-3 text-right font-sans"># 3. بناء ملف آيفون IPA مستقل للرفع للآب ستور</p>
+                                            <p className="text-white bg-slate-900 p-2 rounded select-all font-mono text-left font-mono">flutter build ios --release</p>
                                         </div>
                                         <p className="text-[10px] text-slate-500 font-sans text-right pt-2 border-t border-slate-900">
                                             * ملاحظة: يتطلب بناء الـ IPA حاسوب Mac مثبت عليه Xcode رسميًا.

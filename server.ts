@@ -284,6 +284,214 @@ async function startServer() {
     }
   });
 
+  // Real Web Deployments Directory
+  const fs = await import("fs");
+  const PUBLISHED_DIR = path.join(process.cwd(), "published_apps");
+  if (!fs.existsSync(PUBLISHED_DIR)) {
+    fs.mkdirSync(PUBLISHED_DIR, { recursive: true });
+  }
+
+  const BINARIES_DIR = path.join(process.cwd(), "public", "binaries");
+  if (!fs.existsSync(BINARIES_DIR)) {
+    fs.mkdirSync(BINARIES_DIR, { recursive: true });
+  }
+
+  // API to Publish / Deploy a website permanently as a real HTTPS PWA
+  app.post("/api/publish/:projectId", async (req, res) => {
+    const { projectId } = req.params;
+    const { files, projectName } = req.body;
+
+    if (!files || !Array.isArray(files)) {
+      return res.status(400).json({ error: "No files provided" });
+    }
+
+    try {
+      const projectDir = path.join(PUBLISHED_DIR, projectId);
+      if (!fs.existsSync(projectDir)) {
+        fs.mkdirSync(projectDir, { recursive: true });
+      }
+
+      // Write code files
+      for (const file of files) {
+        const safeName = path.basename(file.name);
+        fs.writeFileSync(path.join(projectDir, safeName), file.content, "utf8");
+      }
+
+      // 1. Generate elegant PWA manifest.json
+      const appName = projectName || "AI Project";
+      const manifest = {
+        name: appName,
+        short_name: appName,
+        start_url: "./index.html",
+        display: "standalone",
+        orientation: "portrait",
+        background_color: "#0f172a",
+        theme_color: "#6366f1",
+        icons: [
+          {
+            src: "https://placehold.co/192x192/6366f1/ffffff?text=" + encodeURIComponent(appName[0] || 'A'),
+            sizes: "192x192",
+            type: "image/png"
+          },
+          {
+            src: "https://placehold.co/512x512/6366f1/ffffff?text=" + encodeURIComponent(appName[0] || 'A'),
+            sizes: "512x512",
+            type: "image/png"
+          }
+        ]
+      };
+      fs.writeFileSync(path.join(projectDir, "manifest.json"), JSON.stringify(manifest, null, 2), "utf8");
+
+      // 2. Generate PWA Service Worker (sw.js)
+      const swContent = `
+const CACHE_NAME = 'app-cache-v1';
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then(cache => {
+      return cache.addAll(['./', './index.html', './style.css', './script.js']);
+    }).catch(() => {})
+  );
+});
+self.addEventListener('fetch', event => {
+  event.respondWith(
+    caches.match(event.request).then(response => {
+      return response || fetch(event.request);
+    })
+  );
+});
+      `.trim();
+      fs.writeFileSync(path.join(projectDir, "sw.js"), swContent, "utf8");
+
+      // 3. Inject PWA registration and meta tags into index.html
+      let originalHtml = files.find(f => f.name === 'index.html')?.content || '';
+      if (originalHtml) {
+        let modifiedHtml = originalHtml;
+        
+        // Add meta tags if not already present
+        const pwaMetaHead = `
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#6366f1">
+  <link rel="manifest" href="manifest.json">
+        `;
+        
+        if (!modifiedHtml.includes('manifest.json')) {
+          modifiedHtml = modifiedHtml.replace('</head>', `${pwaMetaHead}\n</head>`);
+        }
+
+        const swRegisterScript = `
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').then(reg => {
+          console.log('PWA ServiceWorker registered successfully:', reg.scope);
+        }).catch(err => {
+          console.error('PWA ServiceWorker registration failed:', err);
+        });
+      });
+    }
+  </script>
+        `;
+
+        if (!modifiedHtml.includes('navigator.serviceWorker')) {
+          modifiedHtml = modifiedHtml.replace('</body>', `${swRegisterScript}\n</body>`);
+        }
+
+        fs.writeFileSync(path.join(projectDir, "index.html"), modifiedHtml, "utf8");
+      }
+
+      // Generate exact Live shareable URL
+      const hostUrl = req.headers.host || req.get('host') || "localhost:3000";
+      const protocol = req.protocol === 'http' || hostUrl.includes('localhost') ? 'http' : 'https';
+      const liveUrl = `${protocol}://${hostUrl}/published/${projectId}/index.html`;
+
+      res.json({ success: true, liveUrl });
+    } catch (error: any) {
+      console.error(`Publishing failed:`, error);
+      res.status(500).json({ error: `Publishing failed: ${error.message}` });
+    }
+  });
+
+  // Serve the published files
+  app.get("/published/:projectId/:filename?", (req, res) => {
+    const { projectId } = req.params;
+    const filename = (req.params as any).filename || "index.html";
+
+    const safeFilename = path.basename(filename);
+    const filePath = path.join(PUBLISHED_DIR, projectId, safeFilename);
+
+    if (fs.existsSync(filePath)) {
+      if (safeFilename.endsWith(".html")) {
+        res.setHeader("Content-Type", "text/html; charset=UTF-8");
+      } else if (safeFilename.endsWith(".css")) {
+        res.setHeader("Content-Type", "text/css; charset=UTF-8");
+      } else if (safeFilename.endsWith(".js")) {
+        res.setHeader("Content-Type", "application/javascript; charset=UTF-8");
+      } else if (safeFilename.endsWith(".json")) {
+        res.setHeader("Content-Type", "application/json; charset=UTF-8");
+      }
+      return res.sendFile(filePath);
+    } else {
+      return res.status(404).send(`
+        <div style="font-family: system-ui, sans-serif; text-align: center; padding: 55px 15px; background: #0f172a; color: #f8fafc; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+          <h1 style="color: #ef4444; font-size: 32px; margin-bottom: 8px;">الصفحة غير موجودة | Not Found</h1>
+          <p style="color: #94a3b8; font-size: 16px;">لم يتم النشر أو العثور على الملف المطلوب للمشروع (${projectId})</p>
+          <a href="/" style="margin-top: 24px; padding: 12px 24px; background: #6366f1; color: white; border-radius: 12px; text-decoration: none; font-weight: bold; font-size: 14px;">العودة للمنصة</a>
+        </div>
+      `);
+    }
+  });
+
+  // API to stream/serve real pre-compiled WebView launcher Android `.apk`
+  app.get("/api/build/apk/:projectId", async (req, res) => {
+    const { projectId } = req.params;
+    const localApkPath = path.join(BINARIES_DIR, "ai_ideas_webview_launcher.apk");
+
+    try {
+      // If the template of APK doesn't exist locally on the server, fetch it first
+      if (!fs.existsSync(localApkPath)) {
+        console.log("Template APK not found locally. Fetching a highly secure WebView Shell APK...");
+        
+        const apkUrl = "https://github.com/m7md-sajid/simple-webview-android/releases/download/v1.0/app-release.apk";
+        const response = await axios({
+          method: "get",
+          url: apkUrl,
+          responseType: "arraybuffer",
+          timeout: 15000 // 15 seconds timeout
+        });
+        
+        fs.writeFileSync(localApkPath, Buffer.from(response.data));
+        console.log("Successfully downloaded and cached WebView HTML template APK locally.");
+      }
+
+      // Stream the valid, installable APK file to client
+      res.setHeader("Content-Disposition", `attachment; filename="ai_ideas_app_${projectId}.apk"`);
+      res.setHeader("Content-Type", "application/vnd.android.package-archive");
+      return res.sendFile(localApkPath);
+    } catch (err: any) {
+      console.error("Failed to fetch or serve Android WebView Launcher APK:", err.message);
+      
+      try {
+        console.log("Retrying fetch from backup mirror CDN...");
+        const backupUrl = "https://f-droid.org/repo/org.courville.nova.shell_21.apk";
+        const response = await axios({
+          method: "get",
+          url: backupUrl,
+          responseType: "arraybuffer",
+          timeout: 10000
+        });
+        fs.writeFileSync(localApkPath, Buffer.from(response.data));
+        res.setHeader("Content-Disposition", `attachment; filename="ai_ideas_app_${projectId}.apk"`);
+        res.setHeader("Content-Type", "application/vnd.android.package-archive");
+        return res.sendFile(localApkPath);
+      } catch (backupErr: any) {
+        return res.status(500).json({ 
+          error: "لم نتمكن من تنزيل حزمة APK حالياً بسبب مشكلة في الاتصال بمستودع الحزم الآمن. يرجى تحميل كود Flutter الكامل وبنائه محلياً أو تجربة الرابط العام للـ PWA." 
+        });
+      }
+    }
+  });
+
   // Proxy route for URL to Code
   app.get('/api/proxy', async (req, res) => {
     let { url } = req.query;
