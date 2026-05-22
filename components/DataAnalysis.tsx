@@ -4,6 +4,8 @@ import { Message, Project, ProjectSection, SectionType, StoreProduct, BlogPost, 
 import { ChartPieIcon, SpinnerIcon, SparklesIcon, UploadIcon, ArrowDownTrayIcon, CrownIcon, TrashIcon, CopyIcon, CheckIcon, SaveIcon, Share2Icon, CodeIcon } from './Icons';
 import { useAuth } from '../hooks/useAuth';
 import UpgradeModal from './UpgradeModal';
+import { db } from '../firebase';
+import { collection, query as firestoreQuery, where, getDocs } from 'firebase/firestore';
 
 interface DataAnalysisProps {
     onComplete?: (message: Message) => void;
@@ -64,9 +66,39 @@ const DataAnalysis: React.FC<DataAnalysisProps> = ({ onComplete, navigate, conte
     const [saveStatus, setSaveStatus] = useState('');
 
     useEffect(() => {
-        if (currentUser?.email) {
-            const savedProjects = JSON.parse(localStorage.getItem(`appProjects_${currentUser.email}`) || '[]');
-            setProjects(savedProjects);
+        if (!currentUser) return;
+        
+        // 1. Load from localStorage
+        const email = currentUser.email;
+        const key = `appProjects_${email}`;
+        const localProjs: Project[] = JSON.parse(localStorage.getItem(key) || '[]');
+        
+        // 2. Load from Firestore if user has uid
+        if (currentUser.uid) {
+            const q = firestoreQuery(
+                collection(db, 'projects'),
+                where('ownerUid', '==', currentUser.uid)
+            );
+            getDocs(q).then((snap) => {
+                const fsProjs = snap.docs.map(docSnap => ({
+                    id: docSnap.id,
+                    ...(docSnap.data() as any)
+                })) as Project[];
+                
+                // Merge local and firestore uniquely
+                const merged = [...localProjs];
+                fsProjs.forEach(fp => {
+                    if (!merged.some(mp => mp.id === fp.id)) {
+                        merged.push(fp);
+                    }
+                });
+                setProjects(merged);
+            }).catch(err => {
+                console.error("Failed to load firestore projects for data analysis:", err);
+                setProjects(localProjs);
+            });
+        } else {
+            setProjects(localProjs);
         }
     }, [currentUser]);
 
@@ -108,20 +140,21 @@ const DataAnalysis: React.FC<DataAnalysisProps> = ({ onComplete, navigate, conte
     };
 
     const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const query = e.target.value;
-        setSearchQuery(query);
-        if (query.trim()) {
+        const queryVal = e.target.value;
+        setSearchQuery(queryVal);
+        if (queryVal.trim()) {
             const filtered = projects.filter((p: Project) => 
-                p.name.toLowerCase().includes(query.toLowerCase())
+                p.name.toLowerCase().includes(queryVal.toLowerCase()) ||
+                (p.description && p.description.toLowerCase().includes(queryVal.toLowerCase())) ||
+                (p.type && String(p.type).toLowerCase().includes(queryVal.toLowerCase())) ||
+                (p.creationMode && String(p.creationMode).toLowerCase().includes(queryVal.toLowerCase()))
             );
             setSearchResults(filtered);
             setShowResults(true);
             setSearchError('');
         } else {
-            setSearchResults([]);
-            setSelectedProjectId('');
-            setLoadedProjectSections([]);
-            setData('');
+            setSearchResults(projects);
+            setShowResults(true);
         }
     };
 
@@ -130,20 +163,30 @@ const DataAnalysis: React.FC<DataAnalysisProps> = ({ onComplete, navigate, conte
         setSearchQuery(project.name);
         setShowResults(false);
 
-        const compatibleSections = project.sections.filter(s =>
+        // Extract compatible sections if any
+        const compatibleSections = (project.sections || []).filter(s =>
             [SectionType.STORE, SectionType.BLOG, SectionType.USERS, SectionType.FORM].includes(s.type)
         );
         setLoadedProjectSections(compatibleSections);
 
-        if (compatibleSections.length > 0) {
+        let dataString = `معلومات ومكونات المشروع:\n------------------------\nالاسم: ${project.name}\nالوصف: ${project.description || ''}\nالنوع: ${project.type || 'موقع/تطبيق'}\n`;
+
+        if (project.files && project.files.length > 0) {
+            dataString += `\nملفات الأكواد والمحتوى المصدري:\n------------------------`;
+            project.files.forEach(f => {
+                dataString += `\n\n=== اسم الملف: ${f.name} ===\n${f.content || ''}`;
+            });
+            setData(dataString);
+            setSearchError('');
+        } else if (compatibleSections.length > 0) {
             const firstSection = compatibleSections[0];
             setSelectedSectionId(firstSection.id);
             setSearchError('');
             handleLoadSectionData(firstSection.id, compatibleSections);
         } else {
-            setSearchError('هذا المشروع لا يحتوي على أقسام بيانات متوافقة (متجر, مدونة, إلخ).');
-            setLoadedProjectSections([]);
-            setData('');
+            dataString += `\n(هذا المشروع لا يحتوي على ملفات كود أو أقسام بيانات خارجية في بيئته الحالية).`;
+            setData(dataString);
+            setSearchError('');
         }
     };
 
@@ -323,22 +366,39 @@ ${JSON.stringify(result.visualization?.data, null, 2)}
                         type="text"
                         value={searchQuery}
                         onChange={handleSearchChange}
-                        onFocus={() => { if (searchQuery.trim()) setShowResults(true); }}
+                        onFocus={() => {
+                            if (!searchQuery.trim()) {
+                                setSearchResults(projects);
+                            }
+                            setShowResults(true);
+                        }}
                         placeholder="ابحث عن مشروع بالاسم..."
-                        className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-white text-sm"
+                        className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2.5 text-white text-sm"
                         autoComplete="off"
                         disabled={projects.length === 0}
                     />
                     {showResults && searchResults.length > 0 && (
-                        <div className="absolute top-full mt-1 w-full bg-slate-800 border border-slate-600 rounded-lg z-10 max-h-48 overflow-y-auto shadow-lg">
+                        <div className="absolute top-full mt-1 w-full bg-slate-800 border border-slate-700 rounded-xl z-20 max-h-60 overflow-y-auto shadow-2xl divide-y divide-slate-700/50">
                             {searchResults.map(p => (
                                 <button
                                     key={p.id}
                                     onClick={() => handleSelectProject(p)}
-                                    className="w-full text-right p-3 hover:bg-slate-700 text-left"
+                                    className="w-full text-right p-3 hover:bg-slate-700 hover:text-indigo-400 text-slate-100 flex items-center justify-between transition-colors duration-150"
                                 >
-                                    <p className="font-semibold text-sm text-white">{p.name}</p>
-                                    <p className="text-xs text-slate-400">{p.type}</p>
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 bg-indigo-500/10 text-indigo-400 rounded-lg">
+                                            <CodeIcon className="w-4 h-4" />
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="font-semibold text-sm text-white">{p.name}</p>
+                                            <p className="text-xs text-slate-400">{p.creationMode || p.type || 'ملفات أكواد مصدريّة'}</p>
+                                        </div>
+                                    </div>
+                                    {p.files && p.files.length > 0 && (
+                                        <span className="text-[10px] bg-indigo-500/10 text-indigo-300 py-0.5 px-2 rounded-full">
+                                            {p.files.length} ملف كود
+                                        </span>
+                                    )}
                                 </button>
                             ))}
                         </div>

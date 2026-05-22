@@ -75,7 +75,8 @@ import {
   doc, 
   deleteDoc, 
   setDoc,
-  serverTimestamp 
+  serverTimestamp,
+  getDocs
 } from 'firebase/firestore';
 
 
@@ -222,6 +223,11 @@ export const SoftwareProjectBuilder: React.FC<{
     const [isGenerating, setIsGenerating] = useState(false);
     const [error, setError] = useState('');
     const [saveStatus, setSaveStatus] = useState('');
+    
+    // Project Update Mode States
+    const [isUpdateMode, setIsUpdateMode] = useState(false);
+    const [updateProjectTargetId, setUpdateProjectTargetId] = useState<string>('');
+    const [allUserProjects, setAllUserProjects] = useState<Project[]>([]);
     
     // --- Automatic Repair System States & Intelligence ---
     const [iframeErrors, setIframeErrors] = useState<{message: string; lineno?: number; colno?: number; type?: string}[]>([]);
@@ -467,6 +473,63 @@ export const SoftwareProjectBuilder: React.FC<{
 
     // --- Data & Session Management ---
     useEffect(() => {
+        if (!currentUser) return;
+        
+        // 1. Load from localStorage
+        const email = currentUser.email;
+        const key = `appProjects_${email}`;
+        const localProjs: Project[] = JSON.parse(localStorage.getItem(key) || '[]');
+        
+        // 2. Load from Firestore if user has uid
+        if (currentUser.uid) {
+            const q = query(
+                collection(db, 'projects'),
+                where('ownerUid', '==', currentUser.uid)
+            );
+            getDocs(q).then((snap) => {
+                const fsProjs = snap.docs.map(docSnap => ({
+                    id: docSnap.id,
+                    ...docSnap.data()
+                })) as Project[];
+                
+                // Merge local and firestore uniquely
+                const merged = [...localProjs];
+                fsProjs.forEach(fp => {
+                    if (!merged.some(mp => mp.id === fp.id)) {
+                        merged.push(fp);
+                    }
+                });
+                setAllUserProjects(merged);
+            }).catch(err => {
+                console.error("Failed to load firestore projects for update selection:", err);
+                setAllUserProjects(localProjs);
+            });
+        } else {
+            setAllUserProjects(localProjs);
+        }
+    }, [currentUser, screen, project]);
+
+    // Sync active project state to localStorage so sidebar/header transfer always gets the full latest data
+    useEffect(() => {
+        if (project && currentUser?.email) {
+            const key = `appProjects_${currentUser.email}`;
+            const savedApps: Project[] = JSON.parse(localStorage.getItem(key) || '[]');
+            const updatedProject = {
+                ...project,
+                files: projectFiles,
+                builderChat: messages,
+                updatedAt: Date.now()
+            };
+            const updatedApps = savedApps.map(p => p.id === project.id ? updatedProject : p);
+            if (!savedApps.some(p => p.id === project.id)) {
+                updatedApps.unshift(updatedProject);
+            }
+            localStorage.setItem(key, JSON.stringify(updatedApps));
+            localStorage.setItem(`active_editing_project_${currentUser.email}`, JSON.stringify(updatedProject));
+        }
+    }, [project, projectFiles, messages, currentUser]);
+
+    useEffect(() => {
         if (screen === 'list' && currentUser?.uid) {
             const q = query(
                 collection(db, 'projects'),
@@ -508,6 +571,8 @@ export const SoftwareProjectBuilder: React.FC<{
                 setProjectIconUrl(proj.iconUrl || null);
                 setPrompt(proj.description || '');
                 setProjectType(proj.type || ProjectType.WEBSITE);
+                setIsUpdateMode(true);
+                setUpdateProjectTargetId(proj.id);
                 // Simple file handling for now - look for a primary image if in screen mode
                 if ((mode === 'screen' || mode === 'recognizer') && proj.files && proj.files.length > 0) {
                      // In a real app, you might find the most relevant image. Here, we just take the first.
@@ -1200,17 +1265,100 @@ ${codeSnapshot}
                 actualPrompt = recognitionResult.description;
             }
 
-            const ipProtection = (mode === 'screen' || mode === 'recognizer');
-            const newProject = await geminiService.buildProjectFromSpec({
-                projectName: finalName,
-                prompt: actualPrompt,
-                projectType: finalType,
-                files,
-                iconUrl: finalIcon,
-            }, onLog, ipProtection);
-
-            // Add creationMode to project for routing
-            newProject.creationMode = creationModeForThisView;
+            let newProject: Project;
+            if (isUpdateMode && updateProjectTargetId) {
+                onLog('جاري جلب بيانات وبنية الملفات للمشروع القائم للتحديث...');
+                let existingProject: Project | undefined = allUserProjects.find(p => p.id === updateProjectTargetId);
+                
+                if (!existingProject && currentUser?.email) {
+                    const key = `appProjects_${currentUser.email}`;
+                    const savedApps: Project[] = JSON.parse(localStorage.getItem(key) || '[]');
+                    existingProject = savedApps.find(p => p.id === updateProjectTargetId);
+                }
+                
+                if (!existingProject) {
+                    throw new Error('لم نتمكن من العثور على المشروع المحدد لتحديثه.');
+                }
+                
+                let existingProjectFiles = existingProject.files || [];
+                if (existingProjectFiles.length === 0 && currentUser?.uid) {
+                    onLog('جاري استرداد الكود المصدري من قاعدة البيانات السحابية...');
+                    try {
+                        existingProjectFiles = await persistenceService.getProjectFiles(updateProjectTargetId);
+                    } catch (e) {
+                        console.error("Failed to load files from db, fallback to empty", e);
+                    }
+                }
+                
+                existingProject.files = existingProjectFiles;
+                
+                if (existingProject.files.length === 0) {
+                    existingProject.files = [
+                        { name: 'index.html', language: 'html', content: '<h1>' + existingProject.name + '</h1>' },
+                        { name: 'style.css', language: 'css', content: 'body { font-family: sans-serif; }' },
+                        { name: 'script.js', language: 'javascript', content: 'console.log("Loaded");' }
+                    ];
+                }
+                
+                onLog('جاري تقديم طلب التحديث لذكاء الاصطناعي (Gemini)...');
+                
+                const convertedImages = files.map(f => ({
+                    base64: f.url.split(',')[1] || '',
+                    mimeType: f.type || 'image/png'
+                })).filter(img => img.base64);
+                
+                const response = await geminiService.modifyProjectWithAI(
+                    existingProject,
+                    actualPrompt,
+                    convertedImages
+                );
+                
+                newProject = response.updatedProject;
+                newProject.creationMode = creationModeForThisView;
+                newProject.description = finalPrompt || existingProject.description;
+                
+                // Add modification notice to log
+                onLog('تم استلام الرد. جاري تطبيق وتحديث الملفات بنجاح...');
+                
+                if (currentUser?.uid) {
+                    await persistenceService.saveProjectMetadata(newProject);
+                    for (const file of newProject.files || []) {
+                        await persistenceService.saveFile(newProject.id, file);
+                    }
+                    const updateMsg = {
+                        id: `update-${Date.now()}`,
+                        sender: 'ai' as const,
+                        text: response.aiResponse,
+                        timestamp: Date.now()
+                    };
+                    await persistenceService.saveMessage(newProject.id, updateMsg);
+                    
+                    const allMsgs = await persistenceService.getProjectMessages(newProject.id);
+                    // Force state update of messages
+                    (newProject as any).builderChat = allMsgs;
+                } else {
+                    const updateMsg = {
+                        id: `update-${Date.now()}`,
+                        sender: 'ai' as const,
+                        text: response.aiResponse,
+                        timestamp: Date.now()
+                    };
+                    const updatedChat = [...(existingProject.builderChat || []), updateMsg];
+                    newProject.builderChat = updatedChat;
+                }
+            } else {
+                const ipProtection = (mode === 'screen' || mode === 'recognizer');
+                newProject = await geminiService.buildProjectFromSpec({
+                    projectName: finalName,
+                    prompt: actualPrompt,
+                    projectType: finalType,
+                    files,
+                    iconUrl: finalIcon,
+                }, onLog, ipProtection);
+                
+                // Add creationMode to project for routing
+                newProject.creationMode = creationModeForThisView;
+            }
 
             if (currentUser?.uid) {
                 newProject.ownerUid = currentUser.uid;
@@ -1756,20 +1904,96 @@ ${codeSnapshot}
         </div>
     );
     
+    const renderUpdateModeCard = () => {
+        return (
+            <div className="bg-slate-900/60 border border-slate-800 p-5 rounded-2xl space-y-3 shadow-xl text-right w-full max-w-xl mx-auto">
+                <div className="flex items-center justify-between">
+                    <label className="relative inline-flex items-center cursor-pointer">
+                        <input 
+                            type="checkbox" 
+                            checked={isUpdateMode} 
+                            onChange={(e) => {
+                                const checked = e.target.checked;
+                                setIsUpdateMode(checked);
+                                if (!checked) {
+                                    setUpdateProjectTargetId('');
+                                } else if (allUserProjects.length > 0) {
+                                    // Auto-select first project
+                                    const firstProj = allUserProjects[0];
+                                    setUpdateProjectTargetId(firstProj.id);
+                                    setProjectName(firstProj.name);
+                                }
+                            }}
+                            className="sr-only peer" 
+                        />
+                        <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                    </label>
+                    <div className="flex items-center gap-2">
+                        <div className="text-right">
+                            <h3 className="text-sm font-bold text-white">وضع تحديث المشروع</h3>
+                            <p className="text-[11px] text-slate-400">تحديث وتطوير الأكواد والميزات في مشروع قائم تلقائياً</p>
+                        </div>
+                        <span className="p-1.5 bg-indigo-500/10 text-indigo-400 rounded-lg">
+                            <SparklesIcon className="w-5 h-5 animate-pulse" />
+                        </span>
+                    </div>
+                </div>
+
+                {isUpdateMode && (
+                    <div className="space-y-3 pt-2 border-t border-slate-800 animate-fade-in text-right">
+                        <label className="text-xs font-semibold text-slate-300 block mb-1">اختر المشروع المُراد تحديثه:</label>
+                        {allUserProjects.length > 0 ? (
+                            <select 
+                                value={updateProjectTargetId} 
+                                onChange={(e) => {
+                                    const pid = e.target.value;
+                                    setUpdateProjectTargetId(pid);
+                                    const selected = allUserProjects.find(p => p.id === pid);
+                                    if (selected) {
+                                        setProjectName(selected.name);
+                                        // Pre-fill prompt if empty
+                                        if (!prompt) setPrompt(selected.description || '');
+                                    }
+                                }}
+                                className="w-full bg-slate-800 border border-slate-700 hover:border-slate-600 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 text-right font-sans"
+                            >
+                                {allUserProjects.map(p => (
+                                    <option key={p.id} value={p.id}>{p.name} ({p.creationMode || p.type || 'ملفات أكواد مصدريّة'})</option>
+                                ))}
+                            </select>
+                        ) : (
+                            <p className="text-xs text-amber-400 font-sans">لا توجد مشاريع سابقة مفعّلة لتحديثها حالياً.</p>
+                        )}
+
+                        {updateProjectTargetId && (
+                            <div className="p-3 bg-indigo-500/5 border border-indigo-500/10 rounded-xl text-xs text-indigo-300 flex items-center justify-end gap-2 font-sans">
+                                <span>وضع التحديث نشط حالياً للمشروع المختار. سيقوم النظام بتطوير وبناء ملفاته.</span>
+                                <span className="w-2 h-2 rounded-full bg-indigo-400 animate-ping flex-shrink-0" />
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+        );
+    };
+
     const renderIdeaWizard = () => {
         if (suggestionStep === 'category') {
             return (
-                <div className="animate-fade-in text-center">
-                    <h3 className="text-2xl font-bold text-white mb-2">لنبدأ بفكرتك!</h3>
-                    <p className="text-slate-400 mb-6">اختر فئة لمشروعك، وسيقوم الذكاء الاصطناعي باقتراح بعض الأفكار الملهمة.</p>
-                    {isGenerating && <SpinnerIcon className="w-8 h-8 mx-auto animate-spin text-indigo-400 mb-4"/>}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-2xl mx-auto">
-                        {ideaCategories.map(cat => (
-                            <button key={cat.id} onClick={() => handleSelectCategory(cat.id)} className="p-4 bg-slate-800/50 border border-slate-700 rounded-xl hover:bg-slate-700/50 hover:border-indigo-500 transition-all text-center group">
-                                <div className="text-indigo-400 mx-auto">{cat.icon}</div>
-                                <p className="font-semibold text-white text-sm mt-3">{cat.name}</p>
-                            </button>
-                        ))}
+                <div className="animate-fade-in text-center space-y-6 max-w-2xl mx-auto">
+                    {renderUpdateModeCard()}
+                    <div className="pt-4">
+                        <h3 className="text-2xl font-bold text-white mb-2">لنبدأ بفكرتك!</h3>
+                        <p className="text-slate-400 mb-6">اختر فئة لمشروعك، وسيقوم الذكاء الاصطناعي باقتراح بعض الأفكار الملهمة.</p>
+                        {isGenerating && <SpinnerIcon className="w-8 h-8 mx-auto animate-spin text-indigo-400 mb-4"/>}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            {ideaCategories.map(cat => (
+                                <button key={cat.id} onClick={() => handleSelectCategory(cat.id)} className="p-4 bg-slate-800/50 border border-slate-700 rounded-xl hover:bg-slate-700/50 hover:border-indigo-500 transition-all text-center group">
+                                    <div className="text-indigo-400 mx-auto">{cat.icon}</div>
+                                    <p className="font-semibold text-white text-sm mt-3">{cat.name}</p>
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 </div>
             );
@@ -1878,7 +2102,8 @@ ${codeSnapshot}
         if (mode === 'wizard' || mode === 'url') {
             const isUrlMode = mode === 'url';
             return (
-                <div className="max-w-2xl mx-auto py-8">
+                <div className="max-w-2xl mx-auto py-8 space-y-6">
+                    {renderUpdateModeCard()}
                     <div className="mb-8 font-sans">
                         <div className="flex items-center justify-between mb-4">
                             {[1, 2, 3, 4].map((s) => (
@@ -2214,6 +2439,8 @@ ${codeSnapshot}
 
         return (
             <div className="w-full max-w-xl mx-auto space-y-6 animate-fade-in">
+                {renderUpdateModeCard()}
+
                 {showFileUpload && (
                      <div className="space-y-2">
                         <label className="text-sm font-medium text-slate-300">
@@ -2335,7 +2562,7 @@ ${codeSnapshot}
                     </div>
                     <button onClick={handleGenerate} className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2">
                         <RocketLaunchIcon className="w-5 h-5"/>
-                        {mode === 'recognizer' ? 'بناء المشروع (النسخة الآمنة)' : 'ابنِ المشروع'}
+                        {isUpdateMode ? 'تحديث وتطوير كود المشروع 🔄' : (mode === 'recognizer' ? 'بناء المشروع (النسخة الآمنة)' : 'ابنِ المشروع')}
                     </button>
                     {error && <p className="text-red-400 text-sm text-center">{error}</p>}
                 </div>

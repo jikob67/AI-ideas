@@ -402,10 +402,51 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onDelete, onE
         }
     };
 
-    const handleTransfer = (sectionId: string) => {
+    const handleTransfer = async (sectionId: string) => {
         const globalNavigate = (window as any).__appNavigate;
         if (globalNavigate) {
-            globalNavigate(sectionId, { project: project });
+            let fullProject = { ...project };
+            
+            // 1. Try to find the full project from localStorage
+            if (currentUser?.email) {
+                const key = `appProjects_${currentUser.email}`;
+                const savedApps: Project[] = JSON.parse(localStorage.getItem(key) || '[]');
+                const foundLocal = savedApps.find(p => p.id === project.id);
+                if (foundLocal) {
+                    fullProject = { ...fullProject, ...foundLocal };
+                }
+            }
+            
+            // 2. If it still lacks files but database is available and user is authenticated
+            if ((!fullProject.files || fullProject.files.length === 0) && currentUser?.uid) {
+                try {
+                    const dbFiles = await persistenceService.getProjectFiles(project.id);
+                    if (dbFiles && dbFiles.length > 0) {
+                        fullProject.files = dbFiles;
+                    }
+                } catch (e) {
+                    console.error("Failed to load files for full project transfer:", e);
+                }
+                try {
+                    const dbMsgs = await persistenceService.getProjectMessages(project.id);
+                    if (dbMsgs && dbMsgs.length > 0) {
+                        fullProject.builderChat = dbMsgs;
+                    }
+                } catch (e) {
+                    console.error("Failed to load messages for full project transfer:", e);
+                }
+            }
+
+            // 3. Fallback: if files empty, set default basic files
+            if (!fullProject.files || fullProject.files.length === 0) {
+                fullProject.files = [
+                    { name: 'index.html', language: 'html', content: '<h1>' + fullProject.name + '</h1>' },
+                    { name: 'style.css', language: 'css', content: 'body { font-family: sans-serif; }' },
+                    { name: 'script.js', language: 'javascript', content: 'console.log("Loaded");' }
+                ];
+            }
+            
+            globalNavigate(sectionId, { project: fullProject });
         }
         setIsTransferOpen(false);
         setSearchQuery('');

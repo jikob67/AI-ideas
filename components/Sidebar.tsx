@@ -311,7 +311,22 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, op
   const [searchQuery, setSearchQuery] = useState('');
 
   const handleTransfer = (sectionId: string) => {
-    setActiveView(sectionId as View, navigationContext);
+    let finalContext = navigationContext;
+    if (currentUser?.email) {
+      const activeProjKey = `active_editing_project_${currentUser.email}`;
+      const savedActiveProj = localStorage.getItem(activeProjKey);
+      if (savedActiveProj) {
+        try {
+          const activeProj = JSON.parse(savedActiveProj);
+          if (activeProj && (!navigationContext?.project || navigationContext.project.id === activeProj.id)) {
+            finalContext = { ...navigationContext, project: activeProj };
+          }
+        } catch (e) {
+          console.error("Failed to parse active project from localStorage for transfer", e);
+        }
+      }
+    }
+    setActiveView(sectionId as View, finalContext);
     setIsTransferOpen(false);
     setSearchQuery('');
   };
