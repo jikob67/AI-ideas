@@ -524,11 +524,10 @@ export class GeminiService {
     }
 
     async generateSpeech(text: string): Promise<string> {
-        // TTS usually needs specific models if supported, but standard ones might not support audio modality returning speech easily without specific config.
-        // gemini-flash-latest supports audio modality in many regions.
-        const result = await this.callGenerate('gemini-flash-latest', [{ role: 'user', parts: [{ text }] }], {
-            responseModalities: ['audio'],
-            speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Aoide' } } }
+        // Use the recommended gemini-3.1-flash-tts-preview model with uppercase AUDIO modality according to guidelines.
+        const result = await this.callGenerate('gemini-3.1-flash-tts-preview', [{ role: 'user', parts: [{ text }] }], {
+            responseModalities: ['AUDIO'],
+            speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } }
         });
         const audioPart = result.response.candidates?.[0]?.content?.parts?.[0]?.inlineData;
         if (audioPart) {

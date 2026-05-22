@@ -34,36 +34,15 @@ const VideoGenerator: React.FC<{ initialPrompt?: string }> = ({ initialPrompt })
     const [error, setError] = useState('');
     const [isUpgradeModalOpen, setUpgradeModalOpen] = useState(false);
     
-    const [hasSelectedApiKey, setHasSelectedApiKey] = useState(false);
-    const [isCheckingApiKey, setIsCheckingApiKey] = useState(true);
+    const [hasSelectedApiKey, setHasSelectedApiKey] = useState(true);
+    const [isCheckingApiKey, setIsCheckingApiKey] = useState(false);
 
     useEffect(() => {
-        const checkApiKey = async () => {
-            if (window.aistudio) {
-                try {
-                    const hasKey = await window.aistudio.hasSelectedApiKey();
-                    setHasSelectedApiKey(hasKey);
-                } catch (e) {
-                    console.error("Error checking API key:", e);
-                    setHasSelectedApiKey(false); // Assume no key on error
-                }
-            } else {
-                // Fallback for environments where aistudio is not available
-                setHasSelectedApiKey(!!process.env.API_KEY);
-            }
-            setIsCheckingApiKey(false);
-        };
-        checkApiKey();
+        // No-op: Fly.io deployment directly relies on backend environment variable GEMINI_API_KEY
     }, []);
 
     const handleSelectKey = async () => {
-        if (!window.aistudio) {
-            setError("بيئة التشغيل لا تدعم اختيار مفتاح API.");
-            return;
-        }
-        await window.aistudio.openSelectKey();
-        setHasSelectedApiKey(true);
-        setError('');
+        // No-op: Bypassed for Fly.io backend-to-backend handling
     };
     
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
