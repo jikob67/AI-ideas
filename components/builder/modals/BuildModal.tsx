@@ -160,111 +160,72 @@ export const BuildModal: React.FC<BuildModalProps> = ({ isOpen, onClose, project
                 addLog('✅ اجتاز المشروع جميع الفحوصات الفنية (0 أخطاء، 0 تحذيرات فادحة).');
             }
 
-            // STEP 4: PACKAGING & CONTINUOUS DELIVERY (CD)
+             // STEP 4: PACKAGING & CONTINUOUS DELIVERY (CD)
             setPhase('packaging');
-            addLog('📦 بدء تجميع وترشيد كود الإنتاج (Production Packaging & Optimization)...');
-            await new Promise(r => setTimeout(r, 1300));
-            
-            // Build the standalone html bundle
-            const cssFiles = project.files?.filter(f => f.name.endsWith('.css')) || [];
-            const jsFiles = project.files?.filter(f => f.name.endsWith('.js')) || [];
+            addLog('📦 تدويل البناء الخادمي: تجميع وترشيد كود الإنتاج (Server-side Enterprise Packaging)...');
+            await new Promise(r => setTimeout(r, 600));
 
-            let standaloneHtml = indexHtml || '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body><h3>ممتد</h3></body></html>';
-            let cssContent = cssFiles.map(f => f.content).join('\n');
-            let jsContent = jsFiles.map(f => f.content).join('\n');
+            // Call our advanced backend packaging and testing pipeline
+            const response = await fetch(`/api/build/package/${project.id}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    projectName: project.name,
+                    files: project.files || []
+                })
+            });
 
-            if (cssContent) {
-                standaloneHtml = standaloneHtml.replace('</head>', `<style>\n${cssContent}\n</style>\n</head>`);
+            if (!response.ok) {
+                const errData = await response.json();
+                if (errData.logs && Array.isArray(errData.logs)) {
+                    errData.logs.forEach((l: string) => addLog(l));
+                }
+                throw new Error(errData.error || `خطأ استجابة الخادم: ${response.statusText}`);
             }
-            if (jsContent) {
-                standaloneHtml = standaloneHtml.replace('</body>', `<script>\n${jsContent}\n</script>\n</body>`);
-            }
 
-            const htmlBlob = new Blob([standaloneHtml], { type: 'text/html' });
+            const data = await response.json();
             
-            // Build the source code ZIP
-            addLog('📂 تجميع الملفات وبناء الأرشيف الـ ZIP المنظم...');
-            const zip = new JSZip();
-            if (project.files && project.files.length > 0) {
-                project.files.forEach(file => {
-                    zip.file(file.name, file.content);
-                });
-            } else {
-                zip.file('index.html', standaloneHtml);
+            // Loop through returned server-side logs and display them on-screen
+            if (data.logs && Array.isArray(data.logs)) {
+                data.logs.forEach((l: string) => addLog(l));
             }
-            
-            const zipBlob = await zip.generateAsync({ type: 'blob' });
-            addLog('✔ تم ضغط ملفات التطبيق بنجاح.');
-            setLocalWebZipBlob(zipBlob);
-
-            // Support Mobile Packaging (APK/IPA Simulator)
-            addLog('📱 بدء تكامل تطبيقات الهاتف المحمول وتوليد شفرة Flutter الأصيلة...');
-            const dartCode = await generateFlutterCode(project);
-            const { apkBlob, ipaBlob, projectZip } = await simulateFullBuild(project);
-            setLocalFlutterZipBlob(projectZip);
-            
-            addLog('☕ جاري توليف وتصدير مشروع Flutter المصدري المنظم...');
-            addLog('📦 إعداد ملفات Gradle وتجهيز هيكلية أندرويد لـ Android Studio (build.gradle, Manifest)...');
-            addLog('🍎 إعداد ترويسات Xcode وصياغة الحزم لـ iOS...');
-            await new Promise(r => setTimeout(r, 1500));
 
             // STEP 5: DEPLOYING
             setPhase('deploying');
-            addLog('☁️ جاري النشر والرفع النهائي على خادم مخصص مع SSL حقيقي...');
-            
-            const timestamp = Date.now();
-            const liveId = `live-${project.id}-${timestamp}.html`;
-            const zipId = `source-${project.id}-${timestamp}.zip`;
-            const appZipId = `app-flutter-${project.id}-${timestamp}.zip`;
-            
-            let liveUrlResult = '';
+            addLog('☁️ جاري ربط ونشر وحفظ مخرجات المنظومة بروافد النشر الآمن...');
+            await new Promise(r => setTimeout(r, 600));
+
+            setResultLink(data.liveUrl);
+            setSrcZipUrl(data.sourceZipUrl);
+            setApkUrl(data.apkUrl);
+            setIpaUrl(data.liveUrl);
+
+            // Prefetch blobs locally to make direct browser downloads completely crashproof and offline-safe
             try {
-                const response = await fetch(`/api/publish/${project.id}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        projectName: project.name,
-                        files: project.files
-                    })
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    liveUrlResult = data.liveUrl;
-                    addLog('✅ تم النشر بنجاح على استضافة سحابية فعلية دائمة!');
-                    addLog(`🔗 الرابط العام للمشاركة والاستخدام: ${liveUrlResult}`);
-                } else {
-                    throw new Error(await response.text());
+                const srcZipRes = await fetch(data.sourceZipUrl);
+                if (srcZipRes.ok) {
+                    setLocalWebZipBlob(await srcZipRes.blob());
                 }
-            } catch (publishErr) {
-                addLog('⚠️ فشل النشر المحلي المؤقت، جاري استخدام استبقاء سحابي احتياطي...');
-                liveUrlResult = await saveBlob(liveId, htmlBlob);
-                addLog(`🔗 الرابط الاحتياطي: ${liveUrlResult}`);
+                const flutterZipRes = await fetch(data.flutterZipUrl);
+                if (flutterZipRes.ok) {
+                    setLocalFlutterZipBlob(await flutterZipRes.blob());
+                }
+            } catch (blobErr) {
+                console.warn("Failed to bake downloads into client memory, using direct URLs fallback.", blobErr);
             }
 
-            const sourceZipUrlResult = await saveBlob(zipId, zipBlob);
-            const flutterZipUrlResult = await saveBlob(appZipId, projectZip);
-            
-            setResultLink(liveUrlResult);
-            setSrcZipUrl(sourceZipUrlResult);
-            
-            // Set the APK URL to our real backend download route
-            const realApkDownloadUrl = `/api/build/apk/${project.id}`;
-            setApkUrl(realApkDownloadUrl);
-            setIpaUrl(liveUrlResult); // Move iOS PWA flow to the live public link
+            addLog('🚀 تم الانتهاء من دورة البناء والـ CI/CD بنجاح حقيقي 100%!');
+            addLog(`🔗 رابط الويب المباشر المؤكد: ${data.liveUrl}`);
 
-            addLog('🚀 تم الانتهاء من دورة الـ CI/CD بنجاح بنسبة 100%!');
-            addLog(`🔗 رابط الويب المباشر: ${liveUrlResult}`);
-            
             if (onUpdateProject) {
                 onUpdateProject({
                     ...project,
-                    lastDeploymentUrl: liveUrlResult,
-                    flutterProjectUrl: sourceZipUrlResult,
-                    apkUrl: realApkDownloadUrl,
-                    ipaUrl: liveUrlResult,
+                    lastDeploymentUrl: data.liveUrl,
+                    flutterProjectUrl: data.flutterZipUrl,
+                    apkUrl: data.apkUrl,
+                    ipaUrl: data.liveUrl,
                     isPublished: true,
-                    deploymentTimestamp: timestamp
+                    deploymentTimestamp: Date.now()
                 });
             }
 
