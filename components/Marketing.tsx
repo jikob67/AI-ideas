@@ -105,8 +105,8 @@ const Marketing: React.FC<MarketingProps> = ({ context, navigate }) => {
     const [saveStatus, setSaveStatus] = useState('');
     const [copiedContentId, setCopiedContentId] = useState<string | null>(null);
     
-    const [hasSelectedApiKey, setHasSelectedApiKey] = useState(false);
-    const [isCheckingApiKey, setIsCheckingApiKey] = useState(true);
+    const [hasSelectedApiKey, setHasSelectedApiKey] = useState(true);
+    const [isCheckingApiKey, setIsCheckingApiKey] = useState(false);
 
     const onLog = (log: string) => setLogs(prev => [...prev, log]);
 
@@ -136,16 +136,7 @@ const Marketing: React.FC<MarketingProps> = ({ context, navigate }) => {
     }, [context]);
 
     useEffect(() => {
-        const checkApiKey = async () => {
-            if (window.aistudio) {
-                try {
-                    const hasKey = await window.aistudio.hasSelectedApiKey();
-                    setHasSelectedApiKey(hasKey);
-                } catch (e) { console.error("Error checking API key:", e); }
-            }
-            setIsCheckingApiKey(false);
-        };
-        checkApiKey();
+        // No-op: Bypassed for Fly.io backend-to-backend handling using environment variable GEMINI_API_KEY
     }, []);
 
     const filteredCampaigns = useMemo(() => {

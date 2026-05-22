@@ -294,6 +294,74 @@ async function startServer() {
     }
   });
 
+  // Dedicated reliable Text-to-Speech (Audio) Endpoint
+  app.post("/api/gemini/generate-speech", async (req, res) => {
+    const { text } = req.body;
+    try {
+      if (!text) {
+        return res.status(400).json({ error: "الرجاء إدخال نص لتوليد الصوت." });
+      }
+      
+      const response = await getAi().models.generateContent({
+        model: 'gemini-2.0-flash', // Fully released gemini-2.0-flash with native tts
+        contents: [{ role: 'user', parts: [{ text }] }],
+        config: {
+          responseModalities: ['AUDIO'],
+          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } }
+        }
+      });
+      
+      const audioPart = response.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+      if (audioPart && audioPart.data) {
+        return res.json({ base64: audioPart.data });
+      }
+      throw new Error("لم تقم واجهة API بإرجاع أي بيانات صوتية.");
+    } catch (error: any) {
+      console.error("Gemini Generate Speech Error:", error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Dedicated reliable Imagen Image Generation Endpoint
+  app.post("/api/gemini/generate-image", async (req, res) => {
+    const { prompt, aspectRatio } = req.body;
+    try {
+      if (!prompt) {
+        return res.status(400).json({ error: "الرجاء إدخال وصف لتوليد الصورة." });
+      }
+
+      const modelQueue = ['imagen-3.0-generate-001', 'imagen-3.0-capability-001', 'imagen-3.0-generate-002'];
+      let lastError: any = null;
+      
+      for (const currentModel of modelQueue) {
+        try {
+          const response = await getAi().models.generateImages({
+            model: currentModel,
+            prompt,
+            config: {
+              numberOfImages: 1,
+              outputMimeType: 'image/jpeg',
+              aspectRatio: aspectRatio || '1:1',
+            }
+          });
+          
+          if (response && response.generatedImages && response.generatedImages.length > 0) {
+            const base64 = response.generatedImages[0].image.imageBytes;
+            return res.json({ base64 });
+          }
+        } catch (err: any) {
+          lastError = err;
+          console.warn(`[Server] Image generation with ${currentModel} failed:`, err.message);
+        }
+      }
+      
+      throw lastError || new Error("فشلت جميع محاولات توليد الصورة باستخدام النماذج المتاحة.");
+    } catch (error: any) {
+      console.error("Gemini Generate Image Error:", error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Real Web Deployments Directory
   const fs = await import("fs");
 
