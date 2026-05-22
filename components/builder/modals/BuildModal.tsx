@@ -42,11 +42,38 @@ export const BuildModal: React.FC<BuildModalProps> = ({ isOpen, onClose, project
     const [logs, setLogs] = useState<string[]>([]);
     const [isBuilding, setIsBuilding] = useState(false);
     
+    const resolvePublicUrl = (url: string | null): string | null => {
+        if (!url) return null;
+        try {
+            if (url.startsWith('/')) {
+                return `${window.location.protocol}//${window.location.host}${url}`;
+            }
+            const parsed = new URL(url);
+            if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') {
+                parsed.href = parsed.href.replace(/https?:\/\/localhost(:\d+)?/g, `${window.location.protocol}//${window.location.host}`);
+            }
+            const finalUrl = parsed.toString();
+            if (finalUrl.includes('localhost') || finalUrl.startsWith('file:') || finalUrl.startsWith('blob:')) {
+                return null;
+            }
+            return finalUrl;
+        } catch (e) {
+            if (url.includes('localhost') || url.startsWith('file:') || url.startsWith('blob:')) {
+                const clean = url.replace(/https?:\/\/localhost(:\d+)?/g, `${window.location.protocol}//${window.location.host}`);
+                if (clean.startsWith('blob:') || clean.startsWith('file:')) {
+                    return null;
+                }
+                return clean;
+            }
+            return url;
+        }
+    };
+
     // Outputs
-    const [resultLink, setResultLink] = useState<string | null>(project.lastDeploymentUrl || null);
-    const [apkUrl, setApkUrl] = useState<string | null>(project.apkUrl || null);
-    const [ipaUrl, setIpaUrl] = useState<string | null>(project.ipaUrl || null);
-    const [srcZipUrl, setSrcZipUrl] = useState<string | null>(project.flutterProjectUrl || null);
+    const [resultLink, setResultLink] = useState<string | null>(resolvePublicUrl(project.lastDeploymentUrl || null));
+    const [apkUrl, setApkUrl] = useState<string | null>(resolvePublicUrl(project.apkUrl || null));
+    const [ipaUrl, setIpaUrl] = useState<string | null>(resolvePublicUrl(project.ipaUrl || null));
+    const [srcZipUrl, setSrcZipUrl] = useState<string | null>(resolvePublicUrl(project.flutterProjectUrl || null));
     
     // Local in-memory Blobs for robust direct download bypassing CORS / Firebase limits
     const [localWebZipBlob, setLocalWebZipBlob] = useState<Blob | null>(null);
@@ -195,35 +222,49 @@ export const BuildModal: React.FC<BuildModalProps> = ({ isOpen, onClose, project
             addLog('☁️ جاري ربط ونشر وحفظ مخرجات المنظومة بروافد النشر الآمن...');
             await new Promise(r => setTimeout(r, 600));
 
-            setResultLink(data.liveUrl);
-            setSrcZipUrl(data.sourceZipUrl);
-            setApkUrl(data.apkUrl);
-            setIpaUrl(data.liveUrl);
+            const resolvedLiveUrl = resolvePublicUrl(data.liveUrl);
+            const resolvedSourceZipUrl = resolvePublicUrl(data.sourceZipUrl);
+            const resolvedApkUrl = resolvePublicUrl(data.apkUrl);
+            const resolvedIpaUrl = resolvePublicUrl(data.liveUrl);
+            const resolvedFlutterZipUrl = resolvePublicUrl(data.flutterZipUrl);
+
+            setResultLink(resolvedLiveUrl);
+            setSrcZipUrl(resolvedSourceZipUrl);
+            setApkUrl(resolvedApkUrl);
+            setIpaUrl(resolvedIpaUrl);
 
             // Prefetch blobs locally to make direct browser downloads completely crashproof and offline-safe
-            try {
-                const srcZipRes = await fetch(data.sourceZipUrl);
-                if (srcZipRes.ok) {
-                    setLocalWebZipBlob(await srcZipRes.blob());
+            if (resolvedSourceZipUrl) {
+                try {
+                    const srcZipRes = await fetch(resolvedSourceZipUrl);
+                    if (srcZipRes.ok) {
+                        setLocalWebZipBlob(await srcZipRes.blob());
+                    }
+                } catch (blobErr) {
+                    console.warn("Failed to bake source zip download into client memory.", blobErr);
                 }
-                const flutterZipRes = await fetch(data.flutterZipUrl);
-                if (flutterZipRes.ok) {
-                    setLocalFlutterZipBlob(await flutterZipRes.blob());
+            }
+            if (resolvedFlutterZipUrl) {
+                try {
+                    const flutterZipRes = await fetch(resolvedFlutterZipUrl);
+                    if (flutterZipRes.ok) {
+                        setLocalFlutterZipBlob(await flutterZipRes.blob());
+                    }
+                } catch (blobErr) {
+                    console.warn("Failed to bake flutter zip download into client memory.", blobErr);
                 }
-            } catch (blobErr) {
-                console.warn("Failed to bake downloads into client memory, using direct URLs fallback.", blobErr);
             }
 
             addLog('🚀 تم الانتهاء من دورة البناء والـ CI/CD بنجاح حقيقي 100%!');
-            addLog(`🔗 رابط الويب المباشر المؤكد: ${data.liveUrl}`);
+            addLog(`🔗 رابط الويب المباشر المؤكد: ${resolvedLiveUrl}`);
 
             if (onUpdateProject) {
                 onUpdateProject({
                     ...project,
-                    lastDeploymentUrl: data.liveUrl,
-                    flutterProjectUrl: data.flutterZipUrl,
-                    apkUrl: data.apkUrl,
-                    ipaUrl: data.liveUrl,
+                    lastDeploymentUrl: resolvedLiveUrl || undefined,
+                    flutterProjectUrl: resolvedFlutterZipUrl || undefined,
+                    apkUrl: resolvedApkUrl || undefined,
+                    ipaUrl: resolvedIpaUrl || undefined,
                     isPublished: true,
                     deploymentTimestamp: Date.now()
                 });
@@ -409,8 +450,25 @@ export const BuildModal: React.FC<BuildModalProps> = ({ isOpen, onClose, project
                         </div>
                     </div>
 
-                    {/* Results Actions Group (Only appears when build processes or completes) */}
-                    {(phase === 'completed' || phase === 'failed' || resultLink) && (
+                    {/* Error Display Alert Block */}
+                    {error && (
+                        <div className="p-4 bg-red-950/20 border border-red-900/40 rounded-2xl flex flex-row-reverse items-start gap-3 text-right text-red-400 animate-fade-in font-sans">
+                            <span className="p-1.5 bg-red-500/10 rounded-lg text-red-500 mt-0.5">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 flex-shrink-0">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                                </svg>
+                            </span>
+                            <div className="flex-1 text-right">
+                                <h4 className="text-white font-bold text-xs">تعذر إكمال دورة البناء والـ CI/CD</h4>
+                                <p className="text-[11px] text-red-400/80 mt-1 leading-relaxed">
+                                    {error}
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Results Actions Group (Only appears when build completes successfully without errors) */}
+                    {(phase === 'completed' && !error) && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
                             {/* Live Site */}
                             <div className="p-4 bg-slate-800/30 border border-slate-800 rounded-2xl flex flex-col justify-between">

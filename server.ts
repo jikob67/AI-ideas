@@ -297,6 +297,42 @@ async function startServer() {
 
   // Real Web Deployments Directory
   const fs = await import("fs");
+
+  function getRequestUrlInfo(req: express.Request) {
+    const forwardedHost = req.headers['x-forwarded-host'] as string;
+    const forwardedProto = req.headers['x-forwarded-proto'] as string;
+    
+    let hostUrl = forwardedHost || req.headers.host || req.get('host') || "localhost:3000";
+    let protocol = forwardedProto || (req.protocol === 'http' || hostUrl.includes('localhost') ? 'http' : 'https');
+    
+    // Clean protocol to ensure it just contains the scheme without symbols
+    protocol = protocol.replace(/[:\/]/g, '');
+    
+    return { hostUrl, protocol };
+  }
+
+  function validatePublicUrl(url: string): boolean {
+    if (
+      url.includes("localhost") ||
+      url.startsWith("blob:") ||
+      url.startsWith("file:")
+    ) {
+      throw new Error("Invalid public deployment URL");
+    }
+    return true;
+  }
+
+  function verifyArtifact(filePath: string): boolean {
+    if (!fs.existsSync(filePath)) {
+      throw new Error(`Artifact missing at ${filePath}`);
+    }
+    const stat = fs.statSync(filePath);
+    if (stat.size < 5000) {
+      throw new Error(`Artifact is corrupted or empty (size: ${stat.size} bytes is under 5KB threshold)`);
+    }
+    return true;
+  }
+
   const PUBLISHED_DIR = path.join(process.cwd(), "published_apps");
   if (!fs.existsSync(PUBLISHED_DIR)) {
     fs.mkdirSync(PUBLISHED_DIR, { recursive: true });
@@ -465,8 +501,7 @@ self.addEventListener('fetch', event => {
       const flutterZip = new JSZip();
       
       // main.dart WebView Loader
-      const hostUrl = req.headers.host || req.get('host') || "localhost:3000";
-      const protocol = req.protocol === 'http' || hostUrl.includes('localhost') ? 'http' : 'https';
+      const { hostUrl, protocol } = getRequestUrlInfo(req);
       const liveUrl = `${protocol}://${hostUrl}/published/${projectId}/index.html`;
 
       const mainDart = `
@@ -711,37 +746,43 @@ This complete Flutter project runs your web app natively on Android and iOS.
         
         const errors: string[] = [];
 
-        // Check 1: ZIP files integrity
+        // Check 1: ZIP files integrity & verification
+        const zip1Path = path.join(buildProjectDir, "source.zip");
+        const zip2Path = path.join(buildProjectDir, "flutter_source.zip");
+        
         try {
-          const zip1 = fs.readFileSync(path.join(buildProjectDir, "source.zip"));
+          verifyArtifact(zip1Path);
+          const zip1 = fs.readFileSync(zip1Path);
           const testZip1 = await JSZip.loadAsync(zip1);
           if (Object.keys(testZip1.files).length === 0) {
             errors.push("ملف source.zip تالف ولا يحتوي على أي ملفات.");
           } else {
-            addLog("✅ فحص تكامل ملف source.zip: سليم ومضغوط بمعيار DEFLATE ممتاز.");
+            addLog("✅ فحص تكامل ملف source.zip: سليم ومضغوط بمعيار DEFLATE ممتاز وحجمه أكبر من 5KB.");
           }
         } catch (e: any) {
-          errors.push(`تلف مادي في ملف source.zip: ${e.message}`);
+          errors.push(`تلف مادي أو نقص حجم في ملف source.zip (أقل من 5KB): ${e.message}`);
         }
 
         try {
-          const zip2 = fs.readFileSync(path.join(buildProjectDir, "flutter_source.zip"));
+          verifyArtifact(zip2Path);
+          const zip2 = fs.readFileSync(zip2Path);
           const testZip2 = await JSZip.loadAsync(zip2);
           if (!testZip2.file("pubspec.yaml") || !testZip2.file("lib/main.dart")) {
             errors.push("هيكل flutter_source.zip فارغ أو ينقصه ملفات التأسيس الرئيسية.");
           } else {
-            addLog("✅ فحص تكامل ملف flutter_source.zip: سليم ويضم كامل حزمة الهوية وبنية Android/iOS.");
+            addLog("✅ فحص تكامل ملف flutter_source.zip: سليم ويضم كامل حزمة الهوية وبنية Android/iOS وحجمه أكبر من 5KB.");
           }
         } catch (e: any) {
-          errors.push(`تلف مادي في ملف flutter_source.zip: ${e.message}`);
+          errors.push(`تلف مادي أو نقص حجم في ملف flutter_source.zip (أقل من 5KB): ${e.message}`);
         }
 
         // Check 2: APK validity
         const apkFile = path.join(buildProjectDir, "app.apk");
-        if (!fs.existsSync(apkFile) || fs.statSync(apkFile).size < 1000) {
-          errors.push("ملف التطبيق التثبيتي app.apk مفقود أو معطوب.");
-        } else {
-          addLog(`✅ فحص صلاحية حزمة الأندرويد: الملف موجود وحجمه سليم (${(fs.statSync(apkFile).size / 1024 / 1024).toFixed(2)} MB).`);
+        try {
+          verifyArtifact(apkFile);
+          addLog(`✅ فحص صلاحية حزمة الأندرويد app.apk: الملف موجود ومطابق لمعايير الحجم الآمن المضمون لحزمة التشغيل (${(fs.statSync(apkFile).size / 1024 / 1024).toFixed(2)} MB ويبلغ حجمه الفعلي أكثر من 5KB).`);
+        } catch (e: any) {
+          errors.push(`ملف التطبيق التثبيتي app.apk مفقود أو معطوب أو فارغ (أقل من 5KB): ${e.message}`);
         }
 
         // Check 3: PWA iOS Validation
@@ -765,8 +806,7 @@ This complete Flutter project runs your web app natively on Android and iOS.
         }
 
         // Check 4: HTTP 200 accessibility check for built downloads and published page
-        const hostUrl = req.headers.host || req.get('host') || "localhost:3000";
-        const protocol = req.protocol === 'http' || hostUrl.includes('localhost') ? 'http' : 'https';
+        const { hostUrl, protocol } = getRequestUrlInfo(req);
         const liveTargetUrl = `${protocol}://${hostUrl}/published/${projectId}/index.html`;
 
         addLog("🛡️ فحص تصاريح الأمان CORS و SSL ووصول الروابط الخارجية...");
@@ -795,12 +835,13 @@ This complete Flutter project runs your web app natively on Android and iOS.
         throw new Error("تجاوز الحد الأقصى لمحاولات البناء الذاتي والتحقق للأكواد والملفات.");
       }
 
-      const hostUrl = req.headers.host || req.get('host') || "localhost:3000";
-      const protocol = req.protocol === 'http' || hostUrl.includes('localhost') ? 'http' : 'https';
+      const { hostUrl, protocol } = getRequestUrlInfo(req);
+      const liveUrl = `${protocol}://${hostUrl}/published/${projectId}/index.html`;
+      validatePublicUrl(liveUrl);
       
       const responseData = {
         success: true,
-        liveUrl: `${protocol}://${hostUrl}/published/${projectId}/index.html`,
+        liveUrl: liveUrl,
         sourceZipUrl: `${protocol}://${hostUrl}/builds/${projectId}/source.zip`,
         flutterZipUrl: `${protocol}://${hostUrl}/builds/${projectId}/flutter_source.zip`,
         apkUrl: `${protocol}://${hostUrl}/builds/${projectId}/app.apk`,
@@ -920,9 +961,9 @@ self.addEventListener('fetch', event => {
       }
 
       // Generate exact Live shareable URL
-      const hostUrl = req.headers.host || req.get('host') || "localhost:3000";
-      const protocol = req.protocol === 'http' || hostUrl.includes('localhost') ? 'http' : 'https';
+      const { hostUrl, protocol } = getRequestUrlInfo(req);
       const liveUrl = `${protocol}://${hostUrl}/published/${projectId}/index.html`;
+      validatePublicUrl(liveUrl);
 
       res.json({ success: true, liveUrl });
     } catch (error: any) {
