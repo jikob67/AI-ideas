@@ -330,28 +330,56 @@ async function startServer() {
         return res.status(400).json({ error: "الرجاء إدخال وصف لتوليد الصورة." });
       }
 
-      const modelQueue = ['imagen-3.0-generate-001', 'imagen-3.0-capability-001', 'imagen-3.0-generate-002'];
+      const modelQueue = [
+        { model: 'gemini-2.5-flash-image', type: 'content' },
+        { model: 'gemini-3.1-flash-image-preview', type: 'content' },
+        { model: 'imagen-3.0-generate-002', type: 'image' },
+        { model: 'imagen-3.0-generate-001', type: 'image' },
+        { model: 'imagen-3.0-capability-001', type: 'image' }
+      ];
       let lastError: any = null;
       
-      for (const currentModel of modelQueue) {
+      for (const item of modelQueue) {
         try {
-          const response = await getAi().models.generateImages({
-            model: currentModel,
-            prompt,
-            config: {
-              numberOfImages: 1,
-              outputMimeType: 'image/jpeg',
-              aspectRatio: aspectRatio || '1:1',
+          if (item.type === 'content') {
+            const response = await getAi().models.generateContent({
+              model: item.model,
+              contents: [{ role: 'user', parts: [{ text: prompt }] }],
+              config: {
+                imageConfig: {
+                  aspectRatio: aspectRatio || '1:1',
+                }
+              }
+            });
+            
+            const parts = response.candidates?.[0]?.content?.parts;
+            if (parts) {
+              for (const part of parts) {
+                if (part.inlineData && part.inlineData.data) {
+                  const base64 = part.inlineData.data;
+                  return res.json({ base64 });
+                }
+              }
             }
-          });
-          
-          if (response && response.generatedImages && response.generatedImages.length > 0) {
-            const base64 = response.generatedImages[0].image.imageBytes;
-            return res.json({ base64 });
+          } else {
+            const response = await getAi().models.generateImages({
+              model: item.model,
+              prompt,
+              config: {
+                numberOfImages: 1,
+                outputMimeType: 'image/jpeg',
+                aspectRatio: aspectRatio || '1:1',
+              }
+            });
+            
+            if (response && response.generatedImages && response.generatedImages.length > 0) {
+              const base64 = response.generatedImages[0].image.imageBytes;
+              return res.json({ base64 });
+            }
           }
         } catch (err: any) {
           lastError = err;
-          console.warn(`[Server] Image generation with ${currentModel} failed:`, err.message);
+          console.warn(`[Server] Image generation with ${item.model} failed:`, err.message);
         }
       }
       
