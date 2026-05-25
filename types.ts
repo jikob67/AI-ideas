@@ -26,6 +26,8 @@ export type View =
   | 'profitSource'
   | 'appeal'
   | 'drawToCode' 
+  | 'voiceToCode'
+  | 'videoToCode'
   | 'professionalTemplateGenerator'
   | 'trash'
   | 'dataAnalysis'

@@ -22,6 +22,8 @@ import ProfessionalTemplateGenerator from './components/ProfessionalTemplateGene
 import Trash from './components/Trash';
 import ProfitSource from './components/ProfitSource';
 import DrawToCode from './components/DrawToCode';
+import VoiceToCode from './components/VoiceToCode';
+import VideoToCode from './components/VideoToCode';
 import DataAnalysis from './components/DataAnalysis';
 import AiContentDetector from './components/AiContentDetector';
 import Changelog from './components/Changelog';
@@ -218,6 +220,10 @@ const App: React.FC = () => {
         return <SoftwareProjectBuilder key="uiRecognizer" navigate={navigate} mode="recognizer" context={navigationContext} />;
       case 'drawToCode':
         return <DrawToCode key="drawToCode" navigate={navigate} context={navigationContext} />;
+      case 'voiceToCode':
+        return <VoiceToCode key="voiceToCode" navigate={navigate} context={navigationContext} />;
+      case 'videoToCode':
+        return <VideoToCode key="videoToCode" navigate={navigate} context={navigationContext} />;
       case 'fileConverter':
         return <FileConverter key="fileConverter" navigate={navigate} />;
       case 'projectWizard':
