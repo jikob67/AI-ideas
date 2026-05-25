@@ -62,6 +62,11 @@ const ProfessionalTemplateGenerator: React.FC<ProfessionalTemplateGeneratorProps
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const [isConvertMenuOpen, setIsConvertMenuOpen] = useState(false);
     const convertMenuRef = useRef<HTMLDivElement>(null);
+    const [activeSidebarTab, setActiveSidebarTab] = useState<'generate' | 'upload'>('generate');
+    const [pastedHtml, setPastedHtml] = useState('');
+    const [pastedCss, setPastedCss] = useState('');
+    const [pastedJs, setPastedJs] = useState('');
+    const multipleFilesInputRef = useRef<HTMLInputElement>(null);
     // --- End New State ---
     
     // --- Pages & Sub-pages Feature States ---
@@ -179,6 +184,121 @@ const ProfessionalTemplateGenerator: React.FC<ProfessionalTemplateGeneratorProps
             }
         };
         reader.readAsText(file);
+    };
+
+    const handleMultipleFilesUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
+
+        setIsLoading(true);
+        setError('');
+
+        try {
+            const loadedPages: { name: string; title: string; content: string }[] = [];
+            let loadedCss = '';
+            let loadedJs = '';
+            const filePromises = (Array.from(files) as File[]).map((file: File) => {
+                return new Promise<void>((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const text = event.target?.result as string;
+                        const nameLower = file.name.toLowerCase();
+                        if (nameLower.endsWith('.html')) {
+                            const baseName = file.name.replace(/\.html$/i, '');
+                            const title = baseName === 'index' ? 'الصفحة الرئيسية' : baseName;
+                            loadedPages.push({
+                                name: file.name,
+                                title: title,
+                                content: text
+                            });
+                        } else if (nameLower.endsWith('.css')) {
+                            loadedCss += `\n/* --- ${file.name} --- */\n` + text;
+                        } else if (nameLower.endsWith('.js') || nameLower.endsWith('.ts')) {
+                            loadedJs += `\n/* --- ${file.name} --- */\n` + text;
+                        }
+                        resolve();
+                    };
+                    reader.readAsText(file);
+                });
+            });
+
+            await Promise.all(filePromises);
+
+            if (loadedPages.length === 0) {
+                loadedPages.push({
+                    name: 'index.html',
+                    title: 'الصفحة الرئيسية',
+                    content: `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>القالب المرفوع</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-slate-900 text-white min-h-screen p-8 text-center flex flex-col items-center justify-center">
+    <h1 class="text-3xl font-bold mb-4">تم تحميل القالب بنجاح</h1>
+    <p class="text-slate-400">لقد تم رفع ملفات CSS/JS مخصصة. يمكنك تعديل كود HTML في نافذة المحرر.</p>
+    <script src="script.js" defer></script>
+</body>
+</html>`
+                });
+            }
+
+            if (!loadedPages.some(p => p.name === 'index.html')) {
+                loadedPages[0].name = 'index.html';
+            }
+
+            setTemplatePages(loadedPages);
+            setGlobalCss(loadedCss || '/* خصائص CSS للقالب المرفوع */');
+            setGlobalJs(loadedJs || '/* منطق Javascript للقالب المرفوع */');
+            setSelectedPageName('index.html');
+
+            setGeneratedCode({
+                html: loadedPages.find(p => p.name === 'index.html')?.content || '',
+                css: loadedCss || '',
+                js: loadedJs || ''
+            });
+
+            setActiveTab('preview');
+            setScreen('generator');
+            alert(`تم رفع وقراءة ${files.length} ملفات قالب بنجاح، وتحويلها لبيئة المعاينة والتحرير التفاعلية!`);
+        } catch (err) {
+            setError('حدث خطأ أثناء قراءة الملفات المرفوعة.');
+            console.error(err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleLoadPastedTemplate = () => {
+        if (!pastedHtml.trim()) {
+            setError('يرجى كتابة أو لصق كود HTML القالب أولاً.');
+            return;
+        }
+        setIsLoading(true);
+        setError('');
+        try {
+            const pages = [
+                { name: 'index.html', title: 'الصفحة الرئيسية', content: pastedHtml }
+            ];
+            setTemplatePages(pages);
+            setGlobalCss(pastedCss || '/* خصائص CSS للقالب */');
+            setGlobalJs(pastedJs || '/* منطق JavaScript للقالب */');
+            setSelectedPageName('index.html');
+
+            setGeneratedCode({
+                html: pastedHtml,
+                css: pastedCss || '',
+                js: pastedJs || ''
+            });
+            setActiveTab('preview');
+            alert('تم تحميل الأكواد المكتوبة واللاصقة بنجاح في نظام المعاينة والمحرّر التفاعلي!');
+        } catch (err) {
+            setError('فشل تحميل الأكواد المكتوبة والمعدلة.');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const handleExportProjects = () => {
@@ -741,13 +861,13 @@ const ProfessionalTemplateGenerator: React.FC<ProfessionalTemplateGeneratorProps
             <div className="p-4 h-full flex flex-col animate-fade-in space-y-6">
                 <header className="flex-shrink-0 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
-                        <h1 className="text-2xl font-bold text-white">مشاريع القوالب الاحترافية</h1>
+                        <h1 className="text-2xl font-bold text-white">مشاريع قالب إلى كود</h1>
                         <p className="text-slate-400">({templateProjects.length}) مشاريع</p>
                     </div>
                     <div className="flex items-center gap-2">
                         <button onClick={() => importFileRef.current?.click()} className="text-sm bg-slate-600 hover:bg-slate-500 text-white px-3 py-2 rounded-lg flex items-center gap-2"><UploadIcon className="w-4 h-4"/> استيراد</button>
                         <button onClick={handleExportProjects} className="text-sm bg-slate-600 hover:bg-slate-500 text-white px-3 py-2 rounded-lg flex items-center gap-2"><ArrowDownTrayIcon className="w-4 h-4"/> تصدير</button>
-                        <button onClick={() => setScreen('generator')} className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2"><PlusIcon className="w-5 h-5"/> إنشاء قالب جديد</button>
+                        <button onClick={() => setScreen('generator')} className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2"><PlusIcon className="w-5 h-5"/> إنشاء أو رفع قالب جديد</button>
                         <input type="file" accept=".json,.zip,application/zip" ref={importFileRef} className="hidden" onChange={handleImportProjects} />
                     </div>
                 </header>
@@ -794,83 +914,171 @@ const ProfessionalTemplateGenerator: React.FC<ProfessionalTemplateGeneratorProps
 
     return (
         <div className="flex flex-col lg:flex-row h-full bg-slate-900 text-white animate-fade-in">
-            <aside className="w-full lg:w-[30%] flex-shrink-0 bg-slate-800/50 border-b lg:border-r lg:border-b-0 border-slate-700 p-4 flex flex-col gap-6 overflow-y-auto">
+            <aside className="w-full lg:w-[32%] flex-shrink-0 bg-slate-800/50 border-b lg:border-r lg:border-b-0 border-slate-700 p-4 flex flex-col gap-5 overflow-y-auto">
                 <div>
-                     <button onClick={() => setScreen('list')} className="flex items-center gap-2 text-sm text-slate-400 hover:text-white mb-4">
+                     <button onClick={() => setScreen('list')} className="flex items-center gap-2 text-sm text-slate-400 hover:text-white mb-3">
                         <ArrowLeftIcon className="w-4 h-4" /> العودة إلى القائمة
                     </button>
-                    <h2 className="text-xl font-bold text-slate-100">مولّد القوالب الاحترافية</h2>
+                    <h2 className="text-xl font-bold text-slate-100 mb-4">قالب إلى كود</h2>
+                </div>
+
+                {/* Sidebar Tab Selectors */}
+                <div className="flex bg-slate-800 p-1 rounded-lg border border-slate-700">
+                    <button
+                        onClick={() => setActiveSidebarTab('generate')}
+                        className={`flex-1 py-2 text-xs font-semibold rounded-md transition-all ${activeSidebarTab === 'generate' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+                    >
+                        توليد ذكي بالذكاء الاصطناعي ✨
+                    </button>
+                    <button
+                        onClick={() => setActiveSidebarTab('upload')}
+                        className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${activeSidebarTab === 'upload' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+                    >
+                        رفع أو لصق قالب 📄
+                    </button>
                 </div>
                 
-                <div className="space-y-2">
-                    <label className="block text-sm font-medium text-slate-300">1. اختر مشروعًا</label>
-                    <div className="flex items-center gap-2">
-                        <select value={selectedProjectId} onChange={e => setSelectedProjectId(e.target.value)} className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2.5 text-white">
-                            {projects.length > 0 ? projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>) : <option>لا توجد مشاريع</option>}
-                        </select>
-                        {selectedProject && (
-                            <button onClick={() => navigate('editApp', { project: selectedProject, originView: 'professionalTemplateGenerator' })} className="p-2.5 bg-slate-700 hover:bg-slate-600 rounded-lg" title="تعديل المشروع المحدد">
-                                <WrenchScrewdriverIcon className="w-5 h-5" />
-                            </button>
-                        )}
-                    </div>
-                    {selectedProject?.iconUrl && (
-                        <div className="mt-2 flex items-center gap-2 p-2 bg-slate-700/50 rounded-lg">
-                            <img src={selectedProject.iconUrl} alt="icon" className="w-8 h-8 rounded-md object-cover" />
-                            <p className="text-xs text-slate-400">أيقونة المشروع المحدد</p>
-                        </div>
-                    )}
-                </div>
-
-                <div className="space-y-2">
-                    <label className="block text-sm font-medium text-slate-300">2. اختر نمط القالب</label>
-                    <div className="grid grid-cols-2 gap-2">
-                        {templateCategories.map(cat => (
-                            <button key={cat.id} onClick={() => setTemplateCategory(cat.id)} className={`p-3 rounded-lg border-2 transition-colors ${templateCategory === cat.id ? 'bg-indigo-600/30 border-indigo-500' : 'bg-slate-700/50 border-slate-600 hover:border-slate-500'}`}>
-                                <div className={`mx-auto ${templateCategory === cat.id ? 'text-indigo-300' : 'text-slate-400'}`}>{cat.icon}</div>
-                                <p className="text-xs font-semibold mt-2">{cat.name}</p>
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
-                <div className="space-y-2">
-                    <label htmlFor="font-select" className="block text-sm font-medium text-slate-300">3. اختر الخطوط</label>
-                    <select id="font-select" value={JSON.stringify(fontPair)} onChange={e => setFontPair(JSON.parse(e.target.value))} className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2.5 text-white">
-                       {fontPairings.map(fp => <option key={fp.name} value={JSON.stringify(fp.value)} style={{fontFamily: fp.value.body}}>{fp.name}</option>)}
-                    </select>
-                </div>
-
-                <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                        <label className="block text-sm font-medium text-slate-300">4. خصص الألوان</label>
-                        <button onClick={handleThemeSuggestion} disabled={isSuggesting} className="flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 disabled:opacity-50">
-                            {isSuggesting ? <SpinnerIcon className="w-4 h-4 animate-spin"/> : <LightBulbIcon className="w-4 h-4"/>}
-                            اقترح
-                        </button>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                        {Object.entries(theme).map(([key, value]) => (
-                            <div key={key}>
-                                <label className="text-xs text-slate-400 capitalize">{key}</label>
-                                <input type="color" value={value} onChange={e => setTheme(t => ({...t, [key]: e.target.value}))} className="w-full h-10 p-1 bg-slate-700 rounded-md border border-slate-600 cursor-pointer"/>
+                {activeSidebarTab === 'generate' ? (
+                    <>
+                        <div className="space-y-2">
+                            <label className="block text-sm font-medium text-slate-300">1. اختر مشروعًا</label>
+                            <div className="flex items-center gap-2">
+                                <select value={selectedProjectId} onChange={e => setSelectedProjectId(e.target.value)} className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2.5 text-white">
+                                    {projects.length > 0 ? projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>) : <option>لا توجد مشاريع</option>}
+                                </select>
+                                {selectedProject && (
+                                    <button onClick={() => navigate('editApp', { project: selectedProject, originView: 'professionalTemplateGenerator' })} className="p-2.5 bg-slate-700 hover:bg-slate-600 rounded-lg" title="تعديل المشروع المحدد">
+                                        <WrenchScrewdriverIcon className="w-5 h-5" />
+                                    </button>
+                                )}
                             </div>
-                        ))}
-                    </div>
-                </div>
+                            {selectedProject?.iconUrl && (
+                                <div className="mt-2 flex items-center gap-2 p-2 bg-slate-700/50 rounded-lg">
+                                    <img src={selectedProject.iconUrl} alt="icon" className="w-8 h-8 rounded-md object-cover" />
+                                    <p className="text-xs text-slate-400">أيقونة المشروع المحدد</p>
+                                </div>
+                            )}
+                        </div>
 
-                <div className="mt-auto space-y-2">
-                    {error && <p className="text-red-400 text-sm text-center">{error}</p>}
-                    <div className="flex gap-2">
-                        <button onClick={handleGenerate} disabled={isLoading || !selectedProjectId} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center gap-2 disabled:bg-slate-500">
-                            {isLoading ? <SpinnerIcon className="w-5 h-5 animate-spin" /> : <SparklesIcon className="w-5 h-5" />}
-                            {isLoading ? 'جاري الإنشاء...' : 'إنشاء القالب'}
-                        </button>
-                        <button onClick={handleClear} title="مسح" className="p-2 bg-red-500/20 text-red-300 rounded-lg hover:bg-red-500/40">
-                            <TrashIcon className="w-5 h-5" />
-                        </button>
+                        <div className="space-y-2">
+                            <label className="block text-sm font-medium text-slate-300">2. اختر نمط القالب</label>
+                            <div className="grid grid-cols-2 gap-2">
+                                {templateCategories.map(cat => (
+                                    <button key={cat.id} onClick={() => setTemplateCategory(cat.id)} className={`p-3 rounded-lg border-2 transition-colors ${templateCategory === cat.id ? 'bg-indigo-600/30 border-indigo-500' : 'bg-slate-700/50 border-slate-600 hover:border-slate-500'}`}>
+                                        <div className={`mx-auto ${templateCategory === cat.id ? 'text-indigo-300' : 'text-slate-400'}`}>{cat.icon}</div>
+                                        <p className="text-xs font-semibold mt-2">{cat.name}</p>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label htmlFor="font-select" className="block text-sm font-medium text-slate-300">3. اختر الخطوط</label>
+                            <select id="font-select" value={JSON.stringify(fontPair)} onChange={e => setFontPair(JSON.parse(e.target.value))} className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2.5 text-white">
+                               {fontPairings.map(fp => <option key={fp.name} value={JSON.stringify(fp.value)} style={{fontFamily: fp.value.body}}>{fp.name}</option>)}
+                            </select>
+                        </div>
+
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                                <label className="block text-sm font-medium text-slate-300">4. خصص الألوان</label>
+                                <button onClick={handleThemeSuggestion} disabled={isSuggesting} className="flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 disabled:opacity-50">
+                                    {isSuggesting ? <SpinnerIcon className="w-4 h-4 animate-spin"/> : <LightBulbIcon className="w-4 h-4"/>}
+                                    اقترح بمثالية
+                                </button>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                {Object.entries(theme).map(([key, value]) => (
+                                    <div key={key}>
+                                        <label className="text-xs text-slate-400 capitalize">{key}</label>
+                                        <input type="color" value={value} onChange={e => setTheme(t => ({...t, [key]: e.target.value}))} className="w-full h-10 p-1 bg-slate-700 rounded-md border border-slate-600 cursor-pointer"/>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="mt-auto space-y-2 pt-4">
+                            {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+                            <div className="flex gap-2">
+                                <button onClick={handleGenerate} disabled={isLoading || !selectedProjectId} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 px-4 rounded-lg flex items-center justify-center gap-2 disabled:bg-slate-500">
+                                    {isLoading ? <SpinnerIcon className="w-5 h-5 animate-spin" /> : <SparklesIcon className="w-5 h-5" />}
+                                    {isLoading ? 'جاري التوليد من فكرتك...' : 'تحويل الفكرة لقالب مبرمج ✨'}
+                                </button>
+                                <button onClick={handleClear} title="مسح" className="p-2.5 bg-red-500/20 text-red-300 rounded-lg hover:bg-red-500/40">
+                                    <TrashIcon className="w-5 h-5" />
+                                </button>
+                            </div>
+                        </div>
+                    </>
+                ) : (
+                    <div className="space-y-4 flex-grow flex flex-col justify-start">
+                        {/* Multiple File Uploader */}
+                        <div className="border border-dashed border-slate-600 bg-slate-800/40 p-5 rounded-xl text-center hover:border-indigo-500 transition-all cursor-pointer"
+                             onClick={() => multipleFilesInputRef.current?.click()}>
+                            <UploadIcon className="w-8 h-8 text-indigo-400 mx-auto mb-2" />
+                            <h4 className="text-sm font-semibold text-white">رفع قالب مستندات (ملفات متعددة)</h4>
+                            <p className="text-xs text-slate-400 mt-1">يدعم رفع ملفات HTML, CSS, JS من جهازك معاً</p>
+                            <input
+                                type="file"
+                                id="multiple-template-files"
+                                ref={multipleFilesInputRef}
+                                onChange={handleMultipleFilesUpload}
+                                multiple
+                                accept=".html,.css,.js"
+                                className="hidden"
+                            />
+                        </div>
+
+                        <div className="relative flex py-2 items-center">
+                            <div className="flex-grow border-t border-slate-700"></div>
+                            <span className="flex-shrink mx-3 text-xs text-slate-500 font-bold">أو الصق أكواد القالب مباشرة</span>
+                            <div className="flex-grow border-t border-slate-700"></div>
+                        </div>
+
+                        {/* Text areas for copy pasting template codes */}
+                        <div className="space-y-3 flex-grow overflow-y-auto max-h-[280px] custom-scrollbar pr-1">
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-400 mb-1">كود HTML الرئيسي:</label>
+                                <textarea
+                                    value={pastedHtml}
+                                    placeholder="<!-- الصق كود HTML هنا -->"
+                                    onChange={(e) => setPastedHtml(e.target.value)}
+                                    className="w-full h-24 bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs font-mono text-indigo-300 focus:outline-none focus:border-indigo-500 resize-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-400 mb-1">كود CSS التنسيقي (اختياري):</label>
+                                <textarea
+                                    value={pastedCss}
+                                    placeholder="/* الصق كود CSS هنا */"
+                                    onChange={(e) => setPastedCss(e.target.value)}
+                                    className="w-full h-20 bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs font-mono text-emerald-300 focus:outline-none focus:border-indigo-500 resize-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-400 mb-1">كود JS التفاعلي (اختياري):</label>
+                                <textarea
+                                    value={pastedJs}
+                                    placeholder="/* الصق كود JavaScript هنا */"
+                                    onChange={(e) => setPastedJs(e.target.value)}
+                                    className="w-full h-20 bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs font-mono text-amber-300 focus:outline-none focus:border-indigo-500 resize-none"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="mt-auto space-y-2 pt-2">
+                            {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+                            <button
+                                onClick={handleLoadPastedTemplate}
+                                disabled={isLoading || !pastedHtml.trim()}
+                                className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 px-4 rounded-lg flex items-center justify-center gap-2 disabled:bg-slate-700 disabled:text-slate-500 transition-all font-sans"
+                            >
+                                <SparklesIcon className="w-4 h-4" />
+                                <span>قراءة الأكواد وعرض القالب حياً 🚀</span>
+                            </button>
+                        </div>
                     </div>
-                </div>
+                )}
             </aside>
 
             {/* Output Panel */}
@@ -878,8 +1086,8 @@ const ProfessionalTemplateGenerator: React.FC<ProfessionalTemplateGeneratorProps
                 {!generatedCode && !isLoading && (
                     <div className="w-full h-full flex items-center justify-center text-slate-500 flex-col text-center p-8">
                         <CodeIcon className="w-12 h-12 mb-4 text-slate-600" />
-                        <h3 className="font-semibold text-slate-300">معاينة القالب</h3>
-                        <p>ستظهر المعاينة والأكواد هنا بعد الإنشاء.</p>
+                        <h3 className="font-semibold text-slate-300">معاينة القالب التفاعلية</h3>
+                        <p>ستظهر المعاينة والأكواد التفصيلية هنا فور التوليد الذكي أو الرفع من جهازك.</p>
                     </div>
                 )}
                  {isLoading && (
