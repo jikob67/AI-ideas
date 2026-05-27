@@ -408,6 +408,18 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, op
             onClick={() => setActiveView('drawToCode')}
           />
           <NavButton
+            label="صوت إلى كود"
+            icon={<MicrophoneIcon className="w-6 h-6 text-rose-450" />}
+            isActive={activeView === 'voiceToCode'}
+            onClick={() => setActiveView('voiceToCode')}
+          />
+          <NavButton
+            label="فيديو إلى كود"
+            icon={<VideoIcon className="w-6 h-6 text-amber-500" />}
+            isActive={activeView === 'videoToCode'}
+            onClick={() => setActiveView('videoToCode')}
+          />
+          <NavButton
             label="محلل الواجهات"
             icon={<BeakerIcon className="w-6 h-6 text-purple-400" />}
             isActive={activeView === 'uiRecognizer'}
@@ -492,7 +504,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, op
             onClick={() => setActiveView('profitSource')}
           />
           <NavButton
-            label="قوالب احترافية"
+            label="قالب إلى كود"
             icon={<TemplateIcon className="w-6 h-6 text-violet-400" />}
             isActive={activeView === 'professionalTemplateGenerator'}
             onClick={() => setActiveView('professionalTemplateGenerator')}
