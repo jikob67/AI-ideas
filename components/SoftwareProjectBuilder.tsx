@@ -76,7 +76,8 @@ import {
   deleteDoc, 
   setDoc,
   serverTimestamp,
-  getDocs
+  getDocs,
+  getDoc
 } from 'firebase/firestore';
 
 
@@ -585,18 +586,97 @@ export const SoftwareProjectBuilder: React.FC<{
                 
                 // Fetch subcollections if needed
                 if (currentUser?.uid) {
-                    persistenceService.getProjectFiles(proj.id).then(files => {
-                        setProjectFiles(files);
-                        if (files.length > 0) {
+                    const projDocRef = doc(db, 'projects', proj.id);
+                    getDoc(projDocRef).then((docSnap) => {
+                        if (docSnap.exists()) {
+                            persistenceService.getProjectFiles(proj.id).then(files => {
+                                setProjectFiles(files);
+                                if (files.length > 0) {
+                                    const trinity = ['index.html', 'style.css', 'script.js'];
+                                    const primary = trinity.find(name => files.some(f => f.name === name)) || files[0].name;
+                                    setActiveFile(primary);
+                                } else {
+                                    setActiveFile('index.html');
+                                }
+                            });
+                            persistenceService.getProjectMessages(proj.id).then(msgs => {
+                                setMessages(msgs.length > 0 ? msgs : [{ id: 'init', sender: 'ai', text: 'مرحباً! أنا مساعدك الذكي. اطلب مني أي تعديل على مشروعك.' }]);
+                            });
+                        } else {
+                            // If it does not exist in Firestore, initialize and save it
+                            const newProj = {
+                                ...proj,
+                                ownerUid: currentUser.uid,
+                                updatedAt: Date.now()
+                            };
+                            setProject(newProj);
+                            
+                            const generatedFiles = proj.files || [];
+                            const generatedMessages = proj.builderChat || [{ 
+                                id: 'init', 
+                                sender: 'ai', 
+                                text: 'مرحباً! أنا مساعدك الذكي. اطلب مني أي تعديل على مشروعك.',
+                                timestamp: Date.now() 
+                            }];
+                            
+                            setProjectFiles(generatedFiles);
+                            setMessages(generatedMessages);
+                            if (generatedFiles.length > 0) {
+                                const trinity = ['index.html', 'style.css', 'script.js'];
+                                const primary = trinity.find(name => generatedFiles.some(f => f.name === name)) || generatedFiles[0].name;
+                                setActiveFile(primary);
+                            } else {
+                                setActiveFile('index.html');
+                            }
+                            
+                            persistenceService.saveProjectMetadata(newProj).then(() => {
+                                Promise.all([
+                                    ...generatedFiles.map(file => persistenceService.saveFile(proj.id, file)),
+                                    ...generatedMessages.map(msg => persistenceService.saveMessage(proj.id, msg))
+                                ]).catch(err => {
+                                    console.error("Error saving new project subcollections to Firestore:", err);
+                                });
+                            }).catch(err => {
+                                console.error("Error saving new project metadata to Firestore:", err);
+                            });
+                        }
+                    }).catch((error) => {
+                        console.log("getDoc failed or does not exist, initializing new project in Firestore:", error);
+                        const newProj = {
+                            ...proj,
+                            ownerUid: currentUser.uid,
+                            updatedAt: Date.now()
+                        };
+                        setProject(newProj);
+                        
+                        const generatedFiles = proj.files || [];
+                        const generatedMessages = proj.builderChat || [{ 
+                            id: 'init', 
+                            sender: 'ai', 
+                            text: 'مرحباً! أنا مساعدك الذكي. اطلب مني أي تعديل على مشروعك.',
+                            timestamp: Date.now() 
+                        }];
+                        
+                        setProjectFiles(generatedFiles);
+                        setMessages(generatedMessages);
+                        if (generatedFiles.length > 0) {
                             const trinity = ['index.html', 'style.css', 'script.js'];
-                            const primary = trinity.find(name => files.some(f => f.name === name)) || files[0].name;
+                            const primary = trinity.find(name => generatedFiles.some(f => f.name === name)) || generatedFiles[0].name;
                             setActiveFile(primary);
                         } else {
                             setActiveFile('index.html');
                         }
-                    });
-                    persistenceService.getProjectMessages(proj.id).then(msgs => {
-                        setMessages(msgs.length > 0 ? msgs : [{ id: 'init', sender: 'ai', text: 'مرحباً! أنا مساعدك الذكي. اطلب مني أي تعديل على مشروعك.' }]);
+                        
+                        persistenceService.saveProjectMetadata(newProj).then(() => {
+                            Promise.all([
+                                ...generatedFiles.map(file => persistenceService.saveFile(proj.id, file)),
+                                ...generatedMessages.map(msg => persistenceService.saveMessage(proj.id, msg))
+                            ]).catch(err => {
+                                    console.error("Error saving new project subcollections to Firestore:", err);
+                            });
+                        }).catch(err => {
+                            console.error("Error saving new project metadata to Firestore:", err);
+                        });
                     });
                 } else {
                     setMessages(proj.builderChat || [{ id: 'init', sender: 'ai', text: 'مرحباً! أنا مساعدك الذكي. اطلب مني أي تعديل على مشروعك.' }]);
