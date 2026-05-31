@@ -24,6 +24,7 @@ import ProfitSource from './components/ProfitSource';
 import DrawToCode from './components/DrawToCode';
 import VoiceToCode from './components/VoiceToCode';
 import VideoToCode from './components/VideoToCode';
+import MergeToCode from './components/MergeToCode';
 import DataAnalysis from './components/DataAnalysis';
 import AiContentDetector from './components/AiContentDetector';
 import Changelog from './components/Changelog';
@@ -224,6 +225,8 @@ const App: React.FC = () => {
         return <VoiceToCode key="voiceToCode" navigate={navigate} context={navigationContext} />;
       case 'videoToCode':
         return <VideoToCode key="videoToCode" navigate={navigate} context={navigationContext} />;
+      case 'mergeToCode':
+        return <MergeToCode key="mergeToCode" navigate={navigate} context={navigationContext} />;
       case 'fileConverter':
         return <FileConverter key="fileConverter" navigate={navigate} />;
       case 'projectWizard':
@@ -261,7 +264,7 @@ const App: React.FC = () => {
     }
   };
 
-  const fullScreenViews: View[] = ['editApp', 'aiAssistant', 'support', 'ideaToCode', 'textToCode', 'screenToCode', 'uiRecognizer', 'drawToCode', 'dataAnalysis', 'aiContentDetector', 'changelog', 'live', 'fileConverter', 'privacy', 'terms', 'projectWizard', 'linkWizard', 'urlToCode', 'seoOptimizer', 'showroom', 'assetStudio', 'preview', 'guide', 'flowDemo', 'promptRefiner'];
+  const fullScreenViews: View[] = ['editApp', 'aiAssistant', 'support', 'ideaToCode', 'textToCode', 'screenToCode', 'uiRecognizer', 'drawToCode', 'voiceToCode', 'videoToCode', 'mergeToCode', 'dataAnalysis', 'aiContentDetector', 'changelog', 'live', 'fileConverter', 'privacy', 'terms', 'projectWizard', 'linkWizard', 'urlToCode', 'seoOptimizer', 'showroom', 'assetStudio', 'preview', 'guide', 'flowDemo', 'promptRefiner'];
   const isFullScreen = fullScreenViews.includes(activeView);
 
   return (

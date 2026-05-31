@@ -28,6 +28,7 @@ export type View =
   | 'drawToCode' 
   | 'voiceToCode'
   | 'videoToCode'
+  | 'mergeToCode'
   | 'professionalTemplateGenerator'
   | 'trash'
   | 'dataAnalysis'

@@ -420,6 +420,12 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, isOpen, op
             onClick={() => setActiveView('videoToCode')}
           />
           <NavButton
+            label="دمج إلى كود"
+            icon={<SquaresPlusIcon className="w-6 h-6 text-emerald-400" />}
+            isActive={activeView === 'mergeToCode'}
+            onClick={() => setActiveView('mergeToCode')}
+          />
+          <NavButton
             label="محلل الواجهات"
             icon={<BeakerIcon className="w-6 h-6 text-purple-400" />}
             isActive={activeView === 'uiRecognizer'}
