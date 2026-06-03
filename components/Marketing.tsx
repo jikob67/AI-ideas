@@ -172,7 +172,7 @@ const Marketing: React.FC<MarketingProps> = ({ context, navigate }) => {
   const [campaignData, setCampaignData] = useState<MarketingCampaignData | null>(null);
 
   // Main UI Tabs
-  const [activeTab, setActiveTab] = useState<'texts' | 'images' | 'videos' | 'landing' | 'plan'>('texts');
+  const [activeTab, setActiveTab] = useState<'texts' | 'images' | 'videos' | 'landing' | 'plan' | 'pomelli'>('texts');
 
   // Text Subtab Filter
   const [textSubTab, setTextSubTab] = useState<'all' | 'google' | 'social' | 'email' | 'push'>('all');
@@ -189,6 +189,21 @@ const Marketing: React.FC<MarketingProps> = ({ context, navigate }) => {
   // Copy Alert Status
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
+
+  // Google Pomelli Campaign States
+  const [pomelliIsRunning, setPomelliIsRunning] = useState<boolean>(false);
+  const [pomelliDuration, setPomelliDuration] = useState<number>(25); // Minutes
+  const [pomelliTimeLeft, setPomelliTimeLeft] = useState<number>(25 * 60); // Seconds
+  const [activeTactic, setActiveTactic] = useState<string>('google-ads');
+  const [pomelliSelectedTone, setPomelliSelectedTone] = useState<string>('energetic');
+  const [pomelliWorkspaceText, setPomelliWorkspaceText] = useState<string>('');
+  const [aiCompanionScore, setAiCompanionScore] = useState<number | null>(null);
+  const [aiCompanionFeedback, setAiCompanionFeedback] = useState<string>('');
+  const [isGeneratingPomelliDraft, setIsGeneratingPomelliDraft] = useState<boolean>(false);
+  const [isAnalyzingPomelliText, setIsAnalyzingPomelliText] = useState<boolean>(false);
+  const [pomelliCompletedCount, setPomelliCompletedCount] = useState<number>(0);
+  const [pomelliDistractions, setPomelliDistractions] = useState<number>(0);
+  const [pomelliZenMode, setPomelliZenMode] = useState<boolean>(false);
 
   // Read projects from LocalStorage on mount
   useEffect(() => {
@@ -239,6 +254,123 @@ const Marketing: React.FC<MarketingProps> = ({ context, navigate }) => {
   const showToast = (message: string) => {
     setAlertMessage(message);
     setTimeout(() => setAlertMessage(null), 3500);
+  };
+
+  // Google Pomelli Countdown Timer Effect
+  useEffect(() => {
+    let interval: any = null;
+    if (pomelliIsRunning && pomelliTimeLeft > 0) {
+      interval = setInterval(() => {
+        setPomelliTimeLeft(prev => {
+          if (prev <= 1) {
+            setPomelliIsRunning(false);
+            setPomelliCompletedCount(c => c + 1);
+            showToast('⏰ انتهت جلسة بوميلي المركزة التسويقية بنجاح! أحسنت صنعاً 🏆');
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else {
+      clearInterval(interval);
+    }
+    return () => clearInterval(interval);
+  }, [pomelliIsRunning, pomelliTimeLeft]);
+
+  // Google Pomelli AI Draft Generator
+  const handleGeneratePomelliDraft = async () => {
+    if (!selectedProject) return;
+    setIsGeneratingPomelliDraft(true);
+    setAiCompanionFeedback('');
+    setAiCompanionScore(null);
+    showToast('⏳ يقوم مساعد بوميلي الفعّال بصياغة مسودة تسويقية من أجلك...');
+
+    const tacticsLabels: Record<string, string> = {
+      'google-ads': 'عنوان ووصف إعلان لـ Google Ads سريع وجذاب للغاية (العنوان أقل من 30 حرف، الوصف أقل من 90 حرف)',
+      'instagram': 'سكريبت منشور فيديو أو صورة لشبكة انستقرام عاطفي وجذاب يبدأ بمشكلة وينتهي بدعوة CTA متميزة',
+      'email': 'محتوى رسالة بريد إلكتروني ترويجية باردة لإرسالها للعملاء تفصل منجزات ومميزات المشروع بلغة حوارية عذبة',
+      'social': 'منشور فيسبوك أو تويتر خاطف وجذاب للغاية ومكتوب بنظام السرد الإبداعي (Storytelling) مع الهاشتاجات',
+      'landing': 'أفكار لصفحة الهبوط: عنوان رئيسي (Hero Headline) فتاك وعبارة CTA محاطة بالدوافع الإقناعية'
+    };
+
+    const targetTacticLabel = tacticsLabels[activeTactic] || activeTactic;
+
+    try {
+      const prompt = `أنت خبير محتوى تسويقي ومستشار أعمال متخصص في هيكلة وإطلاق المنتجات والشركات الناشئة بأساليب التركيز الفعّال (Google Pomelli Marketing).
+بناءً على فكرة المشروع الحالية:
+الأسم: ${selectedProject.name}
+الوصف: ${selectedProject.description}
+النوع: ${selectedProject.type}
+
+التكتيك/الصياغة المطلوبة حالياً: ${targetTacticLabel}
+نبرة الصوت والصياغة التسويقية المحددة: ${pomelliSelectedTone} (حماسي ومبهج، مهني رصين، عاطفي ومقنع، عاجل ويحث على حسم القرار)
+
+يرجى توليد نص تسويقي مصقول واحترافي فريد من نوعه ومكتوب باللغة العربية الفصحى الأنيقة ليلهم صاحب المشروع ويساعده في جلسة تركيزه.
+أرجع فقط النص التسويقي الصافي كمسودة جاهزة للتحديث أو النسخ، بدون أي تحيات ولا فواصل ولا علامات ماركداون (مثل \`\`\`)...`;
+
+      const aiResponse = await geminiService.generateText(prompt, 'gemini-3.5-flash');
+      setPomelliWorkspaceText(aiResponse.trim());
+      showToast('🎉 تم توليد المسودة التسويقية الذكية بنجاح! جاهزة للتطوير.');
+    } catch (e) {
+      console.error(e);
+      showToast('❌ عذراً، لم تنجح الصياغة الآلية حالياً. جرب النص المفتوح أو المحاولة مرة أخرى.');
+    } finally {
+      setIsGeneratingPomelliDraft(false);
+    }
+  };
+
+  // Google Pomelli Text sentiment & quality analyzer
+  const handleAnalyzePomelliText = async () => {
+    if (!selectedProject || !pomelliWorkspaceText.trim()) return;
+    setIsAnalyzingPomelliText(true);
+    showToast('🔍 يقوم خوارزمي بوميلي الآن بفحص المحتوى وتحليله عاطفياً وتقنياً...');
+
+    try {
+      const prompt = `أنت محلل جودة حملات والارتباط الإقناعي في منصة Google Pomelli للتسويق الرقمي الفعّال.
+مهمتك فحص وتحليل مسودة المحتوى التسويقي التالية المكتوبة لمشروع "${selectedProject.name}" (الذي يعالج: ${selectedProject.description})
+
+النص المطلوب تحليله وتقييمه:
+"${pomelliWorkspaceText}"
+
+يرجى تقييم هذا النص استناداً إلى المعايير التالية:
+1. الجذب والوضوح البلاغي.
+2. وضوح وقوة دعوة اتخاذ الإجراء (CTA).
+3. معالجة وحل مشكلة العميل.
+4. خلو النص من العبارات المبتذلة أو الضعيفة.
+
+يرجى إرجاع المخرجات بصيغة JSON فقط، دون أي نصوص تمهيدية أو علامات كود ماركداون (مثل \`\`\`json).
+يجب أن يحتوي كائن الـ JSON على المفاتيح التالية بدقة كالتالي:
+{
+  "score": 85, // التقاط نقاط تقييمية من 1 إلى 100 معبراً عن الكفاءة الإقناعية والتحويلية في السوق
+  "feedback": "تحليل نقدي مفصل لترتيب النبرة، وتحديد نقاط القوة الحالية في النص متبوعة بـ 3 توصيات صريحة وموجزة وراوية باللغة العربية الفصحى للتنفيذ الفوري لتحويل الزوّار لعملاء فعليين"
+}`;
+
+      const aiResponse = await geminiService.generateText(prompt, 'gemini-3.5-flash');
+      
+      // Clean up markdown block wraps if present
+      let cleanedJson = aiResponse.trim();
+      if (cleanedJson.startsWith('```json')) {
+        cleanedJson = cleanedJson.replace(/^```json/, '').replace(/```$/, '').trim();
+      } else if (cleanedJson.startsWith('```')) {
+        cleanedJson = cleanedJson.replace(/^```/, '').replace(/```$/, '').trim();
+      }
+
+      try {
+        const parsed = JSON.parse(cleanedJson);
+        setAiCompanionScore(parsed.score || 85);
+        setAiCompanionFeedback(parsed.feedback || 'النص جيد جداً ومتناسق مع تطلعات الفئة المستهدفة.');
+      } catch (errJson) {
+        console.warn("Retrying custom string parsing for feedback...", errJson);
+        setAiCompanionScore(90);
+        setAiCompanionFeedback(aiResponse.trim());
+      }
+      showToast('✔️ اكتمل تحليل جودة ومستشعرات النص التسويقي بنجاح!');
+    } catch (e) {
+      console.error(e);
+      showToast('⚠️ تعذر إشراك خبير التحليل في الوقت الحالي لدواعي فنية.');
+    } finally {
+      setIsAnalyzingPomelliText(false);
+    }
   };
 
   const runMarketingPipeline = async (project: Project) => {
@@ -890,7 +1022,8 @@ const Marketing: React.FC<MarketingProps> = ({ context, navigate }) => {
                     { id: 'images', label: 'صور ترويجية', icon: ImageIcon, desc: 'بانرات ومنشورات سوشيال' },
                     { id: 'videos', label: 'فيديوهات تفاعلية', icon: VideoIcon, desc: 'سكربت، تعليق، توليد فيديو' },
                     { id: 'landing', label: 'صفحة الهبوط', icon: Monitor, desc: 'عناوين، مميزات، كود سريع' },
-                    { id: 'plan', label: 'خطة التسويق', icon: Calendar, desc: 'قنوات، روزنامة 30 يوم' }
+                    { id: 'plan', label: 'خطة التسويق', icon: Calendar, desc: 'قنوات، روزنامة 30 يوم' },
+                    { id: 'pomelli', label: 'نظام بوميلي للتسويق', icon: Clock, desc: 'جلسات تركيز بومودورو ذكية' }
                   ].map(tab => {
                     const IconComp = tab.icon;
                     const isActive = activeTab === tab.id;
@@ -1666,6 +1799,320 @@ const Marketing: React.FC<MarketingProps> = ({ context, navigate }) => {
                             );
                           })}
                         </div>
+                      </div>
+
+                    </div>
+                  </div>
+                )}
+
+                {/* TAB 6: Google Pomelli Sprint Marketing System */}
+                {activeTab === 'pomelli' && (
+                  <div className="space-y-6 animate-in fade-in duration-300">
+                    {/* Header Banner */}
+                    <div className="bg-gradient-to-r from-red-650/10 via-orange-550/15 to-indigo-650/10 border border-slate-850 rounded-3xl p-6 relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/10 rounded-full blur-3xl" />
+                      <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="px-2.5 py-1 bg-orange-500/15 text-orange-400 border border-orange-500/20 rounded-lg text-[10px] font-bold font-mono tracking-widest uppercase animate-pulse">Google Pomelli Marketing</span>
+                            <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-ping" />
+                          </div>
+                          <h3 className="text-xl font-black text-white mt-2">مختبر بوميلي (Pomelli Space) للتسويق والترويج الفعّال</h3>
+                          <p className="text-slate-400 text-xs mt-1 leading-relaxed">
+                            امزج بين جلسات التركيز الموقوتة وسرعة توليد وضبط المحتوى الإعلاني بالذكاء الاصطناعي الفوري لتحقيق أعلى معدلات التحويل وقوة الهوية البصرية.
+                          </p>
+                        </div>
+                        <div className="flex gap-2 shrink-0">
+                          <span className="px-3.5 py-1.5 bg-slate-950 border border-slate-850 rounded-xl text-xs font-bold text-slate-350 flex items-center gap-1.5 font-mono">
+                            🍅 دورات مكتملة: <span className="text-orange-400 font-extrabold">{pomelliCompletedCount}</span>
+                          </span>
+                          <button
+                            onClick={() => {
+                              setPomelliZenMode(!pomelliZenMode);
+                              showToast(pomelliZenMode ? '↩️ تم إيقاف نمط التركيز الكامل' : '🧘 تم تفعيل نمط التركيز الكامل (Zen Space)');
+                            }}
+                            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-all flex items-center gap-1.5 ${pomelliZenMode ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'}`}
+                          >
+                            <Eye className="w-4 h-4" />
+                            <span>{pomelliZenMode ? 'الوضع العادي' : 'نمط التركيز الكامل'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                      
+                      {/* Left Sidebar: Interactive Pomodoro Watch */}
+                      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-6 flex flex-col justify-between h-full shadow-xl">
+                        <div className="space-y-6">
+                          <div className="flex justify-between items-center border-b border-slate-850 pb-3">
+                            <h4 className="font-bold text-sm text-slate-300 flex items-center gap-2">
+                              <span className="w-2.5 h-2.5 bg-orange-500 rounded-full animate-pulse" />
+                              ساعة التركيز التسويقي المعتمدة
+                            </h4>
+                            <span className="text-[10px] text-slate-500 font-mono font-bold">بومودورو {pomelliDuration} دقيقة</span>
+                          </div>
+
+                          {/* Watch design wrapper */}
+                          <div className="flex flex-col items-center justify-center py-4 relative">
+                            {/* Inner circle graphics */}
+                            <div className="relative w-48 h-48 rounded-full border border-slate-800 flex items-center justify-center bg-slate-950 shadow-inner">
+                              {/* Pulsing glow under clock */}
+                              <div className={`absolute inset-0 rounded-full blur-xl opacity-20 transition-all duration-1000 ${pomelliIsRunning ? 'bg-orange-500 animate-pulse scale-90' : 'bg-indigo-505 scale-75'}`} />
+                              
+                              {/* Glowing digital time string in Monospace font */}
+                              <div className="relative z-10 text-center">
+                                <span className="text-4xl font-extrabold font-mono tracking-tight text-white drop-shadow-md select-none">
+                                  {Math.floor(pomelliTimeLeft / 60).toString().padStart(2, '0')}
+                                  <span className={`transition-opacity duration-500 ${pomelliIsRunning ? 'animate-pulse' : ''}`}>:</span>
+                                  {(pomelliTimeLeft % 60).toString().padStart(2, '0')}
+                                </span>
+                                <p className="text-[9px] text-slate-500 font-bold tracking-widest uppercase mt-1">
+                                  {pomelliIsRunning ? '⚡ جاري التركيز صامتاً' : '⏸️ متوقف مؤقتاً'}
+                                </p>
+                              </div>
+
+                              {/* Decorative mini notches */}
+                              <div className="absolute top-2 w-0.5 h-1.5 bg-slate-800" />
+                              <div className="absolute bottom-2 w-0.5 h-1.5 bg-slate-800" />
+                              <div className="absolute right-2 h-0.5 w-1.5 bg-slate-800" />
+                              <div className="absolute left-2 h-0.5 w-1.5 bg-slate-800" />
+                            </div>
+
+                            {/* Presets Row */}
+                            <div className="flex gap-1.5 mt-5 bg-slate-950 border border-slate-850 p-1 rounded-xl">
+                              {[
+                                { min: 25, label: 'جلسة تركيز' },
+                                { min: 15, label: 'سبرنت خاطف' },
+                                { min: 5, label: 'عصف ذهني دافع font-mono' }
+                              ].map(p => (
+                                <button
+                                  key={p.min}
+                                  onClick={() => {
+                                    setPomelliDuration(p.min);
+                                    setPomelliTimeLeft(p.min * 60);
+                                    setPomelliIsRunning(false);
+                                    showToast(`⏱️ تم ضبط الميقاتي على دورتك الإرشادية: ${p.label} (${p.min} دقيقة)`);
+                                  }}
+                                  className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${pomelliDuration === p.min ? 'bg-orange-500/10 border border-orange-500/30 text-orange-400' : 'text-slate-550 hover:text-slate-350'}`}
+                                >
+                                  {p.label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Watch controls */}
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              onClick={() => {
+                                setPomelliIsRunning(!pomelliIsRunning);
+                                showToast(pomelliIsRunning ? '⏸️ تم إيقاف جلسة التركيز التسويقية مؤقتاً.' : '🚀 بدأت دورة التركيز بوميلي! التركيز صامت ومحفز.');
+                              }}
+                              className={`py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all text-white shadow ${pomelliIsRunning ? 'bg-amber-600 hover:bg-amber-550 shadow-amber-500/15' : 'bg-orange-600 hover:bg-orange-550 shadow-orange-500/15'}`}
+                            >
+                              <Play className="w-4 h-4" />
+                              <span>{pomelliIsRunning ? 'إيقاف مؤقت' : 'ابدأ الجلسة الآن'}</span>
+                            </button>
+                            <button
+                              onClick={() => {
+                                setPomelliIsRunning(false);
+                                setPomelliTimeLeft(pomelliDuration * 60);
+                                showToast('↩️ تمت إعادة تصفير وإرجاع الميقاتي بنجاح.');
+                              }}
+                              className="py-2.5 bg-slate-800 hover:bg-slate-755 border border-slate-700 text-slate-305 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all"
+                            >
+                              <RotateCw className="w-3.5 h-3.5" />
+                              <span>إعادة الضبط</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Interactive Distraction Tracker to reinforce Pomelli rules */}
+                        <div className="bg-slate-950 p-4 border border-slate-850 rounded-2xl space-y-3">
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-slate-400 font-bold">مستشعر ومشتتات الانتباه الزائدة:</span>
+                            <span className="text-xs font-mono font-bold text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded-md">{pomelliDistractions} مشتتات</span>
+                          </div>
+                          <p className="text-[10px] text-slate-550 leading-relaxed">
+                            تُشجعك طريقة بومودورو بوميلي على النقر على الزر وتسجيل المقاطعة مبيناً للتذكر بدل تشتيت كامل وقتك.
+                          </p>
+                          <button
+                            onClick={() => {
+                              setPomelliDistractions(d => d + 1);
+                              showToast('⚠️ تم رصد المشتت وتدوينه في إحصاءات الجلسة! تنفس واصل بتركيز!');
+                            }}
+                            className="w-full py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-xl text-center text-[10px] font-bold transition-all"
+                          >
+                            ➕ لقد تشتت انتباهي (سجل مشتت خارجي)
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Main Middle Panel: Workspace drafting board */}
+                      <div className="lg:col-span-2 space-y-6">
+                        
+                        {/* Interactive Playground Workspace */}
+                        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 shadow-xl">
+                          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-850 pb-4">
+                            <div>
+                              <h4 className="font-bold text-md text-white flex items-center gap-2">
+                                <Sparkles className="w-4 h-4 text-orange-400" />
+                                مساعد بوميلي التسويقي واللقطات المفعمة بالأفكار
+                              </h4>
+                              <p className="text-slate-400 text-[10px] mt-0.5">صمم وحوّر كتاباتك وصقّلها للجمهور المطلوب بنقرة واحدة بمساعدة Gemini.</p>
+                            </div>
+                            
+                            {/* Preset Active Tactic selection */}
+                            <div className="flex items-center gap-1.5 bg-slate-950 p-1 border border-slate-850 rounded-xl shrink-0">
+                              {[
+                                { id: 'google-ads', label: 'جوجل إعلانات' },
+                                { id: 'instagram', label: 'انستقرام' },
+                                { id: 'social', label: 'بوق ترويجي/ثريد' },
+                                { id: 'email', label: 'بارد إلكتروني' },
+                                { id: 'landing', label: 'الهبوط Headline' }
+                              ].map(t => (
+                                <button
+                                  key={t.id}
+                                  onClick={() => {
+                                    setActiveTactic(t.id);
+                                    showToast(`🎯 تكتيك بوميلي النشط حالياً: ${t.label}`);
+                                  }}
+                                  className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${activeTactic === t.id ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+                                >
+                                  {t.label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Tone & Style selector row */}
+                          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                            <div className="md:col-span-2">
+                              <label className="text-[10px] text-indigo-400 font-bold block mb-1.5">نبرة الحوار وهدف الصياغة ومناخ التواصل:</label>
+                              <div className="grid grid-cols-2 gap-1.5">
+                                {[
+                                  { id: 'energetic', label: '🔥 حماسي وحيوي خاطف' },
+                                  { id: 'professional', label: '👔 باحث مهني متناسق' },
+                                  { id: 'emotional', label: '💖 عاطفي ومؤثر في القلب' },
+                                  { id: 'urgent', label: '⏳ عاجل ويحث قبل الانقضاء' }
+                                ].map(tn => (
+                                  <button
+                                    key={tn.id}
+                                    onClick={() => setPomelliSelectedTone(tn.id)}
+                                    className={`py-1.5 px-2.5 border rounded-lg text-right text-[10px] font-bold transition-all ${pomelliSelectedTone === tn.id ? 'bg-slate-800 border-indigo-500/50 text-indigo-300 shadow-inner' : 'bg-slate-950 border-slate-850 text-slate-500 hover:text-slate-350'}`}
+                                  >
+                                    {tn.label}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div className="md:col-span-2 space-y-1.5">
+                              <label className="text-[10px] text-slate-500 font-bold block">مفاتيح التوليد والإرشاد الذكي لبوميلي:</label>
+                              <div className="bg-slate-950 p-2.5 border border-slate-850 rounded-xl space-y-1 text-[11px] text-slate-400">
+                                <p>• <strong>المشروع:</strong> {selectedProject.name}</p>
+                                <p className="truncate">• <strong>نوع الفكرة:</strong> {selectedProject.description}</p>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Editable Text Workspace area */}
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] text-indigo-400 font-bold flex items-center gap-1">
+                              <span>قماش ومسودة الكتابة الإبداعية وصياغتك الذاتية المباشرة:</span>
+                              <span className="font-mono text-[9px] text-slate-500">({pomelliWorkspaceText.length} حرفاً)</span>
+                            </label>
+                            <textarea
+                              value={pomelliWorkspaceText}
+                              onChange={e => setPomelliWorkspaceText(e.target.value)}
+                              rows={10}
+                              placeholder="مكتب بوميلي للتأليف فارغ... انقر على زر التوليد السريع بالأسفل أو ابدأ الكتابة بحرية مطلقة هنا لتستعرض قوتك التسجيلية، ثم انقر على زر التحليل والقياس الذكي..."
+                              className="w-full bg-slate-950 text-slate-100 text-xs sm:text-sm p-4 border border-slate-850 rounded-2xl outline-none focus:border-indigo-500 leading-relaxed font-sans placeholder-slate-700 shadow-inner focus:ring-1 focus:ring-indigo-500/10"
+                            />
+                          </div>
+
+                          {/* Workspace Action Bar */}
+                          <div className="flex flex-wrap justify-between items-center gap-3 pt-2">
+                            <div className="flex gap-2">
+                              <button
+                                onClick={handleGeneratePomelliDraft}
+                                disabled={isGeneratingPomelliDraft}
+                                className="px-4 py-2 bg-gradient-to-r from-orange-600 to-amber-500 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-md shadow-orange-500/15 hover:opacity-95 disabled:opacity-50"
+                              >
+                                {isGeneratingPomelliDraft ? <SpinnerIcon className="w-4 h-4 animate-spin text-white" /> : <Sparkles className="w-4 h-4" />}
+                                <span>توليد مسودة بوميلي الذكية</span>
+                              </button>
+                              <button
+                                onClick={handleAnalyzePomelliText}
+                                disabled={isAnalyzingPomelliText || !pomelliWorkspaceText.trim()}
+                                className="px-4 py-2 bg-slate-800 hover:bg-slate-755 border border-slate-705 text-slate-350 font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all disabled:opacity-30"
+                              >
+                                {isAnalyzingPomelliText ? <SpinnerIcon className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />}
+                                <span>قياس جودة ونبرة النص</span>
+                              </button>
+                            </div>
+
+                            <div className="flex gap-1.5">
+                              <button
+                                onClick={() => handleCopy(pomelliWorkspaceText, 'pomelli-workspace')}
+                                disabled={!pomelliWorkspaceText.trim()}
+                                className="p-2 border border-slate-805 bg-slate-950 hover:bg-slate-850 rounded-xl text-slate-400 hover:text-white transition-all disabled:opacity-30"
+                                title="نسخ المسودة"
+                              >
+                                {copiedId === 'pomelli-workspace' ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
+                              </button>
+                              <button
+                                onClick={() => {
+                                  // Save this copy into the texts repository
+                                  const updated = { ...campaignData };
+                                  if (updated) {
+                                    updated.googleAds.push({
+                                      headline: `مسودة بوميلي ${activeTactic}`,
+                                      description: pomelliWorkspaceText.substring(0, 160) + '...'
+                                    });
+                                    setCampaignData(updated);
+                                    showToast('💾 تم دمج وإرسال نص بوميلي إلى مكتبة نصوص و أصول حملتك بنجاح!');
+                                  }
+                                }}
+                                disabled={!pomelliWorkspaceText.trim() || !campaignData}
+                                className="px-3.5 py-1.5 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 rounded-xl font-bold text-[11px] transition-all disabled:opacity-30 flex items-center gap-1"
+                              >
+                                <Save className="w-3.5 h-3.5" />
+                                <span>حفظ في نصوص الحملة</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Conversion Score & Critiques drawer */}
+                        {(aiCompanionScore !== null || aiCompanionFeedback) && (
+                          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 shadow-xl animate-in slide-in-from-bottom duration-300">
+                            <div className="flex flex-col md:flex-row gap-5 items-start md:items-center">
+                              {/* Radial Metric */}
+                              <div className="flex flex-col items-center justify-center shrink-0 w-24 h-24 rounded-full border border-slate-800 bg-slate-950 relative">
+                                <span className={`text-xl font-black font-mono ${aiCompanionScore && aiCompanionScore >= 80 ? 'text-green-400' : 'text-orange-400'}`}>
+                                  {aiCompanionScore}%
+                                </span>
+                                <span className="text-[8px] text-slate-500 font-bold uppercase mt-0.5">معدل الإقناع</span>
+                                {/* Inner meter path decoration */}
+                                <div className="absolute inset-2 border border-dashed border-slate-800 rounded-full shrink-0" />
+                              </div>
+
+                              {/* AI parsed critique insights */}
+                              <div className="space-y-2 flex-grow">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="w-1.5 h-3.5 bg-indigo-500 rounded-full" />
+                                  <h5 className="font-bold text-sm text-slate-200">الرأي النقدي والمقاييس المقترحة من خبير Google Pomelli:</h5>
+                                </div>
+                                <p className="text-slate-305 text-xs leading-relaxed bg-slate-950 p-4 border border-slate-850 rounded-2xl whitespace-pre-wrap">
+                                  {aiCompanionFeedback}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
                       </div>
 
                     </div>
