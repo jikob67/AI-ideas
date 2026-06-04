@@ -96,6 +96,14 @@ service cloud.firestore {
       return isSignedIn() && get(/databases/$(database)/documents/projects/$(projectId)).data.ownerUid == request.auth.uid;
     }
 
+    function canReadProject(projectId) {
+      let projectDoc = get(/databases/$(database)/documents/projects/$(projectId));
+      return isOwner(projectDoc.data.ownerUid) || 
+             (projectDoc.data.get('isShared', false) == true) || 
+             (projectDoc.data.get('publicShareId', '') != '') ||
+             (projectDoc.data.get('isPublished', false) == true);
+    }
+
     match /projects/{projectId} {
       allow get: if isOwner(existing().ownerUid) || (existing().get('isShared', false) == true) || (existing().get('publicShareId', '') != '') || (existing().get('isPublished', false) == true);
       allow list: if (isSignedIn() && resource.data.ownerUid == request.auth.uid) || (resource.data.publicShareId != '') || (resource.data.get('isPublished', false) == true);
@@ -110,20 +118,18 @@ service cloud.firestore {
       allow delete: if isOwner(existing().ownerUid);
 
       match /files/{fileId} {
-        allow read: if isOwner(get(/databases/$(database)/documents/projects/$(projectId)).data.ownerUid) || 
-                     (get(/databases/$(database)/documents/projects/$(projectId)).data.get('isShared', false) == true) || 
-                     (get(/databases/$(database)/documents/projects/$(projectId)).data.get('publicShareId', '') != '') ||
-                     (get(/databases/$(database)/documents/projects/$(projectId)).data.get('isPublished', false) == true);
+        allow read: if canReadProject(projectId);
         allow write: if isProjectOwner(projectId) && isValidFile(incoming());
       }
 
       match /messages/{messageId} {
-        allow read: if isProjectOwner(projectId);
+        allow read: if canReadProject(projectId);
         allow write: if isProjectOwner(projectId) && isValidMessage(incoming());
       }
 
       match /snapshots/{snapshotId} {
-        allow read, write: if isProjectOwner(projectId);
+        allow read: if canReadProject(projectId);
+        allow write: if isProjectOwner(projectId);
       }
     }
   }
