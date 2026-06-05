@@ -828,11 +828,135 @@ const Marketing: React.FC<MarketingProps> = ({ context, navigate }) => {
     setRenderedVideoUrl(null);
   };
 
-  const handleEditVideoScene = (index: number, field: 'visual' | 'voiceover', value: string) => {
+  const handleEditVideoScene = (index: number, field: 'visual' | 'voiceover' | 'duration', value: any) => {
     if (!campaignData) return;
     const updated = { ...campaignData };
-    updated.videoScript[index][field] = value;
+    if (field === 'duration') {
+      updated.videoScript[index].duration = Math.max(1, Number(value) || 5);
+    } else {
+      updated.videoScript[index][field] = value;
+    }
     setCampaignData(updated);
+  };
+
+  const handleAddVideoScene = () => {
+    if (!campaignData) return;
+    const updated = { ...campaignData };
+    const nextSceneNum = updated.videoScript.length + 1;
+    updated.videoScript.push({
+      scene: nextSceneNum,
+      visual: '',
+      voiceover: '',
+      duration: 10
+    });
+    setCampaignData(updated);
+    showToast(`➕ تم إضافة المشهد ${nextSceneNum} الجديد! (الآن يمكنك تعبئته أو سيقوم نظام AI Ideas بتلوينه وتلقينه آلياً)`);
+  };
+
+  const handleDeleteVideoScene = (index: number) => {
+    if (!campaignData) return;
+    if (campaignData.videoScript.length <= 1) {
+      showToast('⚠️ لا يمكن حذف آخر مشهد. يجب بقاء مشهد واحد على الأقل لتكوين الفيديو.');
+      return;
+    }
+    const updated = { ...campaignData };
+    updated.videoScript.splice(index, 1);
+    // Re-index scenes
+    updated.videoScript.forEach((sc, idx) => {
+      sc.scene = idx + 1;
+    });
+    setCampaignData(updated);
+    showToast('🗑️ تم حذف المشهد بنجاح وإعادة توازن أرقام المراحل للمخطط.');
+  };
+
+  const handleAutoFillScene = async (index: number) => {
+    if (!campaignData || !selectedProject) return;
+    showToast(`⏳ جاري التوليد التلقائي والذكي لتفاصيل المشهد ${index + 1}...`);
+    
+    const pName = selectedProject.name;
+    const pDesc = selectedProject.description || 'تقديم حلول رقمية ذكية تناسب متطلبات العصر';
+    const cleanDesc = pDesc.trim();
+    const briefDesc = cleanDesc.length > 80 ? cleanDesc.substring(0, 80) + '...' : cleanDesc;
+    const miniDesc = cleanDesc.length > 50 ? cleanDesc.substring(0, 50) + '...' : cleanDesc;
+
+    const sceneNum = index + 1;
+    
+    try {
+      const prompt = `أنت جزء من نظام AI Ideas الرائد. قم بكتابة وتعبئة مشهد واحد فقط لفيديو ترويجي لـ مشروع "${pName}" الذي يهدف إلى: "${pDesc}".
+هذا هو المشهد رقم ${sceneNum} من الفيديو.
+قم بإرجاع إجابة قصيرة ومباشرة بصيغة JSON كالتالي فقط بدون كود ماركداون وبدون أي كلام جانبي:
+{
+  "visual": "الوصف البصري والرسوم المتحركة للمشهد ${sceneNum} باللغة العربية الفصحى الفاخرة",
+  "voiceover": "التعليق الصوتي والخطاب المقترح لهذا المشهد باللغة العربية الفصحى لجذب الجمهور"
+}`;
+      const response = await geminiService.generateText(prompt, 'gemini-3.5-flash');
+      let cleaned = response.trim();
+      if (cleaned.startsWith('```json')) {
+        cleaned = cleaned.replace(/^```json/, '').replace(/```$/, '').trim();
+      } else if (cleaned.startsWith('```')) {
+        cleaned = cleaned.replace(/^```/, '').replace(/```$/, '').trim();
+      }
+      const parsed = JSON.parse(cleaned);
+      const updated = { ...campaignData };
+      updated.videoScript[index].visual = parsed.visual || '';
+      updated.videoScript[index].voiceover = parsed.voiceover || '';
+      setCampaignData(updated);
+      showToast(`✨ تم إثراء المشهد ${sceneNum} بالذكاء الاصطناعي بنجاح!`);
+    } catch (e) {
+      console.warn("Single scene gemini generation failed, using optimized local heuristics...", e);
+      const updated = { ...campaignData };
+      if (sceneNum === 1) {
+        updated.videoScript[index].visual = `لقطة تفاعلية قريبة وحركية متميزة تعرض التحديات التي يعالجها تطبيق ${pName} في حل مشاكل ${miniDesc}.`;
+        updated.videoScript[index].voiceover = `هل تشعر بالثقل والتعقيد المستمر في معاملات ${briefDesc} اليوم؟`;
+      } else if (sceneNum === 2) {
+        updated.videoScript[index].visual = `عرض مبهج من النظرة الأولى للواجهات المتألقة واللوحات الإحصائية الخاصة بـ ${pName} التي تضمن الأتمتة السهلة.`;
+        updated.videoScript[index].voiceover = `تطبيق ${pName} هو الحل المبتكر والذكي المخصص ليمنحك كامل السيطرة والريادة الرقمية لـ ${miniDesc}.`;
+      } else {
+        updated.videoScript[index].visual = `شعار ${pName} الذهبي والنيلي المتأقلم يلمع بخلفية فاخرة مرندرة مع واجهة CTA الحث المباشر المثير للشباب.`;
+        updated.videoScript[index].voiceover = `لا تفوت فرصتك! انطلق اليوم مع ${pName} مجاناً، وعجل بالتسجيل لتستمتع بامتيازات مدهشة!`;
+      }
+      setCampaignData(updated);
+      showToast(`✨ تم توليد مشهد متميز ملائم لهوية مشروعك آلياً!`);
+    }
+  };
+
+  const handleAutoFillAllScenes = () => {
+    if (!campaignData || !selectedProject) return;
+    const updated = { ...campaignData };
+    const pName = selectedProject.name;
+    const pDesc = selectedProject.description || 'تقديم خدمات وحلول ذكية فائقة تناسب متطلبات العصر';
+    const cleanDesc = pDesc.trim();
+    const briefDesc = cleanDesc.length > 80 ? cleanDesc.substring(0, 80) + '...' : cleanDesc;
+    const miniDesc = cleanDesc.length > 50 ? cleanDesc.substring(0, 50) + '...' : cleanDesc;
+
+    updated.videoScript.forEach((sc, index) => {
+      const sceneNum = index + 1;
+      if (!sc.visual || sc.visual.trim() === '') {
+        if (sceneNum === 1) {
+          sc.visual = `لقطة قريبة تبرز الفوضى التقليدية أو الأساليب اليدوية المجهدة السابقة لـ ${miniDesc}.`;
+        } else if (sceneNum === 2) {
+          sc.visual = `عرض رائع وتفاعلي لواجهات تطبيق ${pName} الذكية التي تسهل السيطرة على البيانات وتعد بالنمو المذهل والراحة الحقيقية.`;
+        } else if (sceneNum === 3) {
+          sc.visual = `شعار ${pName} وهوية العلامة الملونة مع واجهة دعوة لاتخاذ إجراء جذابة بنموذج اتصال سريع.`;
+        } else {
+          sc.visual = `لقطة بصرية معبرة عن السهولة والسرعة التي يوفرها تطبيق ${pName} للعملاء في قطاع ${miniDesc}.`;
+        }
+      }
+      if (!sc.voiceover || sc.voiceover.trim() === '') {
+        if (sceneNum === 1) {
+          sc.voiceover = `هل تعاني من التعقيد وصعوبة التحكم في معاملات ${briefDesc} اليدوية؟`;
+        } else if (sceneNum === 2) {
+          sc.voiceover = `تطبيق ${pName} مخصص ليمنحكم التحكم والسيطرة التامة وتبسيط المعالجات بأحدث الخصائص التقنية واللوحات!`;
+        } else if (sceneNum === 3) {
+          sc.voiceover = `سارع بالانضمام إلينا اليوم لتجربة تطبيق ${pName} بالكامل مجاناً وامتلاك الريادة المطلقة!`;
+        } else {
+          sc.voiceover = `مع مشروع ${pName}، نجاحك الاستراتيجي وراحتك الرقمية مضمونة بالكامل.`;
+        }
+      }
+    });
+
+    setCampaignData(updated);
+    showToast('🤖 تم فحص وتعبئة كافة خلايا السيناريو والتعليق الفارغة بواسطة AI Ideas باحترافية تامة!');
   };
 
   const handleRenderVideo = async () => {
@@ -841,9 +965,53 @@ const Marketing: React.FC<MarketingProps> = ({ context, navigate }) => {
     setRenderedVideoUrl(null);
     setActiveSceneIndex(0);
 
+    // AI Ideas Optional-Fields Handling:
+    // Automatically auto-fill any empty visual or voiceover fields with project templates on the fly!
+    if (campaignData && campaignData.videoScript && selectedProject) {
+      const pName = selectedProject.name;
+      const pDesc = selectedProject.description || 'تقديم خدمات وحلول ذكية فائقة تناسب متطلبات العصر';
+      const cleanDesc = pDesc.trim();
+      const briefDesc = cleanDesc.length > 80 ? cleanDesc.substring(0, 80) + '...' : cleanDesc;
+      const miniDesc = cleanDesc.length > 50 ? cleanDesc.substring(0, 50) + '...' : cleanDesc;
+
+      let autfilledAny = false;
+      campaignData.videoScript.forEach((sc, idx) => {
+        const sceneNum = idx + 1;
+        if (!sc.visual || sc.visual.trim() === '') {
+          autfilledAny = true;
+          if (sceneNum === 1) {
+            sc.visual = `لقطة قريبة تعبر عن الفوضى أو التحدي والمعاناة في إدارة ${pName} أو الطرق اليدوية لـ ${miniDesc}.`;
+          } else if (sceneNum === 2) {
+            sc.visual = `وميض من الرسوم والواجهات المبتكرة الخاصة بتطبيق ${pName} التي تقدم كفاءة عالية وتدفق مريح لـ ${miniDesc}.`;
+          } else if (sceneNum === 3) {
+            sc.visual = `شعار ${pName} والزر التفاعلي للدعوة إلى الاشتراك الفوري بلمسة واحدة مذهلة.`;
+          } else {
+            sc.visual = `لقطة سينمائية تعزز ثقة المستخدم بنظام ${pName} والسيطرة الكاملة على مهام ${miniDesc}.`;
+          }
+        }
+        if (!sc.voiceover || sc.voiceover.trim() === '') {
+          autfilledAny = true;
+          if (sceneNum === 1) {
+            sc.voiceover = `هل تشعر بالإجهاد والتشعب وصعوبة إدارة شؤون ${briefDesc}؟`;
+          } else if (sceneNum === 2) {
+            sc.voiceover = `تطبيق ${pName} هو الإجابة الشاملة والحل الذكي الهادف لتبسيط أعمالك كلياً بلمسة واحدة!`;
+          } else if (sceneNum === 3) {
+            sc.voiceover = `ابدأ اليوم مجاناً دون قيود واكتشف الفوائد وبهاجة الكفاءة والإنتاجية مع ${pName}!`;
+          } else {
+            sc.voiceover = `مع نظام ${pName}، صممنا لك حلول الكفاءة والارتياح العصري بلمسة مبتكرة تناسبك.`;
+          }
+        }
+      });
+
+      if (autfilledAny) {
+        setCampaignData({ ...campaignData });
+      }
+    }
+
     const logs = [
       '🎬 جاري قراءة وتحليل نصوص المشاهد والسيناريو والوصف البصري والروابط الهندسية...',
-      '🎙️ توليد التعليق الصوتي التلقائي المتناسق مع مخارج الحروف العربية ومزامنة الترددات...',
+      '🤖 [AI Ideas] فحص خلايا السيناريو البصري وشرح التعليق الصوتي الاختياري وتوليفها آلياً...',
+      '🎙️ توليد التعليก الصوتي التلقائي المتناسق مع مخارج الحروف العربية ومزامنة الترددات...',
       '🎨 بناء وتجهيز إطارات الفيديو المتحركة بناءً على البرومبت وهوية المشروع وخطوط الماركة...',
       '📝 تركيب نصوص الشرح والعناوين الفرعية (Subtitles) على إتجاهات رندرة المشاهد وتعديل ألوان الكروما...',
       '⏳ دمج المحتوى المرئي والصوتي بالكامل وبدء المعالجة والضغط الفوري بدقة 1080p عالية الوضوح...',
@@ -1728,36 +1896,101 @@ const Marketing: React.FC<MarketingProps> = ({ context, navigate }) => {
                       
                       {/* Scenes timeline & custom edits */}
                       <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
-                        <div className="flex justify-between items-center border-b border-slate-850 pb-3">
-                          <h4 className="font-bold text-sm text-slate-300">سيناريو المشاهد والتعليق الصوتي المعتمد</h4>
-                          <span className="text-[10px] text-indigo-400 font-bold">{campaignData.videoScript.length} مشاهد مخصصة</span>
+                        <div className="flex flex-col sm:flex-row justify-between sm:items-center border-b border-slate-850 pb-3 gap-2">
+                          <div>
+                            <h4 className="font-bold text-sm text-slate-300">سيناريو المشاهد والتعليق الصوتي المعتمد</h4>
+                            <p className="text-[10px] text-slate-500 mt-0.5">يمكنك كتابة مشاهدك الخاصة أو تركها فارغة ليقوم نظام AI Ideas بتعبئتها تلقائياً.</p>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-1.5 self-end sm:self-auto">
+                            <button
+                              onClick={handleAutoFillAllScenes}
+                              className="px-2.5 py-1.5 bg-indigo-505/10 bg-indigo-900/30 hover:bg-indigo-900/50 border border-indigo-500/30 text-indigo-400 rounded-lg text-xs font-bold flex items-center gap-1 transition-all"
+                              title="ملء جميع الأوصاف والتعليقات الصوتية الفارغة دفعة واحدة بالذكاء الاصطناعي"
+                            >
+                              <Sparkles className="w-3 h-3" />
+                              <span>🤖 تعبئة الفراغات تلقائياً</span>
+                            </button>
+                            <button
+                              onClick={handleAddVideoScene}
+                              className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-bold flex items-center gap-1 transition-all"
+                            >
+                              <Plus className="w-3 h-3" />
+                              <span>إضافة مشهد</span>
+                            </button>
+                          </div>
                         </div>
 
-                        <div className="space-y-4 max-h-[450px] overflow-y-auto pr-1">
+                        <div className="space-y-4 max-h-[480px] overflow-y-auto pr-1">
                           {campaignData.videoScript.map((sc, scIdx) => (
-                            <div key={scIdx} className="bg-slate-950 p-4 rounded-xl border border-slate-850 space-y-3 relative">
-                              <span className="absolute top-3 left-3 text-xs font-mono text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20">
-                                المشهد {sc.scene} • {sc.duration} ث
-                              </span>
+                            <div key={scIdx} className="bg-slate-950 p-4 rounded-xl border border-slate-850 space-y-4 relative">
+                              
+                              {/* Scene Header Badge & Duration Input */}
+                              <div className="flex flex-wrap items-center justify-between border-b border-slate-900 pb-2.5 gap-2">
+                                <span className="text-xs font-mono text-indigo-400 bg-indigo-500/10 px-2.5 py-1 rounded-lg border border-indigo-500/20 font-bold">
+                                  المشهد {sc.scene}
+                                </span>
+                                
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[10px] text-slate-500">المدة:</span>
+                                  <input 
+                                    type="number" 
+                                    min="1" 
+                                    max="60"
+                                    value={sc.duration} 
+                                    onChange={e => handleEditVideoScene(scIdx, 'duration', e.target.value)}
+                                    className="w-12 bg-slate-900 border border-slate-800 rounded-md px-1.5 py-0.5 text-center text-xs text-white font-mono outline-none focus:border-indigo-550"
+                                    title="مدة عرض هذا المشهد المخصص بالثواني"
+                                  />
+                                  <span className="text-[10px] text-slate-500">ث</span>
+                                </div>
+                              </div>
                               
                               <div className="space-y-1">
-                                <label className="text-[10px] text-slate-500 font-bold">الوصف البصري للمشهد والرسوم المتحركة:</label>
+                                <label className="text-[10px] text-slate-400 font-bold flex items-center gap-1">
+                                  <span>الوصف البصري والرسومات للمخرج:</span>
+                                  <span className="text-slate-500 text-[9px] font-normal">(اختياري - يموله AI Ideas تلقائياً)</span>
+                                </label>
                                 <textarea
                                   value={sc.visual}
                                   onChange={e => handleEditVideoScene(scIdx, 'visual', e.target.value)}
                                   rows={2}
-                                  className="w-full bg-slate-900 text-slate-200 text-xs p-2 border border-slate-850 rounded mt-1 outline-none focus:border-indigo-500"
+                                  placeholder="(اختياري) اكتب كيف يتخيل المخرج لقطات هذا المشهد، أو اتركه فارغاً لتبنى AI Ideas الصياغة المثالية تلقائياً..."
+                                  className="w-full bg-slate-900 text-slate-200 text-xs p-2.5 border border-slate-850 rounded-lg mt-1 outline-none focus:border-indigo-500 placeholder:text-slate-650"
                                 />
                               </div>
 
                               <div className="space-y-1">
-                                <label className="text-[10px] text-green-400 font-bold">سكريبت التعليق الصوتي المقترح (Voiceover narrative):</label>
+                                <label className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
+                                  <span>التعليق المسموع المعتمد (Voiceover narrative):</span>
+                                  <span className="text-slate-500 text-[9px] font-normal">(اختياري - يقوم به المعالج التلقائي)</span>
+                                </label>
                                 <textarea
                                   value={sc.voiceover}
                                   onChange={e => handleEditVideoScene(scIdx, 'voiceover', e.target.value)}
                                   rows={2}
-                                  className="w-full bg-slate-900 text-slate-205 text-xs p-2 border border-slate-850 rounded mt-1 outline-none focus:border-indigo-500 font-mono"
+                                  placeholder="(اختياري) اكتب الكلمات أو الحوار الدقيق والملهم لهذا المشهد باللغة العربية الفصحى، أو اتركه فارغاً لتتولاه AI Ideas..."
+                                  className="w-full bg-slate-900 text-emerald-205 text-slate-200 text-xs p-2.5 border border-slate-850 rounded-lg mt-1 outline-none focus:border-indigo-500 font-mono placeholder:text-slate-650"
                                 />
+                              </div>
+
+                              {/* Action Buttons for Scene */}
+                              <div className="flex justify-end gap-2 pt-2 border-t border-slate-900">
+                                <button
+                                  onClick={() => handleAutoFillScene(scIdx)}
+                                  className="px-2 py-1 bg-slate-900 hover:bg-indigo-950/40 hover:text-indigo-400 border border-slate-850 text-[10px] text-slate-400 font-bold rounded-lg flex items-center gap-1 transition-all"
+                                  title="توليد تلقائي بالذكاء الاصطناعي لهذا المشهد المعين"
+                                >
+                                  <Sparkle className="w-3 h-3 text-indigo-400" />
+                                  <span>ولد بالـ AI</span>
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteVideoScene(scIdx)}
+                                  className="px-2 py-1 bg-slate-900 hover:bg-rose-950/40 hover:text-rose-450 text-[10px] text-slate-400 font-bold rounded-lg flex items-center gap-1 border border-slate-850 hover:border-rose-900/40 transition-all text-red-400"
+                                  title="حذف هذا المشهد من سيناريو الفيديو الإعلاني"
+                                >
+                                  <Trash2 className="w-3 h-3 text-rose-400" />
+                                  <span>حذف</span>
+                                </button>
                               </div>
                             </div>
                           ))}
