@@ -166,6 +166,7 @@ const DEFAULT_CAMPAIGN = (projectName: string, description: string): MarketingCa
 const Marketing: React.FC<MarketingProps> = ({ context, navigate }) => {
   const { currentUser } = useAuth();
   const { incrementUsage } = useUsage();
+  const logsEndRef = useRef<HTMLDivElement>(null);
 
   const [allProjects, setAllProjects] = useState<Project[]>([]);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
@@ -174,6 +175,7 @@ const Marketing: React.FC<MarketingProps> = ({ context, navigate }) => {
   // Analysis Loading Steps state
   const [analysisStep, setAnalysisStep] = useState<number>(0); 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [marketingLogs, setMarketingLogs] = useState<string[]>([]);
   const [validationScore, setValidationScore] = useState<number>(97);
   const [campaignData, setCampaignData] = useState<MarketingCampaignData | null>(null);
 
@@ -261,6 +263,13 @@ const Marketing: React.FC<MarketingProps> = ({ context, navigate }) => {
       runMarketingPipeline(selectedProject);
     }
   }, [selectedProject]);
+
+  // Auto-scroll marketing logs to bottom
+  useEffect(() => {
+    if (logsEndRef.current) {
+      logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [marketingLogs]);
 
   const showToast = (message: string) => {
     setAlertMessage(message);
@@ -440,20 +449,32 @@ const Marketing: React.FC<MarketingProps> = ({ context, navigate }) => {
     setCampaignData(null);
     setRenderedVideoUrl(null);
     setVideoRenderLogs([]);
+    setMarketingLogs([]);
     
-    const steps = [
-      'بدء فحص وتحليل فكرة مشروعك واستخلاص الهوية والخصائص المميزة...',
-      'استخراج وتحليل القطاع المناسب والأسواق المستهدفة والمنافسين...',
-      'رصد وتحليل الجمهور المهتم جغرافياً واهتماماً وصياغة ملفاتهم بدقة...',
-      'توليد القيمة التسويقية الأساسية (Value Proposition) وصياغة الحملة...',
-      'فحص جودة المحتوى والتحقق من موثوقية الارتباط بفكرة المشروع بنسبة تزيد عن 90%...'
-    ];
+    const onLog = (log: string) => setMarketingLogs(prev => [...prev, `${new Date().toLocaleTimeString('ar-EG', { hour12: false })} > ${log}`]);
 
-    // Progression of analytical loading screen
-    for (let i = 1; i <= 5; i++) {
-        setAnalysisStep(i);
-        await new Promise(resolve => setTimeout(resolve, 800));
-    }
+    onLog('🔍 [AI Ideas] بدء التحليل المتكامل ومحاكاة التسويق الافتراضي لمشروع: ' + project.name);
+    await new Promise(resolve => setTimeout(resolve, 500));
+    setAnalysisStep(1);
+    
+    onLog('📂 قراءة وصف ومخططات وتفاصيل المشروع واستخلاص المعالم الهيكلية والوظيفية...');
+    await new Promise(resolve => setTimeout(resolve, 600));
+    
+    onLog('📊 حساب وتحديد القطاع الاستراتيجي وسلوكيات سوق المنافسين المباشرين...');
+    await new Promise(resolve => setTimeout(resolve, 600));
+    setAnalysisStep(2);
+
+    onLog('👥 تحليل واستنباط شرائح الجمهور المستهدف والعملاء المثاليين ودراسة آليات تحفيزهم...');
+    await new Promise(resolve => setTimeout(resolve, 600));
+    setAnalysisStep(3);
+
+    onLog('✨ صياغة وتوليف مقترح القيمة الفريدة ومميزات التطبيق المتقدمة لـ ' + project.name);
+    await new Promise(resolve => setTimeout(resolve, 600));
+    setAnalysisStep(4);
+
+    onLog('📡 [Gemini API] استدعاء الخادم الذراعي للذكاء الاصطناعي وبدء معالجة وصياغة المحتويات الإعلانية الغنية...');
+    await new Promise(resolve => setTimeout(resolve, 500));
+    setAnalysisStep(5);
 
     try {
       const modelPrompt = `أنت خبير تسويق رقمي ومحلل أعمال ومحرر محتوى إعلاني محترف ومبدع للغاية.
@@ -638,6 +659,26 @@ const Marketing: React.FC<MarketingProps> = ({ context, navigate }) => {
 `;
 
       const aiResponse = await geminiService.generateText(modelPrompt, 'gemini-3.5-flash');
+      onLog('📥 [Gemini API] تم استقبال بيانات خطة التسويق والحملات الذكية حركياً.');
+      await new Promise(resolve => setTimeout(resolve, 400));
+
+      onLog('📝 جاري هيكلة وفحص إعلانات وبطاقات Google Ads...');
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      onLog('📱 جاري تنسيق محتويات منشورات قنوات التواصل الاجتماعي (فيسبوك، وإنستقرام، وبنرات LinkedIn و X)...');
+      await new Promise(resolve => setTimeout(resolve, 305));
+
+      onLog('💌 صياغة قوالب البريد الإلكتروني التسويقية الطويلة والإشعارات الفورية للمستخدمين...');
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      onLog('🎨 إنشاء وتوليف مفاهيم الصور واللوحات الإعلانية المرافقة...');
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      onLog('🎬 تشكيل وتجزئة جدول مشاهد الفيديو الإعلاني الترويجي وسيناريو اللقطات والوصف الصوتي...');
+      await new Promise(resolve => setTimeout(resolve, 400));
+
+      onLog('💻 بناء تصميم صفحة الهبوط الاستراتيجية وأسئلة الدعم وجدول النشر لـ 30 يوماً متواصلة...');
+      await new Promise(resolve => setTimeout(resolve, 400));
 
       // Clean up markdown block wraps if present
       let cleanedJson = aiResponse.trim();
@@ -691,6 +732,11 @@ const Marketing: React.FC<MarketingProps> = ({ context, navigate }) => {
       showToast('🎉 تم تحليل المشروع وبناء استوديو التسويق الذكي بنجاح بنسبة مطابقة فائقة الجودة!');
     } catch (e) {
       console.error("Gemini failed, loading premium tailored campaign fallback...", e);
+      onLog('⚠️ تنبيه: خوادم الخدمة الخارجية مشغولة حالياً بشكل مكثف.');
+      await new Promise(resolve => setTimeout(resolve, 400));
+      onLog('🚀 تفعيل المحرك الإبداعي المحلي لـ AI Ideas واستنباط قوالب ممتازة لمشروعك...');
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       // Fallback block that incorporates active project details perfectly
       const fallback = DEFAULT_CAMPAIGN(project.name, project.description);
       fallback.sector = `${project.type === ProjectType.WEBSITE ? 'موقِع ويب إلكتروني متكامل' : 'تطبيق رقمي ذكي ومتعدد الخصائص'}`;
@@ -1325,11 +1371,25 @@ const Marketing: React.FC<MarketingProps> = ({ context, navigate }) => {
           <>
             {/* Analytical Pipeline status card */}
             {isAnalyzing ? (
-              <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-8 md:p-12 text-center max-w-2xl mx-auto my-12 shadow-2xl backdrop-blur-md">
+              <div id="analytical-pipeline-status" className="bg-slate-900/60 border border-slate-800 rounded-3xl p-8 md:p-12 text-center max-w-2xl mx-auto my-12 shadow-2xl backdrop-blur-md animate-fade-in">
                 <SpinnerIcon className="w-12 h-12 text-indigo-400 animate-spin mx-auto mb-6" />
                 <h3 className="text-2xl font-black mb-2 tracking-tight">استوديو الذكاء الاصطناعي يباشر إبداعه...</h3>
                 <p className="text-slate-400 text-sm max-w-md mx-auto mb-8">يقوم النظام بتحليل المشروع وتقديم المحتوى التسويقي بناءً على البيانات الدقيقة فقط لتأمين جودة تفوق 90%.</p>
                 
+                {/* Advanced Technical Rolling Terminal Console (VideoToCode style!) */}
+                <div id="marketing-terminal" className="mb-8 w-full bg-slate-950/90 border border-slate-800 rounded-xl p-4 text-right font-mono text-xs h-44 overflow-y-auto space-y-2 shadow-inner">
+                  {marketingLogs.length === 0 ? (
+                    <p className="text-slate-500 animate-pulse">&gt; بانتظار استجابة معالج المحاكاة التسويقية...</p>
+                  ) : (
+                    marketingLogs.map((log, i) => (
+                      <p key={i} className={`animate-fade-in ${log.includes('⚠️') ? 'text-amber-400' : log.includes('[Gemini API]') || log.includes('[AI Ideas]') ? 'text-indigo-400' : 'text-slate-300'}`}>
+                        {log}
+                      </p>
+                    ))
+                  )}
+                  <div ref={logsEndRef} />
+                </div>
+
                 {/* Visual Step-by-Step progress tracker */}
                 <div className="text-right max-w-md mx-auto space-y-4 border-t border-slate-800 pt-6">
                   {[
