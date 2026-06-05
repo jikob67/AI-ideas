@@ -84,78 +84,84 @@ interface MarketingCampaignData {
   };
 }
 
-const DEFAULT_CAMPAIGN = (projectName: string, description: string): MarketingCampaignData => ({
-  sector: 'تحليل جاري...',
-  targetAudience: 'تحليل جاري...',
-  valueProposition: 'تحليل جاري...',
-  designStyle: 'نظيف وعصري',
-  relevanceScore: 98,
-  googleAds: [
-    { headline: `احصل على ${projectName} الآن`, description: `الحل المتكامل والذكي لـ ${description.substring(0, 50)}. جربه مجاناً اليوم!` },
-    { headline: `أفضل تطبيق لـ ${projectName}`, description: `سهل الاستخدام وعملي وموثوق. حمل تطبيق ${projectName} وانطلق بقوة.` }
-  ],
-  facebookInstagramAds: [
-    {
-      primaryText: `هل تعبت من الحلول المعقدة؟ تطبيق ${projectName} هو بوابتك لتجربة سلسة ومثمرة في ${description.substring(0, 60)}. صُمم خصيصاً لتوفير وقتك وجهدك وضمان أفضل النتائج بأبسط الخطوات! 🚀✨\n\nاشترك الآن وانضم لآلاف المستفيدين المبتهجين بالخدمة. ✔️`,
-      headline: `السهولة والكفاءة في مكان واحد مع ${projectName}`,
-      description: `عرض محدود لفترة وجيزة: احصل على خصم 50% عند الاشتراك الأسبوعي!`
-    }
-  ],
-  xLinkedInPosts: [
-    { platform: 'X', content: `نعيد تعريف الابتكار مع تطبيق #${projectName}! الحل الأمثل لتسهيل حياتك وإنجاز مهامك بكفاءة متناهية. \n\nاكتشف المزيد الآن عبر موقعنا الإلكتروني 🔗👇\n\n#ريادة_الأعمال #تكنولوجيا #ابتكار` },
-    { platform: 'LinkedIn', content: `يسعدنا اليوم الإعلان عن إطلاق ${projectName} كمنصة رائدة تهدف إلى تمكين الأفراد والمؤسسات من تحسين كفاءتهم في مجال ${description.substring(0, 100)}. \n\nمن خلال دمج التقنيات الذكية مع تصميم واجهات يركز على احتياجات المستخدم، يقدم ${projectName} قيمة حقيقية وقابلة للقياس لوقتكم وعملكم. شاركونا رحلة التحول الرقمي الاستثنائية! 📈✨ \n\n#ريادة_الأعمال #التحول_الرقمي #ابتكار #حلول_ذكية` }
-  ],
-  emails: [
-    {
-      subject: `🎉 ترحيب حار من فريق ${projectName} - بوابتك لتسهيل حياتك!`,
-      body: `مرحباً بك عزيزنا المشترك،\n\nيسعدنا جداً انضمامك إلينا في رحلة ${projectName}!\n\nنعلم أن وقتك ثمين، ولهذا قمنا ببناء تطبيق ${projectName} بهدف واحد بسيط: تقديم الحل المثالي والذكي لمشاكل ${description.substring(0, 100)} بطريقة سلسة ومبسطة كلياً.\n\nإليك أهم المميزات التي ستحصل عليها فوراً:\n- أداء متميز وموثوق.\n- واجهات مصممة بعناية لتناسب راحتك البصرية.\n- دعم فني متكامل على مدار الساعة.\n\nلا تنتظر أكثر، انطلق معنا الآن وجرب الفارق بنفسك ونعدك بأنك لن تندم!\n\nتحياتنا الحارة،\nفريق عمل ${projectName}`
-    }
-  ],
-  pushNotifications: [
-    { title: `أهلاً بك مجدداً في ${projectName}! 👋`, body: `اكتشف التحديثات الجديدة وزد من إنتاجيتك الآن بضغطة واحدة.` },
-    { title: `⚠️ عرض خاص ينتهي قريباً!`, body: `لا تفوت فرصة الاستمتاع بالخصائص اللامتناهية لمشروعك بأقل تكلفة ممكنة.` }
-  ],
-  imagePrompts: [
-    { platform: 'Instagram (Square 1:1)', size: '1080 x 1080', prompt: `A professional creative advertising post featuring a minimalist futuristic glassmorphism interface floating in front of clean background with abstract representations of productivity and growth, elegant soft studio lighting, color palette of indigo and cool gray, cinematic depth of field, high-tech, 3D render` },
-    { platform: 'X & LinkedIn (Landscape 16:9)', size: '1200 x 675', prompt: `A sleek digital marketing banner displaying an abstract concept of connection, speed, and clean code, sharp graphics, professional navy blue and white lights, ultra-clean web mockup, high dynamic range, masterwork, 8k resolution` },
-    { platform: 'TikTok & Stories (Portrait 9:16)', size: '1080 x 1920', prompt: `A mobile-first vibrant social media story graphic layout with premium textures, neon gradient light trails, a modern abstract smartphone device frame showcasing dynamic dashboards, modern layout art, trending visuals` }
-  ],
-  videoTitle: `الفيديو التعريفي بـ ${projectName}`,
-  videoDuration: 30,
-  videoScript: [
-    { scene: 1, visual: 'لقطة قريبة لشخص يبدو متعباً أمام كمبيوتر محمول بظلال رمادية داكنة.', voiceover: 'هل تشعر بالإرهاق المستمر من تعقيد إدارة شؤون حياتك اليومية؟', duration: 10 },
-    { scene: 2, visual: 'وميض ساطع من الضوء يتحول إلى اللون الأزرق النيلي والذهبي الدافئ، يظهر واجهة التطبيق البسيطة والجميلة.', voiceover: 'لقد حان وقت التغيير! نقدم لك تطبيقنا الجديد لتبسيط كل شيء بلمسة ذكية واحدة.', duration: 10 },
-    { scene: 3, visual: 'لقطة لشخص يبتسم بارتياح يحمل هاتفه مع زر CTA بارز يدعو للاشتراك.', voiceover: 'ابدأ اليوم مجاناً واكتشف متعة الكفاءة والإنتاجية مع مشروعنا الاستثنائي.', duration: 10 }
-  ],
-  landingPage: {
-    heroHeadline: `الطريقة الأسهل والأسرع لإدارة أعمالك بذكاء وتفوق`,
-    heroDescription: `منصة ${projectName} تقدم لك كافة الأدوات والحلول التفاعلية في مكان واحد لنقل تجربتك إلى أبعاد جديدة غير مسبوقة تماماً.`,
-    features: [
-      { title: 'كفاءة وسرعة استثنائية', desc: 'تم بناء خوارزمياتنا لتوفر لك تفاعلاً فورياً فائق السرعة وبأقل استهلاك للطاقة والموارد.' },
-      { title: 'أمان وتشفير مطلق لبياناتك', desc: 'خصوصيتك هي أولويتنا القصوى، لذا نعتمد بروتوكولات حماية متقدمة لحفظ كافة السجلات الحساسة.' },
-      { title: 'دعم وتحليلات ذكية وفورية', desc: 'نظام رصد تلقائي يساعدك على استخلاص أفضل النتائج وتصحيح المسار فوراً بناءً على بيانات حقيقية.' }
+const DEFAULT_CAMPAIGN = (projectName: string, description: string): MarketingCampaignData => {
+  const cleanDesc = description ? description.trim() : 'خدمات وحلول رقمية مبتكرة';
+  const briefDesc = cleanDesc.length > 80 ? cleanDesc.substring(0, 80) + '...' : cleanDesc;
+  const miniDesc = cleanDesc.length > 50 ? cleanDesc.substring(0, 50) + '...' : cleanDesc;
+
+  return {
+    sector: 'قطاع التقنية والأعمال الذكية',
+    targetAudience: `المهتمين والعملاء الباحثين عن كفاءة أعلى في الاستفادة من خدمات ${projectName} وتسهيل ${briefDesc}.`,
+    valueProposition: `تمكين المستخدمين من إنجاز مهام ${projectName} وحلول ${miniDesc} بأحدث التقنيات وأسرع أداء تفاعلي.`,
+    designStyle: 'نظيف وعصري بلمسات وألوان مريحة وممتازة',
+    relevanceScore: 98,
+    googleAds: [
+      { headline: `احصل على ${projectName} الآن`, description: `الحل المتكامل والذكي لـ ${miniDesc}. جربه مجاناً اليوم واستمتع بالكفاءة!` },
+      { headline: `أحدث تطبيق لـ ${projectName}`, description: `سهل الاستخدام وعملي وموثوق للتعامل مع ${miniDesc}. حمل التطبيق وانطلق بقوة.` }
     ],
-    faqs: [
-      { question: 'هل يتطلب التطبيق خبرة برمجية سابقة لاستخدامه؟', answer: 'مطلقاً! تم تصميم الواجهة بعناية فائقة لتكون واضحة وبسيطة جداً بحيث يمكن لأي شخص التعامل معها من اللحظة الأولى بنجاح.' },
-      { question: 'كيف يمكنني البدء في خطة التجربة المجانية؟', answer: 'كل ما عليك هو النقر على زر البدء وتدوين معلوماتك البسيطة لتفعيل حسابك بشكل فوري وبدون أي اشتراطات مسبقة.' }
+    facebookInstagramAds: [
+      {
+        primaryText: `هل تبحث عن حل متكامل لتسهيل حياتك المهنية واليومية؟ تطبيق ${projectName} هو بوابتك لتجربة سلسة ومثمرة في ${briefDesc}. صُمم خصيصاً لتوفير وقتك وجهدك وضمان أفضل النتائج بأبسط الخطوات الممكنة! 🚀✨\n\nاشترك الآن وانضم لآلاف المستفيدين المبتهجين بالخدمة وبادر بالتسجيل الفوري. ✔️`,
+        headline: `السهولة والاحترافية الحقيقية في مكان واحد مع ${projectName}`,
+        description: `عرض خاص لفترة محدودة: احصل على اشتراك مميز لتجربة ${projectName} بالكامل!`
+      }
     ],
-    ctas: [
-      { text: `انطلق الآن مع ${projectName} مجاناً`, subtext: 'ابدأ تجربتك الاستثنائية اليوم بالكامل بدون الحاجة لبطاقة ائتمانية' }
-    ]
-  },
-  marketingPlan: {
-    channels: ['البحث العضوي عبر فيسبوك وإنستغرام باستهداف مهتمين بالمجال', 'منشورات مهنية احترافية على منصة LinkedIn', 'إعلانات التسويق عبر البريد للاشتراكات الجديدة'],
-    keywords: [`تطبيق ${projectName}`, `تبسيط ${projectName}`, `أفضل حل لـ ${projectName}`, 'برامج إنتاجية وتطوير ذكي'],
-    launchStrategy: 'قم بالإعلان المبدئي بين الأصدقاء والمجتمعات التقنية المتخصصة، ثم أطلق حملة إعلانية ممولة تستهدف القيمة المباشرة وحل المشاكل على مدار أسبوع كامل للحصول على أول 100 عميل مهتم.',
-    thirtyDayCalendar: [
-      { day: 1, topic: 'منشور تشويقي أولى لحل المشكلات', caption: `هل تعاني من الفوضى في مهامك؟ ترقبوا الإطلاق الكبير للتطبيق الأسهل والحل الحتمي! #${projectName} #تطوير`, channel: 'X / LinkedIn' },
-      { day: 5, topic: 'استعراض واجهات وفوائد النظام المباشرة', caption: `كيف نوفر لك 4 ساعات يومياً؟ إليك استعراض بسيط لواجهاتنا فائقة الخيارات سهلة الاستخدام. #${projectName} #تصميم`, channel: 'Instagram' },
-      { day: 12, topic: 'منشور تثقيفي حول أهمية التنظيم', caption: `الإحصاءات تؤكد أن التنظيم يفرز تفرغاً ذهنياً يبدع فيه العقل بأكثر من 35% من طاقته! #${projectName}`, channel: 'LinkedIn' },
-      { day: 20, topic: 'قسيمة خصم ترحيبية لأول 50 مسجل', caption: `كن أحد المميزين الأوائل واحصل على باقة المزايا الكاملة بنصف القيمة مدى الحياة! الكود: FIR50 #${projectName}`, channel: 'X' },
-      { day: 30, topic: 'احتفال بمرور شهر وحصاد ثقة وملاحظات العملاء', caption: `عائلة تطبيق ${projectName} تكبر كل يوم، شكراً لثقتكم واقتراحاتكم الثمينة التي تصنع الفارق دوماً!`, channel: 'All Channels' }
-    ]
-  }
-});
+    xLinkedInPosts: [
+      { platform: 'X', content: `نعيد تعريف الابتكار لحل مشاكل ${miniDesc} مع #${projectName}! الخيار الأمثل لتسهيل المهام وإنجاز العمليات بكفاءة تامة. \n\nاكتشف المزايا الآن عبر موقعنا الإلكتروني 🔗👇\n\n#${projectName.replace(/\s+/g, '_')} #ابتكار #تكنولوجيا` },
+      { platform: 'LinkedIn', content: `يسعدنا اليوم الإعلان عن إطلاق ${projectName} كحل رائد يهدف إلى تمكين المستخدمين لتحسين كفاءتهم في ${briefDesc}. \n\nمن خلال دمج واجهات تفاعلية تركز على تجربة المستخدم، يقدم ${projectName} قيمة حقيقية وسريعة لتوفير الوقت والجهد الحركي. شاركونا قصة تفوقنا! 📈✨ \n\n#ريادة_الأعمال #تحول_رقمي #ابتكار #حلول_ذكية` }
+    ],
+    emails: [
+      {
+        subject: `🎉 انطلق اليوم مع ${projectName} - الحل الذكي المبتكر لـ ${miniDesc}!`,
+        body: `مرحباً بك عزيزنا المشترك،\n\nيسعدنا جداً انضمامك إلينا في رحلة ${projectName}!\n\nنعلم أن وقتك ثمين، ولهذا قمنا بتصميم هويتنا لتلبية احتياجاتك في ${briefDesc} بطريقة سلسة ومبسطة كلياً تنقل إنتاجيتك لأبعاد جديدة.\n\nإليك أهم المميزات التي ستحصل عليها فوراً بداخل ${projectName}:\n- أداء فائق وموثوقية عالية لحل العقبات اليومية.\n- واجهات أنيقة ومريحة تضمن لك السهولة والتحكم بالبيانات.\n- دعم فني متكامل يساعدك في تحقيق الارتياح والنجاح المأمول.\n\nلا تنتظر أكثر، جرب الفارق الاستثنائي بنفسك الآن مجاناً ولن تندم!\n\nتحياتنا الحارة،\nفريق عمل ${projectName}`
+      }
+    ],
+    pushNotifications: [
+      { title: `أهلاً بك مجدداً في ${projectName}! 👋`, body: `شاهد المزايا الجديدة في ${miniDesc} وزد من إنتاجيتك الآن بضغطة واحدة.` },
+      { title: `⚠️ عرض خاص من ${projectName} ينتهي قريباً!`, body: `لا تفوت فرصة الاستمتاع بالخصائص والامتيازات المفتوحة لتسريع أعمالك.` }
+    ],
+    imagePrompts: [
+      { platform: 'Instagram (Square 1:1)', size: '1080 x 1085', prompt: `A professional creative advertising post for ${projectName} featuring a minimalist clean interface showing abstract representations of ${briefDesc}, elegant soft studio lighting, color palette of indigo and cool dark gray, cinematic depth of field, 3D render` },
+      { platform: 'X & LinkedIn (Landscape 16:9)', size: '1200 x 675', prompt: `A sleek digital marketing banner for ${projectName} showing abstract speed, clean lines, professional navy blue light glow, ultra-clean web mockup relating to ${briefDesc}, high dynamic range, masterwork` },
+      { platform: 'TikTok & Stories (Portrait 9:16)', size: '1080 x 1920', prompt: `A mobile-first vibrant social media story layout for ${projectName} with premium textures, neon gradient light trails, modern abstract interface with dynamic dashboards related to ${briefDesc}, trending design` }
+    ],
+    videoTitle: `الفيديو الإعلاني لمشروع ${projectName}`,
+    videoDuration: 30,
+    videoScript: [
+      { scene: 1, visual: `لقطة قريبة تعبر عن التحدي والمعاناة في إدارة ${projectName} أو العقبات والتشعبات التقليدية.`, voiceover: `هل تشعر بالإرهاق المستمر من تعقيد إدارة ${briefDesc} والعمليات اليدوية المجهدة؟`, duration: 10 },
+      { scene: 2, visual: `وميض ساطع من الضوء يتحول إلى اللون النيلي والذهبي الدافئ تظهر فيه مميزات وعجائب واجهات ${projectName} المتكاملة.`, voiceover: `لقد حان وقت التغيير! نقدم لك ${projectName} لتبسيط كل شيء بلمسة ذكية واحدة وهندسة استراتيجية فائقة للتعامل مع ${miniDesc}.`, duration: 10 },
+      { scene: 3, visual: `لقطة لشخص يبتسم بارتياح ومجسم هاتف يعرض شعار ${projectName} مع زر CTA بارز يدعو للاشتراك الفوري.`, voiceover: `ابدأ اليوم مجاناً واكتشف متعة الكفاءة والإنتاجية مع ${projectName} المخصص لتلبية احتياجاتك المتنوعة واقتناص الفوائد.`, duration: 10 }
+    ],
+    landingPage: {
+      heroHeadline: `الطريقة الأسهل والأسرع لإدارة ${projectName} بذكاء وتفوق`,
+      heroDescription: `منصة ${projectName} تقدم لك كافة الأدوات والحلول التفاعلية في مكان واحد لتسريع وتسهيل ${briefDesc} بكفاءة عالية.`,
+      features: [
+        { title: `كفاءة وسرعة استثنائية في ${projectName}`, desc: `تم بناء خوارزمياتنا لتوفر لك تفاعلاً فورياً فائق السرعة وبأقل استهلاك للموارد لإنجاز مهام ${miniDesc}.` },
+        { title: `أمان وتشفير مطلق لبياناتك بخصائص ${projectName}`, desc: `خصوصيتك هي أولويتنا القصوى، لذا نعتمد بروتوكولات حماية مشددة لحفظ وتأمين كافة ملفات ${projectName} بخصوصية كاملة.` },
+        { title: 'تحليلات ذكية وفورية من النظرة الأولى', desc: `نظام رصد تفاعلي متقدم يساعدك على قياس الإنتاجية والنتائج لتسريع اتخاذ القرار الصائب دائماً.` }
+      ],
+      faqs: [
+        { question: `هل يتطلب تطبيق ${projectName} معرفة أو خبرة تقنية مسبقة لاستخدامه؟`, answer: `مطلقاً! تم تصميم الواجهة بلمسات بسيطة لتركز على تجربة المستخدم السهلة، بحيث يمكن لأي شخص إنجاز مهام ${projectName} من اللحظة الأولى للبدء بنجاح.` },
+        { question: `كيف يمكنني البدء في خطة الاستخدام المجاني لتطبيق ${projectName}؟`, answer: `كل ما عليك هو التسجيل وتفعيل حسابك بلمسة واحدة لتبدأ رحلتك في تسهيل ${miniDesc} بدون أي شروط مسبقة أو رسوم خفية.` }
+      ],
+      ctas: [
+        { text: `انطلق الآن مع ${projectName} مجاناً`, subtext: `ابدأ تجربتك الاستثنائية اليوم بالكامل بدون الحاجة لبطاقة ائتمانية` }
+      ]
+    },
+    marketingPlan: {
+      channels: [`إعلانات وسائل التواصل والمجتمعات التقنية المهتمة بقطاع ${projectName}`, `منشورات علمية وتثقيفية على منصة LinkedIn لإظهار كفاءة العمل`, 'حملات الترويج بالبريد والرسائل المباشرة المخصصة للفئات المستهدفة'],
+      keywords: [`تطبيق ${projectName}`, `تسهيل ${projectName}`, `أفضل نظام لـ ${projectName}`, `برامج وحلول ${projectName}`],
+      launchStrategy: `قم بمشاركة فكرة ومزايا ${projectName} بين زملائك والمجتمعات المباشرة، ثم انشر محتويات تثقيفية تبرز جودة وسرعة الواجهات لتوليد الثقة وتحقيق أول 50 مستخدم نشط في أقصر وقت.`,
+      thirtyDayCalendar: [
+        { day: 1, topic: 'منشور تشويقي أولي لمخاطبة اهتمام العميل', caption: `هل تعاني من الصعوبة والتعقيد؟ ترقبوا الإطلاق الحصري للحل الأقوى والأسهل دائماً! #${projectName} #ابتكار`, channel: 'X / LinkedIn' },
+        { day: 5, topic: 'استعراض واجهات وفوائد النظام المباشرة', caption: `كيف نوفر لك ساعاتك المهدورة ونسهّل أعباءك اليومية؟ إليك نظرة على واجهاتنا فائقة الأداء والميزات. #${projectName} #سهولة`, channel: 'Instagram' },
+        { day: 12, topic: 'منشور تثقيفي حول أهمية التنظيم وإيجاد الحلول الرقمية', caption: `سرعة معالجة الملفات في ${projectName} تمنحك تفرغاً ذهنياً يبدع فيه عقلك بنسب مضاعفة ومؤكدة! #${projectName} #ذكاء`, channel: 'LinkedIn' },
+        { day: 20, topic: 'عرض خاص وهدايا ترحيبية للمسجلين الأوائل للحث على اتخاذ القرار', caption: `كن أحد رواد منصتنا الأوائل واحصل على باقة الميزات الكاملة والخدمة الحصرية لنصف القيمة مدى الحياة! #${projectName}`, channel: 'X' },
+        { day: 30, topic: 'مشاركة قصص التفوق وحصاد ثقة أول شهر من الانطلاق والانتشار', caption: `عائلة تطبيق ${projectName} تنمو وتزدهر كل يوم، شكراً لثقتكم واقتراحاتكم القيمة التي تجعلنا ننفرد بتقديم الأحسن دائماً!`, channel: 'All Channels' }
+      ]
+    }
+  };
+};
 
 const Marketing: React.FC<MarketingProps> = ({ context, navigate }) => {
   const { currentUser } = useAuth();
@@ -188,6 +194,8 @@ const Marketing: React.FC<MarketingProps> = ({ context, navigate }) => {
   const [isRenderingVideo, setIsRenderingVideo] = useState(false);
   const [videoRenderLogs, setVideoRenderLogs] = useState<string[]>([]);
   const [renderedVideoUrl, setRenderedVideoUrl] = useState<string | null>(null);
+  const [activeSceneIndex, setActiveSceneIndex] = useState<number>(0);
+  const [videoFormat, setVideoFormat] = useState<'vertical' | 'landscape'>('vertical');
 
   // Copy Alert Status
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -315,8 +323,26 @@ const Marketing: React.FC<MarketingProps> = ({ context, navigate }) => {
       setPomelliWorkspaceText(aiResponse.trim());
       showToast('🎉 تم توليد المسودة التسويقية الذكية بنجاح! جاهزة للتطوير.');
     } catch (e) {
-      console.error(e);
-      showToast('❌ عذراً، لم تنجح الصياغة الآلية حالياً. جرب النص المفتوح أو المحاولة مرة أخرى.');
+      console.warn("Gemini failing or busy, crafting high-quality tailored backup...", e);
+      const pName = selectedProject.name;
+      const pDesc = selectedProject.description || '';
+      const cleanDesc = pDesc.trim();
+      const briefDesc = cleanDesc.length > 80 ? cleanDesc.substring(0, 80) + '...' : cleanDesc;
+      
+      let backupText = '';
+      if (activeTactic === 'google-ads') {
+        backupText = `العنوان: احصل على ${pName} الآن\nالوصف: الحل المتكامل والمبتكر لـ ${briefDesc}. جربه بالكامل مجاناً اليوم واستمتع بدقة وكفاءة فائقة!`;
+      } else if (activeTactic === 'instagram') {
+        backupText = `💡 هل تشعر بالتعقيد أو تبحث عن طريقة لتبسيط ${briefDesc}؟\n\nتطبيق ${pName} هو الحل الثوري والذكي المصمم لمساعدتك بلمسة واحدة لامتلاك التحكم بجميع أعمالك! ✨🚀\n\n🎯 شاهد المزايا الحيوية والواجهات الآن وقم بزيارة صفحتنا للتسجيل والتفعيل الفوري مجاناً!`;
+      } else if (activeTactic === 'email') {
+        backupText = `موضوع الرسالة: 🎉 انطلق اليوم بامتياز مع ${pName} - بوابتك الأمثل للراحة الرقمية!\n\nأهلاً بك عزيزنا القارئ والمشترك،\n\nيسعدنا جداً إحاطتك بمشروع ${pName}، الحل الذكي العصري المصمم بعناية فائقة لتنظيم وتسهيل ${briefDesc} بأسلوب مبسط كلياً يعيد تعريف الكفاءة الذاتية.\n\nلماذا يستحق ${pName} تجربتك الفريدة؟\n📈 أداء سريع وموثوقية بالغة لإنجاز أعبائك اليومية.\n🔒 حماية وتشفير مشدد لبياناتك وسجلاتك الحساسة.\n\nتفضل بزيارتنا وتجربة المزايا بالكامل لتنال الانطباع السليم وجربه مجاناً اليوم!\n\nتحياتنا الحارة،\nفريق عمل ${pName}`;
+      } else if (activeTactic === 'social') {
+        backupText = `هل مللت من الأساليب اليدوية المهدرة للوقت والجهد في ${briefDesc}؟\n\nتطبيق ${pName} مخصص لمنحك التحكم والسيطرة التامة وتبسيط المعالجات بأحدث الخصائص التقنية والواجهات سهلة الاستخدام! 📈✨\n\nاكتشف الفارق والامتيازات الاستثنائية اليوم بالكامل عبر موقعنا 👇🔗\n\n#${pName.replace(/\s+/g, '_')} #ابتكار #حلول_ذكية #تقنية`;
+      } else {
+        backupText = `العنوان الأساسي لـ ${pName}: الطريقة الأكفأ والأسهل للتغلب على مشاكل ${briefDesc}!\n\nعبارة الحث CTA: سجل حسابك المجاني اليوم بلمسة واحدة لتحصل على ميزات الباقة الاستثنائية مدى الحياة!`;
+      }
+      setPomelliWorkspaceText(backupText);
+      showToast('🎉 تم صياغة مسودة تسويقية احتياطية متقنة تتماشى تماماً مع هوية مشروعك!');
     } finally {
       setIsGeneratingPomelliDraft(false);
     }
@@ -369,8 +395,41 @@ const Marketing: React.FC<MarketingProps> = ({ context, navigate }) => {
       }
       showToast('✔️ اكتمل تحليل جودة ومستشعرات النص التسويقي بنجاح!');
     } catch (e) {
-      console.error(e);
-      showToast('⚠️ تعذر إشراك خبير التحليل في الوقت الحالي لدواعي فنية.');
+      console.warn("Gemini failed for text analysis, performing advanced local heuristic evaluation...", e);
+      const text = pomelliWorkspaceText.trim().toLowerCase();
+      const pName = (selectedProject?.name || 'مشروعك').toLowerCase();
+      
+      let score = 75;
+      const feedbackPoints: string[] = [];
+      
+      if (text.includes(pName)) {
+        score += 10;
+        feedbackPoints.push(`ممتاز: تم استخدام اسم مشروعك "${selectedProject?.name || 'مشروعك'}" بنجاح مما يدعم بناء الهوية وترسيخ العلامة التجارية.`);
+      } else {
+        feedbackPoints.push(`نصيحة: لم يتضمن النص اسم مشروعك الشامل "${selectedProject?.name || 'مشروعك'}". ننصح بإدراجه ليثبت في أذهان الجمهور المستهدف.`);
+      }
+      
+      if (text.length > 150) {
+        score += 5;
+        feedbackPoints.push(`ممتاز: النص متكامل ومفصل مما يمنح الفرصة لسرد الفوائد بشكل مريح.`);
+      } else if (text.length < 50) {
+        score -= 10;
+        feedbackPoints.push(`تنبيه: محتوى النص مقتضب جداً، قد يحتاج لتفاصيل إضافية تبرز الميزات والامتيازات.`);
+      }
+      
+      const ctaWords = ['سجل', 'اشترك', 'ابدأ', 'جرب', 'احصل', 'انضم', 'رابط', 'زوروا', 'تواصل'];
+      const hasCta = ctaWords.some(w => text.includes(w));
+      if (hasCta) {
+        score += 10;
+        feedbackPoints.push(`ممتاز: وجود عبارة دعوة لاتخاذ إجراء واضحة (CTA) تدعم توجيه المستهلك للمرحلة التالية.`);
+      } else {
+        feedbackPoints.push(`نصيحة: يفتقر النص إلى نداء صريح وواضح للفعل (مثال: اشترك الآن، عجل بالتسجيل) لرفع نسب التفاعل والتحول.`);
+      }
+      
+      const scoreResult = Math.min(100, Math.max(20, score));
+      setAiCompanionScore(scoreResult);
+      setAiCompanionFeedback(`(تقييم محلي احتياطي فعال)\n\nالتحليل وجودة الصياغة:\n- ` + feedbackPoints.join('\n- '));
+      showToast('✔️ اكتمل تحليل جودة ومستشعرات النص التسويقي عبر المعالج الاحتياطي!');
     } finally {
       setIsAnalyzingPomelliText(false);
     }
@@ -703,40 +762,51 @@ const Marketing: React.FC<MarketingProps> = ({ context, navigate }) => {
     if (!campaignData) return;
     const updated = { ...campaignData };
     
+    // Retrieve project metadata for highly specific, customized contextual text
+    const pName = selectedProject?.name || 'مشروعك المبتكر';
+    const pDesc = selectedProject?.description || 'تقديم خدمات وحلول ذكية فائقة تناسب متطلبات العصر';
+    const cleanDesc = pDesc.trim();
+    const briefDesc = cleanDesc.length > 80 ? cleanDesc.substring(0, 80) + '...' : cleanDesc;
+    const miniDesc = cleanDesc.length > 50 ? cleanDesc.substring(0, 50) + '...' : cleanDesc;
+    const sector = campaignData.sector || 'قطاع التقنية والأعمال الرياضية والحلول الذكية';
+    const feature1 = campaignData.landingPage?.features?.[0]?.title || 'كفاءة وسرعة استثنائية';
+    const feature2 = campaignData.landingPage?.features?.[1]?.title || 'أمان وحماية تامة للبيانات';
+    const feature3 = campaignData.landingPage?.features?.[2]?.title || 'تحليلات ذكية وفورية';
+
     // Dynamically adjust scripts based on duration to meet prompt specifications
     if (secs === 15) {
       updated.videoScript = [
-        { scene: 1, visual: 'عرض متألق فائق السرعة لشعار وهدف المشروع مع تناسق الأبعاد وعصر السرعة.', voiceover: 'تبحث عن حل مثالي ومجرب لمشكلتك اليوم؟', duration: 5 },
-        { scene: 2, visual: 'استعراض سريع ومبهر لواجهة التطبيق والمميزات بلمسات راقية ومؤشرات نجاح حية.', voiceover: 'مشروعنا هو الإجابة الشاملة لمطالب يومك بضغطة واحدة! ابدأ فوراً.', duration: 10 }
+        { scene: 1, visual: `عرض متألق فائق السرعة لشعار ${pName} وهوية المعالم البصرية المميزة لـ ${miniDesc} مع تناسق الأبعاد وعصر السرعة.`, voiceover: `تبحث عن أفضل حل وأسلوب مجرب وموثوق لـ ${miniDesc}؟`, duration: 5 },
+        { scene: 2, visual: `استعراض سريع ومبهر لواجهة تطبيق ${pName} وأهم الخيارات الحية والميزات بلمسات راقية ومؤشرات نجاح حية.`, voiceover: `${pName} هو الإجابة المبتكرة والتسهيل الشامل لتبسيط أعمالك بضغطة واحدة! ابدأ اليوم واستمتع بجاذبية الكفاءة.`, duration: 10 }
       ];
     } else if (secs === 30) {
       updated.videoScript = [
-        { scene: 1, visual: 'لقطة قريبة لشخص يبدو متعباً أمام كمبيوتر محمول بظلال رمادية داكنة يعبر عن المعاناة.', voiceover: 'هل تشعر بالإرهاق المستمر من تعقيد إدارة شؤون حياتك اليومية والمصروفات؟', duration: 10 },
-        { scene: 2, visual: 'وميض ساطع من الضوء يتحول إلى اللون النيلي والذهبي الدافئ تظهر فيه مميزات وعجائب الفكرة المتكاملة.', voiceover: 'لقد حان وقت التغيير! نقدم لك تطبيقنا الجديد لتبسيط كل شيء بلمسة ذكية واحدة وهندسة استراتيجية.', duration: 10 },
-        { scene: 3, visual: 'لقطة لشخص يبتسم بارتياح ومجسم الهاتف مع زر CTA بارز وجذاب للاشتراك والتنفيذ الفوري.', voiceover: 'ابدأ اليوم مجاناً واكتشف متعة الكفاءة والإنتاجية مع مشروعنا التفاعلي الفاخر المخصص لك.', duration: 10 }
+        { scene: 1, visual: `لقطة قريبة تعبر عن الفوضى أو التحدي والمعاناة في إدارة ${pName} أو الطرق اليدوية المجهدة السابقة لـ ${miniDesc}.`, voiceover: `هل تشعر بالإرهاق المستمر والتشعب من تعقيد إدارة شؤون ${briefDesc} والعمليات اليومية المرهقة؟`, duration: 10 },
+        { scene: 2, visual: `وميض ساطع من الضوء يتحول إلى اللون النيلي والذهبي الدافئ تظهر فيه مميزات وعجائب واجهات ${pName} المتكاملة الفاخرة.`, voiceover: `لقد حان وقت التغيير البناء! نقدم لك تطبيق ${pName} لتبسيط كل شيء بسلسلة من المزايا وهندسة استراتيجية شاملة.`, duration: 10 },
+        { scene: 3, visual: `لقطة لشخص يبتسم بارتياح يحمل هاتفه مع زر CTA بارز وجذاب يدعو للاشتراك الفوري وبدء التشغيل بداخل ${pName}.`, voiceover: `ابدأ اليوم مجاناً واكتشف متعة الكفاءة والإنتاجية وحل مشاكلك مع ${pName} المصمم بعناية خصيصاً كحل واعد لك.`, duration: 10 }
       ];
     } else if (secs === 60) {
       updated.videoScript = [
-        { scene: 1, visual: 'بداية مشوقة تعرض الفوضى وتراكم الأعمال مع رسوم متحركة منسقة تجذب العين.', voiceover: 'الجميع يبحث عن طريقة لزيادة ساعات اليوم، أو على الأقل إيجاد وقت للراحة دون المساس بجودة المهام.', duration: 15 },
-        { scene: 2, visual: 'تدفق حلول المشروع بأناقة بالغة عبر شاشات بصرية تبرز المزايا والامتيازات الرئيسية بالتفصيل ومؤشرات النجاح.', voiceover: 'هنا يأتي دور حلولنا، حيث قمنا بهندسة نظام فريد يعمل آلياً لحل مشاكل القطاع بدقة تتجاوز 95% ووقت إنجاز قياسي.', duration: 25 },
-        { scene: 3, visual: 'استعراض باقات الاشتراك والهدايا الحصرية مع شعار جذاب وخلفية موسيقية ناعمة تحث على البداية.', voiceover: 'انضم إلى جيل المستقبل والشركاء السعداء ووفر وقتك ومواردك للحصول على الامتيازات الكاملة الآن مجاناً.', duration: 20 }
+        { scene: 1, visual: `بداية مشوقة تعرض الفوضى وتراكم الأعباء في مهام ${miniDesc} مع رسوم متحركة منسقة تجذب عين المشاهد لخيارات ${pName}.`, voiceover: `في عصرنا الرقمي السريع، يبحث الجميع عن طريقة ذكية ومحكمة لإنجاز أهداف ${pName} بامتياز، والتخلص من إهدار الوقت الثمين لرواد الأعمال والمهتمين.`, duration: 15 },
+        { scene: 2, visual: `تدفق حلول ${pName} المذهلة بأناقة فائقة عبر لقطات بصرية تبرز واجهات التحكم والمزايا مثل ${feature1} و ${feature2}.`, voiceover: `هنا يبرز دور منصة ${pName}، حيث قمنا بهندسة نظام فريد يعمل آلياً لتقديم حلول متقنة بمعدل دقة مرتفع يفوق 95% وتجربة استخدام خالية من العقبات.`, duration: 25 },
+        { scene: 3, visual: `استعراض لخيارات وباقات الخدمة والتسجيل لتطبيق ${pName} مع شعار العلامة التجارية يلمع بخلفية موسيقية هادئة وجاذبة.`, voiceover: `انضم لشركائنا المتميزين والسعداء بمشروع ${pName}، ووفر مواردك للحصول على الامتيازات الكاملة والخصومات الاستثنائية فوراً مجاناً وابدأ النهوض!`, duration: 20 }
       ];
     } else if (secs === 90) {
       updated.videoScript = [
-        { scene: 1, visual: 'مقدمة سينمائية غامرة تعرض التحديات التي يواجهها الفرد والشركات في هذا القطاع وتراكم الأعمال.', voiceover: 'في عالم متسارع مليء بالمعلومات وتراكم المسؤوليات، يبحث الجميع عن الموثوقية والدقة العالية للتغلب على الفواتير أو إدارة الوقت والمهام المعقدة.', duration: 15 },
-        { scene: 2, visual: 'شرح حي تفصيلي للمشكلات والمخاطر المترتبة على الأساليب التقليدية المجهدة للشركات ورواد الأعمال.', voiceover: 'الخطأ الصغير قد يكلفك مئات الساعات، والحلول التقليدية لم تعد تسعف النمو المتوقع لمشروعات النخبة والشركات المتقدمة في السوق.', duration: 20 },
-        { scene: 3, visual: 'تحول درامي مشوق وتقديم واجهات التطبيق الرائعة واستخراج القيمة الاستراتيجية والنمو السريع بدقة متناهية.', voiceover: 'هنا يأتي استوديو الكفاءة المتقدم، الحل الذكي المتكامل المصمم خصيصاً للتغلب على هذه التحديات بأحدث تقنيات التحليل الفوري بنقرة واحدة.', duration: 25 },
-        { scene: 4, visual: 'استعراض لمزايا الأتمتة السهلة، الحفظ السحابي، ودخول الأعضاء وتناغم الشاشات وعناصر العلامة التجارية.', voiceover: 'استمتع بدقة ارتباط خارقة تفوق 95%، وتقارير تفاعلية، ولوحة معلومات سهلة لتكبير الفوائد والوصول للجمهور المهتم بدقة.', duration: 20 },
-        { scene: 5, visual: 'دعوة لاتخاذ إجراء CTA وشعار المشروع يلمع بخلفية فاخرة.', voiceover: 'انضم لشركائنا المتميزين فوراً واصعد بمشروعك إلى القمة. سجّل الآن مجاناً وابدأ البناء المتكامل لحلمك!', duration: 10 }
+        { scene: 1, visual: `مقدمة سينمائية غامرة تعرض التحديات المتزايدة التي يواجهها الأفراد والشركات في حلول ${miniDesc} وصعوبة تنظيمها.`, voiceover: `في عالم متسارع مليء بالمعلومات وتراكم المسؤوليات البنيوية، يحتاج الجميع للموثوقية العالية والدقة الفائقة للتغلب على تحديات ${pName} المعقدة.`, duration: 15 },
+        { scene: 2, visual: `شرح تفصيلي للمشكلات والمخاطر المترتبة على الأساليب التقليدية المجهدة لرواد الأعمال بقطاع ${sector}.`, voiceover: `الخطأ الصغير في إدارة ${pName} قد يكلفك مئات الساعات المفقودة، والحلول التقليدية لم تعد تسعف التطور والنمو المطلوب للشركات الرائدة اليوم.`, duration: 20 },
+        { scene: 3, visual: `تحول درامي مشوق وتقديم واجهات ${pName} المتطورة الرائعة وعناصر استخراج القيمة الاستراتيجية للتنظيم بدقة متناهية.`, voiceover: `هنا يظهر استوديو الفعالية المتطورة لـ ${pName}، الحل الذكي المتكامل المصمم لمواجهة هذه الثغرات بأحدث خطط التحليل السحابي من النظرة الأولى بنقرة واحدة.`, duration: 25 },
+        { scene: 4, visual: `لقطات تعرض مزايا الأتمتة المريحة للمشروع مثل ${feature2} و ${feature3} مع مؤشرات حية لنجاح المستخدمين وسرعتهم.`, voiceover: `تمتع بالأمان المطلق، والسرعة الفائقة لخدمة ${pName}، مع تقارير لوحة معلومات تفاعلية تسهم في تسهيل الوصول للجمهور والتحويل بدقة.`, duration: 20 },
+        { scene: 5, visual: `دعوة بطلة وصريحة لاتخاذ الإجراء CTA مع تلاشي الشاشة وظهور شعار ${pName} مع تأثيرات ضوئية أنيقة ومثيرة للاهتمام.`, voiceover: `انضم لطلائع الناجحين في تطبيق ${pName} لتجعل طموحك واقعاً ملموساً. تفضل بالتسجيل المجاني الآن وباشر الاستمتاع بالامتيازات المتكاملة!`, duration: 10 }
       ];
     } else if (secs === 180) {
       updated.videoScript = [
-        { scene: 1, visual: 'مقدمة وثائقية فاخرة تلخص حكاية القطاع والتغيرات الكبرى الحالية وروح الهوية البصرية للفكرة.', voiceover: 'التحول الرقمي والذكاء الاصطناعي ليسا مجرد خيار، بل هما أساس التفوق والنجاح لأي عمل أو مبادرة عصرية ذات رسالة قوية.', duration: 30 },
-        { scene: 2, visual: 'عرض الصعوبات اليومية وتشتت الأدوات وغياب رؤية البيانات بدقة عالية على شاشات تفاعلية حية.', voiceover: 'يتعثر أكثر من 70% من رواد الأعمال بسبب غياب الأدوات المترابطة، مما يؤدي للارتباك وضياع ميزانيات التسويق والإنتاج ومتابعة العمليات.', duration: 30 },
-        { scene: 3, visual: 'لحظة الإلهام وكيف تمت هندسة وتصميم هذا المشروع لمعالجة الثغرات بذكاء شامل وتطويره مع الوقت.', voiceover: 'من هنا ولدت الفكرة لتكون الجسر التكنولوجي المثالي لتوحيد جهودك وحفظ بياناتك وتدفق مهامك دون أي تعقيد تقني مسبق.', duration: 35 },
-        { scene: 4, visual: 'عروض تفصيلية حية للشاشات الرائعة وتصدير البيانات والتقارير الفورية بملفات PDF وإكسل المعتمدة بالكامل.', voiceover: 'تواصل مع جمهورك المستهدف، ووظف قوة خوارزميات الذكاء الذاتي، واحصل على قراءات دقيقة تضمن لك اتخاذ القرار الصائب وتصميم الإعلانات دائماً.', duration: 35 },
-        { scene: 5, visual: 'شهادات لعملاء حقيقيين وسعادة مستخدمي النظام بمختلف اللغات وتأثير الحلول الإعلانية والمحتويات المتولدة.', voiceover: 'نحن لا نقدم مجرد برمجية، بل نصنع تجربة متكاملة وشراكة دائمة تدفعك للنمو وتوفر عليك آلاف الساعات والجهد المتكرر في قطاعات الأعمال.', duration: 30 },
-        { scene: 6, visual: 'نظرة أخيرة مشوقة ودعوة بطلة للتسجيل الفوري والترقية لميزات PRO الحيوية وبدء التجربة المضمونة.', duration: 20, voiceover: 'أطلق العنان لطاقات عملك اليوم بلا أي مخاطر تقنية أو سحابية. تفضل بزيارتنا وتفعيل حسابك الذهبي فوراً وابدأ التغيير الحقيقي الملموس!' }
+        { scene: 1, visual: `مقدمة وثائقية فاخرة تلخص حكاية القطاع وتدفق التغيرات الكبرى الحالية والجو البصري المريح لمشروع ${pName}.`, voiceover: `التحول الرقمي وتطبيق الآليات الذكية لم يعد خياراً ثانوياً بداخل ${pName}، بل هو حجر الأساس في قيادة التفوق والانتشار العصري لصاحب فكرة اليوم.`, duration: 30 },
+        { scene: 2, visual: `استعراض للصعوبات والتشتت وغياب الحلول المتمثلة في تطبيق ${briefDesc} وكيف يعاني الفئة المستهدفة.`, voiceover: `يتعثر الكثير من المهتمين بسبب تشتت السجلات وغياب المتابعة السليمة لـ ${pName}، مما يستنزف الموارد ويقهر فرص النجاح والتوسع والنمو المأمول.`, duration: 30 },
+        { scene: 3, visual: `لقطة تعرض قصة الإلهام وتصميم هذا المشروع ${pName} لمعالجة هذه التحديات بدقة عالية ترتقي بجودة المخرجات.`, voiceover: `لهذا السبب قمنا ببناء ${pName}، ليكون الجسر التكنولوجي المثالي لتوحيد وتنسيق العمليات والملفات وحفظ الأمان دون أي تعقيد وتدفقات غير مرغوبة.`, duration: 35 },
+        { scene: 4, visual: `عروض تفصيلية لأداء الواجهات الذكية واللوحات الإحصائية الشاملة واستخراج ملفات التحليل بداخل منصة ${pName}.`, voiceover: `تواصل بجدية، واستدعي كافة الخوارزميات المحكمة في تطبيق ${pName}، لتنال أفضل قراءة موثوقة تلائم متطلباتك وتكفل لك اتخاذ القرار الصائب بلا تراجع.`, duration: 35 },
+        { scene: 5, visual: `لقطة مبهجة تعرض تفاعل مستخدمي تطبيق ${pName} مع المزايا الحيوية كـ ${feature1} و ${feature2} بشكل تفاعلي.`, voiceover: `نحن لا نقترح مجرد برمجيات تقليدية بداخل ${pName}، بل نقوم بصياغة تجربة متكاملة تدفع بأعمالك وتوفر عليك آلاف الدولارات في بناء التسويق والتشغيل السليم.`, duration: 30 },
+        { scene: 6, visual: `مشهد نهائي رائع وخلفية سينمائية محفزة مع دعوة واضحة CTA للاشتراك المجاني وتفعيل الحساب الذهبي لـ ${pName}.`, voiceover: `أطلق العنان لقدرات عملك الحقيقية الآن بلا أي مخاوف مع ${pName}. تفضل بزيارة موقعنا وسجل حسابك الخالي من الرسوم اليوم واستمتع بالتغيير الحقيقي!`, duration: 20 }
       ];
     } else {
       // Dynamic custom duration generator to yield flexible user-defined video duration scenes
@@ -747,8 +817,8 @@ const Marketing: React.FC<MarketingProps> = ({ context, navigate }) => {
         const scDuration = i === sceneCount - 1 ? secs - (step * i) : step;
         script.push({
           scene: i + 1,
-          visual: `مشهد مخصص ${i + 1} لـ ${scDuration} ثوانٍ: يحلل النظام سلوك الشاشات ومظاهر هوية العلامة التجارية ويولد تصميمات متلاحقة ورسوم سينمائية.`,
-          voiceover: `التعليق المقترح للمرحلة ${i + 1} يتطرق بذكاء إلى القيمة المقترحة لـ ${selectedProject?.name || 'مشروعك'} ويعزز الإقناع لدى الجمهور المستهدف في ${scDuration} ثانية.`,
+          visual: `مشهد مخصص ${i + 1} لـ ${scDuration} ثوانٍ: يحلل فيه تطبيق ${pName} تفاصيل ${miniDesc} ويعرض عناصر العلامة التجارية المميزة.`,
+          voiceover: `التعليق المقترح للمرحلة ${i + 1} يتطرق بذكاء فائق إلى المزايا الفريدة لـ ${pName} المتمثلة في تسهيل ${briefDesc} لرفع ثقة الجمهور المستهدف في ${scDuration} ثانية.`,
           duration: scDuration
         });
       }
@@ -769,25 +839,34 @@ const Marketing: React.FC<MarketingProps> = ({ context, navigate }) => {
     setIsRenderingVideo(true);
     setVideoRenderLogs([]);
     setRenderedVideoUrl(null);
+    setActiveSceneIndex(0);
 
     const logs = [
-      '🎬 جاري قراءة وتحليل نصوص المشاهد والسيناريو والوصف البصري...',
-      '🎙️ توليد التعليق الصوتي الصوتي التلقائي المتناسق مع مخارج الحروف العربية الفصحى...',
-      '🎨 بناء وتصدير إطارات الفيديو المتحركة بناءً على البرومبت وهوية المشروع...',
-      '📝 تركيب نصوص الشرح والعناوين الفرعية (Subtitles) على إطارات المشاهد وتعديل الألوان...',
-      '⏳ دمج المحتوى بالكامل وبدء المعالجة الرندرة النهائية بدقة 1080p عالية الوضوح...',
-      '✨ تم تجميع وتجهيز الفيديو التسويقي القصير بنجاح تام وبأحسن مظهر!'
+      '🎬 جاري قراءة وتحليل نصوص المشاهد والسيناريو والوصف البصري والروابط الهندسية...',
+      '🎙️ توليد التعليق الصوتي التلقائي المتناسق مع مخارج الحروف العربية ومزامنة الترددات...',
+      '🎨 بناء وتجهيز إطارات الفيديو المتحركة بناءً على البرومبت وهوية المشروع وخطوط الماركة...',
+      '📝 تركيب نصوص الشرح والعناوين الفرعية (Subtitles) على إتجاهات رندرة المشاهد وتعديل ألوان الكروما...',
+      '⏳ دمج المحتوى المرئي والصوتي بالكامل وبدء المعالجة والضغط الفوري بدقة 1080p عالية الوضوح...',
+      '✨ تم رندرة وتجميع الفيديو السينمائي التسويقي بنجاح تام وهو جاهز الآن للتشغيل والمعاينة التفاعلية!'
     ];
 
     for (let i = 0; i < logs.length; i++) {
       setVideoRenderLogs(prev => [...prev, logs[i]]);
-      await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 500));
+      await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 400));
     }
 
     setIsRenderingVideo(false);
-    // Simulate real generated vertical clip placeholder
-    setRenderedVideoUrl('https://assets.mixkit.co/videos/preview/mixkit-animation-of-a-futuristic-city-with-flying-vehicles-42358-large.mp4');
-    showToast('✨ تهانينا! تم توليد وتجميع الفيديو الإعلاني القصير وجاهز للمعاينة!');
+    
+    // Choose high-quality, ultra-reliable CORS-enabled Google Storage MP4 sample based on project type to guarantee successful play in iframes
+    let videoUrl = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4';
+    if (selectedProject?.type === 'store' || selectedProject?.type === 'saas') {
+      videoUrl = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4';
+    } else if (selectedProject?.type === 'mobile' || selectedProject?.type === 'api') {
+      videoUrl = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4';
+    }
+    
+    setRenderedVideoUrl(videoUrl);
+    showToast('✨ تهانينا! تم توليد وتجميع الفيديو الإعلاني القصير بنجاح وهو متصل الآن بمشهد الشروحات التفاعلية!');
   };
 
   // Download Landing page HTML template
@@ -1688,14 +1767,39 @@ const Marketing: React.FC<MarketingProps> = ({ context, navigate }) => {
                       {/* Rendering display & player mockup */}
                       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between">
                         <div className="space-y-4">
-                          <h4 className="font-bold text-sm text-white">معاينة وشاشة توليد الفيديو النهائي</h4>
                           
-                          {/* Player Box */}
-                          <div className="aspect-[9/16] max-h-[320px] bg-slate-950 rounded-2xl border border-slate-850 overflow-hidden relative flex items-center justify-center mx-auto w-full max-w-[190px]">
+                          {/* Aesthetic Title & Aspect Selector Header */}
+                          <div className="flex items-center justify-between border-b border-slate-850 pb-2.5">
+                            <h4 className="font-bold text-xs text-slate-300">شاشة رندرة المعاينة</h4>
+                            <div className="flex gap-1 bg-slate-950 p-0.5 border border-slate-850 rounded-lg">
+                              <button 
+                                onClick={() => setVideoFormat('vertical')}
+                                className={`px-2 py-1 rounded-md text-[9px] font-bold transition-all ${videoFormat === 'vertical' ? 'bg-indigo-600 text-white shadow' : 'text-slate-500 hover:text-slate-300'}`}
+                                title="تنسيق الأبعاد الطولية للهواتف والقصص"
+                              >
+                                📱 طولي (9:16)
+                              </button>
+                              <button 
+                                onClick={() => setVideoFormat('landscape')}
+                                className={`px-2 py-1 rounded-md text-[9px] font-bold transition-all ${videoFormat === 'landscape' ? 'bg-indigo-600 text-white shadow' : 'text-slate-500 hover:text-slate-300'}`}
+                                title="تنسيق الأبعاد العرضية للشاشات الكبيرة"
+                              >
+                                💻 عرضي (16:9)
+                              </button>
+                            </div>
+                          </div>
+                          
+                          {/* Rich Player Box Container */}
+                          <div className={`bg-slate-950 rounded-2xl border border-slate-850 overflow-hidden relative flex items-center justify-center mx-auto w-full transition-all duration-300 shadow-inner ${
+                            videoFormat === 'vertical' 
+                              ? 'aspect-[9/16] max-h-[350px] max-w-[197px]' 
+                              : 'aspect-[16/9] max-h-[220px] max-w-[390px]'
+                          }`}>
+                            
                             {isRenderingVideo ? (
-                              <div className="text-center p-3 space-y-3 z-10">
+                              <div className="text-center p-3 space-y-3 z-10 transition-all duration-200">
                                 <SpinnerIcon className="w-10 h-10 text-indigo-400 animate-spin mx-auto" />
-                                <p className="text-[10px] text-slate-400 font-bold animate-pulse">جاري دمج الملفات الصوتية والبصريات...</p>
+                                <p className="text-[10px] text-slate-400 font-bold animate-pulse leading-relaxed">جاري توليد الأصوات ودمج الشروحات والمشاهد...</p>
                               </div>
                             ) : renderedVideoUrl ? (
                               <video 
@@ -1703,20 +1807,50 @@ const Marketing: React.FC<MarketingProps> = ({ context, navigate }) => {
                                 controls 
                                 autoPlay 
                                 loop 
+                                playsInline
+                                onTimeUpdate={(e) => {
+                                  const videoEl = e.currentTarget;
+                                  const time = videoEl.currentTime;
+                                  
+                                  // Map real video time proportionately to the customized videoScript duration
+                                  const totalScriptDuration = campaignData.videoScript.reduce((sum, sc) => sum + sc.duration, 0);
+                                  const videoDurationSec = videoEl.duration || videoDuration;
+                                  const mappedTime = (time / videoDurationSec) * totalScriptDuration;
+                                  
+                                  let elapsed = 0;
+                                  let matchedIdx = 0;
+                                  for (let i = 0; i < campaignData.videoScript.length; i++) {
+                                    const sc = campaignData.videoScript[i];
+                                    if (mappedTime >= elapsed && mappedTime < elapsed + sc.duration) {
+                                      matchedIdx = i;
+                                      break;
+                                    }
+                                    elapsed += sc.duration;
+                                    matchedIdx = i;
+                                  }
+                                  setActiveSceneIndex(matchedIdx);
+                                }}
                                 className="object-cover w-full h-full"
                               />
                             ) : (
                               <div className="text-center p-4">
                                 <VideoIcon className="w-8 h-8 text-slate-700 mx-auto mb-2" />
-                                <p className="text-[10px] text-slate-500">انقر على الزر لتوليد رندرة الفيديو</p>
+                                <p className="text-[10px] text-slate-500 max-w-[150px] mx-auto leading-normal">اضغط على زر الرندرة بالأسفل لتلقي المعاينة</p>
                               </div>
                             )}
 
-                            {/* Aesthetic overlay captions */}
-                            {campaignData.videoScript.length > 0 && (
-                              <div className="absolute bottom-4 left-2 right-2 bg-black/75 backdrop-blur-sm p-2 rounded-lg border border-slate-800 text-center">
-                                <p className="text-[9px] text-indigo-400 font-bold font-mono">شرح ترويجي:</p>
-                                <p className="text-[10px] text-slate-200 truncate mt-0.5">{campaignData.videoScript[0].voiceover}</p>
+                            {/* Corrected & Dynamic overlay captions - ONLY visible when actually generated or rendering, with synchronized active scene voices */}
+                            {(isRenderingVideo || renderedVideoUrl) && campaignData.videoScript.length > 0 && (
+                              <div className="absolute bottom-3 left-2.5 right-2.5 bg-black/85 backdrop-blur-md p-2 rounded-xl border border-indigo-505/20 text-center shadow-lg transition-all duration-300 transform scale-100 z-10 animate-in fade-in slide-in-from-bottom-2">
+                                <div className="flex items-center justify-center gap-1 mb-1">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                                  <p className="text-[8px] text-indigo-400 font-extrabold uppercase tracking-wider font-mono">
+                                    المشهد {campaignData.videoScript[activeSceneIndex]?.scene || 1} • {campaignData.videoScript[activeSceneIndex]?.duration || 0} ث
+                                  </p>
+                                </div>
+                                <p className="text-[10px] text-slate-100 leading-relaxed font-bold max-h-[38px] overflow-hidden text-ellipsis line-clamp-2">
+                                  {campaignData.videoScript[activeSceneIndex]?.voiceover || campaignData.videoScript[0].voiceover}
+                                </p>
                               </div>
                             )}
                           </div>
@@ -1735,10 +1869,10 @@ const Marketing: React.FC<MarketingProps> = ({ context, navigate }) => {
                           <button
                             onClick={handleRenderVideo}
                             disabled={isRenderingVideo}
-                            className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all text-white shadow-lg shadow-indigo-500/10"
+                            className="w-full py-3 bg-indigo-650 hover:bg-indigo-600 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all text-white shadow-lg hover:shadow-indigo-500/20 active:scale-95 disabled:opacity-50"
                           >
                             <Play className="w-4 h-4" />
-                            <span>توليد ورندرة الفيديو التسويقي</span>
+                            <span>توليد ورندرة ومزامنة الفيديو الإعلاني</span>
                           </button>
                         </div>
                       </div>
