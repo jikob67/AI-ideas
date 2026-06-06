@@ -260,7 +260,7 @@ async function startServer() {
     // If the requested model is 'gemini-3.5-flash' or 'gemini-flash-latest', let's add alternative flash models to fall back to
     if (requestedModel === "gemini-3.5-flash" || requestedModel === "gemini-flash-latest") {
       modelQueue.push("gemini-2.5-flash");
-      modelQueue.push("gemini-2.0-flash-exp");
+      modelQueue.push("gemini-1.5-flash");
     }
 
     let modelIndex = 0;
@@ -322,7 +322,7 @@ async function startServer() {
     const modelQueue = [requestedModel];
     if (requestedModel === "gemini-3.5-flash" || requestedModel === "gemini-flash-latest") {
       modelQueue.push("gemini-2.5-flash");
-      modelQueue.push("gemini-2.0-flash-exp");
+      modelQueue.push("gemini-1.5-flash");
     }
 
     let modelIndex = 0;
