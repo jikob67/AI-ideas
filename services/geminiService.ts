@@ -427,12 +427,12 @@ export class GeminiService {
         }
     }
 
-    async generateVideo(prompt: string, image: { base64: string; mimeType: string } | null, resolution: '720p' | '1080p', aspectRatio: '16:9' | '9:16', onProgress: (log: string) => void): Promise<string> {
+    async generateVideo(prompt: string, image: { base64: string; mimeType: string } | null, resolution: '720p' | '1080p', aspectRatio: '16:9' | '9:16', onProgress: (log: string) => void, model?: string, durationSeconds?: number): Promise<string> {
         onProgress('Starting video generation request...');
         const startRes = await fetch('/api/gemini/generate-video', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt, image, config: { resolution, aspectRatio } })
+            body: JSON.stringify({ prompt, image, model, config: { resolution, aspectRatio, durationSeconds: durationSeconds || 5 } })
         });
         const { operationName } = await startRes.json();
 

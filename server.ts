@@ -380,7 +380,7 @@ async function startServer() {
     const { model, prompt, image, config } = req.body;
     try {
       const operation = await getAi().models.generateVideos({
-        model: model || 'veo-3.1-lite-generate-preview',
+        model: model || 'veo-3.1-generate-preview',
         prompt,
         ...(image && { image: { imageBytes: image.base64, mimeType: image.mimeType } }),
         config
