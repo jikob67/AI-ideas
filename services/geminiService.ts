@@ -1,6 +1,7 @@
 import { Type, Modality } from '@google/genai';
 import { Project, ProjectFile, ProjectSection, ProjectType, DesignConfig, MarketingSuggestion, MarketingAsset, Message, SectionType, User, ProjectIdea } from '../types';
 import { SECTION_DEFINITIONS, getInitialSectionsForProjectType, PLAN_SECTIONS } from '../constants';
+import { auth } from '../firebase';
 
 // A helper function to simulate network delay
 const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
@@ -438,21 +439,28 @@ export class GeminiService {
 
         onProgress('Video generation in progress... this may take several minutes.');
         let checks = 0;
+        let permanentUrl: string | null = null;
         while (true) {
             await new Promise(resolve => setTimeout(resolve, 10000));
             const statusRes = await fetch('/api/gemini/video-status', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ operationName })
+                body: JSON.stringify({ 
+                    operationName, 
+                    userId: auth.currentUser?.uid || 'anonymous' 
+                })
             });
             const status = await statusRes.json();
-            if (status.done) break;
+            if (status.done) {
+                permanentUrl = status.response?.generatedVideos?.[0]?.video?.storageUri || null;
+                break;
+            }
             checks++;
             onProgress(`Checking status (${checks})... still processing.`);
         }
 
         onProgress('Video generation complete.');
-        return `/api/gemini/video-download?operationName=${encodeURIComponent(operationName)}`;
+        return permanentUrl || `/api/gemini/video-download?operationName=${encodeURIComponent(operationName)}`;
     }
 
     // Mock for video analysis as it's not directly supported in the same way
