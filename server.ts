@@ -7,30 +7,6 @@ import { Readable } from "stream";
 import { GoogleGenAI } from "@google/genai";
 import JSZip from "jszip";
 import zlib from "zlib";
-import fs from "fs";
-import admin from "firebase-admin";
-import { getStorage } from "firebase-admin/storage";
-
-let adminInitialized = false;
-let bucket: any = null;
-
-try {
-  const configPath = path.join(process.cwd(), "firebase-applet-config.json");
-  if (fs.existsSync(configPath)) {
-    const configData = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-    admin.initializeApp({
-      projectId: configData.projectId,
-      storageBucket: configData.storageBucket
-    });
-    bucket = getStorage().bucket();
-    adminInitialized = true;
-    console.log("[Firebase Admin] Initialized with bucket:", configData.storageBucket);
-  } else {
-    console.warn("[Firebase Admin] Config file not found at:", configPath);
-  }
-} catch (error: any) {
-  console.error("[Firebase Admin] Initialization failed:", error.message);
-}
 
 // CRC32 table & function for standalone metadata chunk calculations
 const crcTable = new Int32Array(256);
@@ -404,7 +380,7 @@ async function startServer() {
     const { model, prompt, image, config } = req.body;
     try {
       const operation = await getAi().models.generateVideos({
-        model: model || 'veo-3.1-generate-preview',
+        model: model || 'veo-3.1-lite-generate-preview',
         prompt,
         ...(image && { image: { imageBytes: image.base64, mimeType: image.mimeType } }),
         config
@@ -417,39 +393,12 @@ async function startServer() {
   });
 
   app.post("/api/gemini/video-status", async (req, res) => {
-    const { operationName, userId } = req.body;
+    const { operationName } = req.body;
     try {
       const { GenerateVideosOperation } = await import('@google/genai');
       const op = new GenerateVideosOperation();
       op.name = operationName;
       const updated = await getAi().operations.getVideosOperation({ operation: op });
-      
-      if (updated.done && updated.response?.generatedVideos?.[0]?.video?.uri && bucket) {
-        const videoUrl = updated.response.generatedVideos[0].video.uri;
-        try {
-          const key = process.env.GEMINI_API_KEY;
-          const videoRes = await fetch(videoUrl, {
-            headers: key ? { 'x-goog-api-key': key } : {}
-          });
-          const videoBuffer = await videoRes.arrayBuffer();
-          const targetUserId = userId || "anonymous";
-          const file = bucket.file(`videos/${targetUserId}/${Date.now()}.mp4`);
-          await file.save(Buffer.from(videoBuffer), {
-            metadata: {
-              contentType: 'video/mp4'
-            }
-          });
-          const [permanentUrl] = await file.getSignedUrl({ action: 'read', expires: '03-09-2491' });
-          console.log("[Firebase Storage] Video successfully uploaded. Signed URL:", permanentUrl);
-          
-          if (updated.response.generatedVideos[0].video) {
-             (updated.response.generatedVideos[0].video as any).storageUri = permanentUrl;
-          }
-        } catch (storageError: any) {
-          console.error("[Firebase Storage] Upload error:", storageError.message);
-        }
-      }
-      
       res.json(updated);
     } catch (error: any) {
       console.error("Gemini Video Status Error:", error.message);

@@ -1,7 +1,6 @@
 import { Type, Modality } from '@google/genai';
 import { Project, ProjectFile, ProjectSection, ProjectType, DesignConfig, MarketingSuggestion, MarketingAsset, Message, SectionType, User, ProjectIdea } from '../types';
 import { SECTION_DEFINITIONS, getInitialSectionsForProjectType, PLAN_SECTIONS } from '../constants';
-import { auth } from '../firebase';
 
 // A helper function to simulate network delay
 const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
@@ -428,39 +427,32 @@ export class GeminiService {
         }
     }
 
-    async generateVideo(prompt: string, image: { base64: string; mimeType: string } | null, resolution: '720p' | '1080p', aspectRatio: '16:9' | '9:16', onProgress: (log: string) => void, model?: string, durationSeconds?: number): Promise<string> {
+    async generateVideo(prompt: string, image: { base64: string; mimeType: string } | null, resolution: '720p' | '1080p', aspectRatio: '16:9' | '9:16', onProgress: (log: string) => void): Promise<string> {
         onProgress('Starting video generation request...');
         const startRes = await fetch('/api/gemini/generate-video', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt, image, model, config: { resolution, aspectRatio, durationSeconds: durationSeconds || 5 } })
+            body: JSON.stringify({ prompt, image, config: { resolution, aspectRatio } })
         });
         const { operationName } = await startRes.json();
 
         onProgress('Video generation in progress... this may take several minutes.');
         let checks = 0;
-        let permanentUrl: string | null = null;
         while (true) {
             await new Promise(resolve => setTimeout(resolve, 10000));
             const statusRes = await fetch('/api/gemini/video-status', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    operationName, 
-                    userId: auth.currentUser?.uid || 'anonymous' 
-                })
+                body: JSON.stringify({ operationName })
             });
             const status = await statusRes.json();
-            if (status.done) {
-                permanentUrl = status.response?.generatedVideos?.[0]?.video?.storageUri || null;
-                break;
-            }
+            if (status.done) break;
             checks++;
             onProgress(`Checking status (${checks})... still processing.`);
         }
 
         onProgress('Video generation complete.');
-        return permanentUrl || `/api/gemini/video-download?operationName=${encodeURIComponent(operationName)}`;
+        return `/api/gemini/video-download?operationName=${encodeURIComponent(operationName)}`;
     }
 
     // Mock for video analysis as it's not directly supported in the same way

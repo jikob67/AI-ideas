@@ -23,11 +23,7 @@ import {
   FileCode,
   Upload,
   Globe,
-  Settings,
-  Sliders,
-  Cpu,
-  Layers,
-  Flame
+  Settings
 } from 'lucide-react';
 import { geminiService } from '../services/geminiService';
 
@@ -67,28 +63,6 @@ export const UnifiedMarketingWorkspace: React.FC<UnifiedMarketingWorkspaceProps>
   const [selectedDuration, setSelectedDuration] = useState<number>(30);
   const [selectedType, setSelectedType] = useState<'text' | 'image' | 'video' | 'all'>('text');
   const [selectedPlatform, setSelectedPlatform] = useState<string>('all');
-
-  // --- Imagen 3 / Veo 3 / Gemini 1.5 Pro Advanced Parameters ---
-  const [imagenStyle, setImagenStyle] = useState<string>('cinematic_illustration');
-  const [imagenDetail, setImagenDetail] = useState<string>('ultra_hdr');
-  const [imagenPromptFidelity, setImagenPromptFidelity] = useState<number>(8);
-  const [imagenAntiArtifacts, setImagenAntiArtifacts] = useState<boolean>(true);
-  const [imagenContrast, setImagenContrast] = useState<string>('balanced');
-  const [imagenLighting, setImagenLighting] = useState<string>('studio');
-
-  const [veoCameraMotion, setVeoCameraMotion] = useState<string>('cinematic_drone');
-  const [veoResolution, setVeoResolution] = useState<string>('4k_smooth');
-  const [veoMotionSpeed, setVeoMotionSpeed] = useState<string>('medium');
-  const [veoDepthOfField, setVeoDepthOfField] = useState<string>('medium');
-  const [veoFrameRate, setVeoFrameRate] = useState<string>('60fps');
-  const [veoPerspective, setVeoPerspective] = useState<string>('eye_level');
-
-  const [geminiCreativity, setGeminiCreativity] = useState<number>(0.7);
-  const [geminiPersona, setGeminiPersona] = useState<string>('saudi_growth');
-  const [geminiMaxWords, setGeminiMaxWords] = useState<number>(200);
-  const [geminiStrictness, setGeminiStrictness] = useState<string>('balanced');
-  const [geminiTone, setGeminiTone] = useState<string>('professional');
-  const [geminiCtaType, setGeminiCtaType] = useState<string>('high_urgency');
 
   // Voice tone & Audios states
   const [selectedVoiceTone, setSelectedVoiceTone] = useState<string>('gulf_luxury');
@@ -192,40 +166,22 @@ export const UnifiedMarketingWorkspace: React.FC<UnifiedMarketingWorkspaceProps>
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const file = e.dataTransfer.files[0];
       setUploadedAudioFile(file.name);
-      showToast(`🎵 تم تحميل واستقدام الملف الصوتي المشتق بنجاح: ${file.name}`);
+      showToast(`🎵 تم تحميل واستقدام الملف الصوتي "${file.name}" بنجاح لدبلاج الإعلان!`);
     }
   };
 
   // Live image rendering function using Imagen 3
   const handleLiveGenerateImage = async () => {
     setIsGeneratingCustomImage(true);
-    showToast('⚡ جاري إرسال البرومبت المطوّر للرسم الفوري بمحرك Imagen 3 المتقدّم...');
+    showToast('⚡ جاري إرسال البرومبت المطوّر للرسم الفوري بمحرك Imagen 3...');
     try {
       // Find prompt in data or build a generic premium prompt related to current project
       const basePrompt = campaignData.imagePrompts?.[0]?.prompt || `Sleek high-tech advertising graphic representing ${selectedProject?.name}. Clean 3D details.`;
-      
-      const styleSuffix = 
-        imagenStyle === 'cinematic_illustration' ? 'cinematic high-end illustration style, octane render, beautiful dynamic lighting' :
-        imagenStyle === 'realistic_photo' ? 'raw premium professional photograph, clean studio lighting, realistic details, advertisement style' :
-        imagenStyle === '3d_render' ? 'gorgeous 3D isometric render, neon accents, minimalist clay render style, cute design, colorful' :
-        imagenStyle === 'cyberpunk' ? 'futuristic high-tech cyberpunk art, glowing holograms, immersive bold retro aesthetic' :
-        'elegant abstract art vector, modernist minimalist line drawings, pristine shapes, aesthetic off-whites';
-
-      const detailSuffix = 
-        imagenDetail === 'ultra_hdr' ? 'super high fidelity, 8k resolution, award-winning composition, immaculate clarity' :
-        imagenDetail === 'soft_studio' ? 'soft cinematic studio lighting, premium clean gradient background, high-end commercial feel' :
-        'crisp organic handcraft lines, minimalist style, perfect symmetry';
-
-      const contrastSuffix = `color contrast grading: ${imagenContrast}`;
-      const lightingSuffix = `lighting atmosphere focus: ${imagenLighting}`;
-      const antiArtifactSuffix = imagenAntiArtifacts ? 'highly proportional anatomical body and structural assets, perfect faces, crisp lines, distortion-free objects' : '';
-      const promptFidelityInfo = `prompt matching instruction weight: ${imagenPromptFidelity}`;
-
-      const finalPrompt = `${basePrompt}, in ${styleSuffix}, ${detailSuffix}, ${contrastSuffix}, ${lightingSuffix}, ${antiArtifactSuffix}, ${promptFidelityInfo}, aspect ratio ${selectedDimension}`;
+      const finalPrompt = `${basePrompt}, aspect ratio ${selectedDimension}, ultra hd, glowing masterwork advertising vector`;
       
       const base64Str = await geminiService.generateImage(finalPrompt, selectedDimension === '16:9' ? '16:9' : selectedDimension === '9:16' ? '9:16' : '1:1');
       setCustomGeneratedImage(`data:image/jpeg;base64,${base64Str}`);
-      showToast('🎨 تم رسم وتضمين الصورة الحقيقية بالإعلان بمواصفات Imagen 3 بنجاح!');
+      showToast('🎨 تم رسم وتضمين الصورة الحقيقية بالإعلان الحركي بنجاح!');
     } catch (err) {
       console.error(err);
       // Beautiful abstract placeholder fallback
@@ -242,22 +198,10 @@ export const UnifiedMarketingWorkspace: React.FC<UnifiedMarketingWorkspaceProps>
     setShowSuggestionsModal(true);
     setSuggestions([]);
     try {
-      // Choose persona descriptor
-      const personaDesc = 
-        geminiPersona === 'saudi_growth' ? 'مستشار نمو هكر سعودي ذو خبرة استثنائية في السوق الخليجي المحلّي المتسارع' :
-        geminiPersona === 'global_agency' ? 'خبير وكالات إعلانية عالمي يدمج الابتكار اللفظي بالهندسة الفكرية والبيانات الضخمة' :
-        geminiPersona === 'brand_storyteller' ? 'راوي علامات تجارية وكاتب أدبي مميز يجذب العواطف والانتماء الإعلاني العميق' :
-        'كاتب حملات تسويقية تحويلية يركز على زيادة المبيعات المباشرة وعبارات الدعوة للإجراء (CTA-focused)';
-
-      const prompt = `أنت ${personaDesc} بصفتك مستشاراً تسويقياً وابتكارياً في استوديو AI Ideas.
-درجة الحرارة الإبداعية للمحاكاة المتبعة حالياً هي: ${geminiCreativity} (حيث 0.2 تعني رصانة فائقة ودقة علمية، و1.2 تعني ذروة الابتكار والجموح اللغوي).
-السرية البنائية والتنغيم اللغوي المعتمد: أسلوب ${geminiTone === 'professional' ? 'مهني ومباشر' : geminiTone === 'humorous' ? 'فكاهي وجذاب بالعامية والمصطلحات الذكية' : geminiTone === 'empathetic' ? 'تعاطفي وودود جداً' : 'جريء ومستفز لإثارة الاهتمام'}.
-طبيعة زر الدعوة للإجراء CTA المطلوب: ${geminiCtaType === 'high_urgency' ? 'عالي الاستعجال ومحدد بفرصة' : geminiCtaType === 'passive_friendly' ? 'ودود وهادئ' : 'تعليمي يركز على فهم المنفعة أولا'}.
-الشروط الصارمة للنصوص وقواعد اللغة: أسلوب مخرجات ${geminiStrictness === 'balanced' ? 'قريب ومريح للمتلقي المحبب' : geminiStrictness === 'technical' ? 'علمي تقني رصين وغني ببيانات صلبة' : 'شاعري بلاغي ذو طابع فني رائد'}.
-الحد الأقصى للتوليد اللفظي المقترح للملخص: في حدود ${geminiMaxWords} كلمة أو عبارة لضمان الكفاءة المركّزة.
-المشروع الحالي المراد ترويجه هو "${selectedProject.name}" في قطاع "${campaignData.sector || 'التقنية'}".
-أعطني 3 توصيات مخصصة واستثنائية جداً للترويج الفعّال وزيادة معدل انتشار هذا المشروع، مشيراً إلى كيفية الاستفادة من معايير Veo 3 للإنتاج البصري الحركي (${veoCameraMotion}) بدقة ورندرة ${veoResolution}، ومعدل إطارات ${veoFrameRate}، ومنظور بصري ${veoPerspective === 'eye_level' ? 'مستوى العين طبيعي' : veoPerspective === 'high_angle' ? 'زاوية علوية واسعة درون' : veoPerspective === 'worms_eye' ? 'زاوية سفلية تعبر عن فخامة الأصول' : 'منظور عين ذاتي POV'} وسرعة حركة ${veoMotionSpeed === 'slow' ? 'حالمة وبطيئة وملهمة' : veoMotionSpeed === 'fast' ? 'ديناميكية وسريعة وجذابة لجيل الشباب' : 'متوازنة ومهنية'}، وعزل خلفية ${veoDepthOfField === 'low' ? 'خفيف هادئ' : veoDepthOfField === 'high' ? 'قوي جداً سينمائي' : 'معتدل طبيعي'}، ومواصفات Imagen 3 للصور الفنية بنمط (${imagenStyle}) ومستوى تطابق (${imagenPromptFidelity}/10) ودرجة تباين (${imagenContrast}) وإضاءة (${imagenLighting}) و Gemini 1.5 Pro للتوليد اللغوي.
-اكتب التوصيات بأسلوب رائد ومباشر وموجز ومحفز في شكل نقاط مرقمة واضحة ومباشرة باللغة العربية الفصحى.`;
+      const prompt = `أنت مستشار تسويق ونمو ابتكاري في استوديو AI Ideas.
+المشروع الحالي هو "${selectedProject.name}" في قطاع "${campaignData.sector || 'التقنية'}".
+أعطني 3 توصيات مخصصة واستثنائية جداً للترويج الفعّال وزيادة معدل انتشار هذا المشروع، مشيراً إلى كيفية الاستفادة من معايير Veo 3 للفيديو و Imagen 3 للصور و Gemini 1.5 Pro للنصوص.
+اكتب التوصيات بأسلوب رائد مباشر وموجز ومحفز في شكل نقاط مرقمة واضحة ومباشرة باللغة العربية الفصحى.`;
       
       const response = await geminiService.generateText(prompt, 'gemini-1.5-pro');
       const lines = response.split('\n').filter(l => l.trim().length > 6);
@@ -818,392 +762,6 @@ ${campaignData.videoScript?.map((sc: any) => `  * المشهد ${sc.scene} (${sc
               </button>
             ))}
           </div>
-        </div>
-
-      </div>
-
-      {/* ────────────────────────────────────────────────────────
-          بوابة التحكم الكلي بمحركات التوليد (Advanced AI Engine Parameters Panel)
-          ──────────────────────────────────────────────────────── */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-6">
-        
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-850 pb-4 gap-3">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-indigo-500/10 rounded-xl border border-indigo-500/20">
-              <Cpu className="w-5 h-5 text-indigo-400" />
-            </div>
-            <div>
-              <h4 className="font-extrabold text-md text-white">🎛️ بوابة التحكم الدقيق بالنماذج الفائقة (Imagen 3 & Veo 3 & Gemini 1.5 Pro)</h4>
-              <p className="text-[10px] text-slate-500 leading-normal font-medium">قم بتعديل وضبط الخواص المتقدمة لمولدات النصوص والصور والفيديو والتجربة الإعلانية الكاملة</p>
-            </div>
-          </div>
-          <div className="text-[10.5px] bg-indigo-600/10 text-indigo-300 border border-indigo-500/30 px-3 py-1.5 rounded-xl font-bold font-mono">
-            ENGINE STATUS: CALIBRATED | ACTIVE
-          </div>
-        </div>
-
-        {/* 3 Columns for 3 Engines */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-          {/* Column 1: Imagen 3 */}
-          <div className="bg-slate-950/40 p-5 rounded-2xl border border-slate-850 space-y-5">
-            <div className="flex items-center justify-between border-b border-slate-850 pb-2.5">
-              <span className="font-extrabold text-sm text-indigo-400 flex items-center gap-1.5">
-                🎨 Imagen 3 Engine
-              </span>
-              <span className="text-[9px] bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 px-2 py-0.5 rounded-md font-mono font-bold">
-                v3.0.Ultra
-              </span>
-            </div>
-
-            {/* Prompt Style */}
-            <div className="space-y-1.5">
-              <label className="text-xs text-slate-300 font-bold block">التوجه والأسلوب الفني (Style Preset):</label>
-              <select
-                value={imagenStyle}
-                onChange={(e) => {
-                  setImagenStyle(e.target.value);
-                  showToast('🎨 تم تعيين الأسلوب الفني في Imagen 3');
-                }}
-                className="w-full text-xs p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-white outline-none focus:border-indigo-500 font-medium"
-              >
-                <option value="cinematic_illustration">رسومات سينمائية ثلاثية الأبعاد (Cinematic)</option>
-                <option value="realistic_photo">تصوير واقعي عالي الدقة (Realistic Photo)</option>
-                <option value="3d_render">تصميم ثلاثي أبعاد مجسم (3D Render)</option>
-                <option value="cyberpunk">خيال مستقبلي (Cyberpunk Sci-Fi)</option>
-                <option value="elegant_abstract">تجريدي راقٍ ومودرن (Elegant Abstract)</option>
-              </select>
-            </div>
-
-            {/* Detail Density */}
-            <div className="space-y-1.5">
-              <label className="text-xs text-slate-300 font-bold block">كثافة التفاصيل والعمق (Detail Density):</label>
-              <select
-                value={imagenDetail}
-                onChange={(e) => {
-                  setImagenDetail(e.target.value);
-                  showToast('⚡ تم تحديث مستوى تفاصيل الصور');
-                }}
-                className="w-full text-xs p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-white outline-none focus:border-indigo-500 font-medium"
-              >
-                <option value="ultra_hdr">تفاصيل خيالية نقية (Ultra HDR compositing)</option>
-                <option value="soft_studio">إضاءة استوديو ناعمة وتدرجات احترافية</option>
-                <option value="organic_symmetry">رسومات ونقوش رشيقة بسيطة ومريحة</option>
-              </select>
-            </div>
-
-            {/* Color Contrast */}
-            <div className="space-y-1.5">
-              <label className="text-xs text-slate-300 font-bold block">الدرجة اللونية والتباين (Color Contrast):</label>
-              <select
-                value={imagenContrast}
-                onChange={(e) => {
-                  setImagenContrast(e.target.value);
-                  showToast('🌈 تم تغيير درجة التباين اللوني');
-                }}
-                className="w-full text-xs p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-white outline-none focus:border-indigo-500 font-medium"
-              >
-                <option value="balanced">متناسق وطبيعي (Balanced)</option>
-                <option value="vibrant">إشباع لوني غني وصاخب (Vibrant)</option>
-                <option value="pastel">ألوان باستيل هادئة وناعمة (Pastel Soft)</option>
-                <option value="monochromatic">أحادية اللون راقية (Monochromatic)</option>
-                <option value="contrast">تباين حار ومظلم (High Contrast Drama)</option>
-              </select>
-            </div>
-
-            {/* Lighting Theme */}
-            <div className="space-y-1.5">
-              <label className="text-xs text-slate-300 font-bold block">موضوع وتوزيع الإضاءة (Lighting Atmosphere):</label>
-              <select
-                value={imagenLighting}
-                onChange={(e) => {
-                  setImagenLighting(e.target.value);
-                  showToast('💡 تم تعديل إضاءة المشهد في Imagen 3');
-                }}
-                className="w-full text-xs p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-white outline-none focus:border-indigo-500 font-medium"
-              >
-                <option value="studio">إضاءة الإعلان الرسمية (Studio Light)</option>
-                <option value="dreamy">أجواء حالمة مع غبار ذهبي (Dreamy Shimmer)</option>
-                <option value="dynamic">إضاءة حركية مشبعة بالنيون (Dynamic Neon)</option>
-                <option value="volumetric">أشعة شمس بركانية حية (Volumetric Rays)</option>
-                <option value="moody">ظلال ناعمة وجو غامض (Moody Shadows)</option>
-              </select>
-            </div>
-
-            {/* Prompt Fidelity Slider */}
-            <div className="space-y-1.5 pt-1">
-              <div className="flex justify-between text-xs font-bold">
-                <span className="text-slate-300">درجة الامتثال للنص العرّاب:</span>
-                <span className="text-indigo-400 font-mono">{imagenPromptFidelity}/10</span>
-              </div>
-              <input
-                type="range"
-                min="3"
-                max="10"
-                step="1"
-                value={imagenPromptFidelity}
-                onChange={(e) => setImagenPromptFidelity(parseInt(e.target.value))}
-                className="w-full accent-indigo-500 h-1 bg-slate-800 rounded-lg cursor-pointer"
-              />
-              <span className="text-[10px] text-slate-550 block font-medium">القيم الأعلى تركز بشكل مطلق على ترجمة مدخلات المستخدم اللفظية حرفياً</span>
-            </div>
-
-            {/* Anti Artifacts Toggle */}
-            <div className="flex items-center justify-between pt-2">
-              <div>
-                <span className="text-xs text-slate-205 font-bold block">معدل تشذيب الوجوه وعلاج التشوه:</span>
-                <span className="text-[10px] text-slate-500">حماية الوجوه والأطراف وعناصر الإعلان</span>
-              </div>
-              <button
-                onClick={() => {
-                  setImagenAntiArtifacts(!imagenAntiArtifacts);
-                  showToast(imagenAntiArtifacts ? '🚨 تم إقفال واقي التشوه البصري' : '🛡️ تم تفعيل جدار حماية التفاصيل الإعلانية من التشوه البصري');
-                }}
-                className={`w-11 h-6 rounded-full transition-all relative p-1 ${imagenAntiArtifacts ? 'bg-indigo-600' : 'bg-slate-800'}`}
-              >
-                <div className={`w-4 h-4 bg-white rounded-full transition-all duration-300 shadow ${imagenAntiArtifacts ? 'translate-x-[-1.25rem]' : 'translate-x-0'}`} />
-              </button>
-            </div>
-
-          </div>
-
-          {/* Column 2: Veo 3 */}
-          <div className="bg-slate-950/40 p-5 rounded-2xl border border-slate-850 space-y-5">
-            <div className="flex items-center justify-between border-b border-slate-850 pb-2.5">
-              <span className="font-extrabold text-sm text-indigo-400 flex items-center gap-1.5">
-                🎬 Veo 3 Engine
-              </span>
-              <span className="text-[9px] bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 px-2 py-0.5 rounded-md font-mono font-bold">
-                v3.0.Motion
-              </span>
-            </div>
-
-            {/* Camera Motion */}
-            <div className="space-y-1.5">
-              <label className="text-xs text-slate-300 font-bold block">خط حركة الكاميرا (Camera Motion Type):</label>
-              <select
-                value={veoCameraMotion}
-                onChange={(e) => {
-                  setVeoCameraMotion(e.target.value);
-                  showToast('🎬 تم تعيين نمط حركة كاميرا Veo 3');
-                }}
-                className="w-full text-xs p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-white outline-none focus:border-indigo-500 font-medium"
-              >
-                <option value="cinematic_drone">دوران واقتراب درون علوي (Cinematic Drone)</option>
-                <option value="dolly_zoom">اقتراب دولي سينمائي بؤري (Dolly Zoom)</option>
-                <option value="slow_pan">تحريك لليمين للأمام بنعومة (Slow Slide Pan)</option>
-                <option value="high_speed_car">لقطة سيارة سريعة ملحمية (High Speed Track)</option>
-                <option value="stationary_shot">مشهد ساكن مركّز (Stationary Studio Shot)</option>
-              </select>
-            </div>
-
-            {/* Resolution Frame */}
-            <div className="space-y-1.5">
-              <label className="text-xs text-slate-300 font-bold block">الدقة والمعالجة الرقمية (Resolution Output):</label>
-              <select
-                value={veoResolution}
-                onChange={(e) => {
-                  setVeoResolution(e.target.value);
-                  showToast('📺 تم تعديل نظام الرندرة في Veo 3');
-                }}
-                className="w-full text-xs p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-white outline-none focus:border-indigo-500 font-medium"
-              >
-                <option value="4k_smooth">رندرة 4K حركية سلسة ورسم مذهل</option>
-                <option value="full_hd_classic">دقة Full HD كلاسيكية مرشّحة للأطوال</option>
-                <option value="cinematic_grain">سينمائي ذو حبيبات فنية دافئة (Cinematic Grain)</option>
-              </select>
-            </div>
-
-            {/* Motion Speed */}
-            <div className="space-y-1.5">
-              <label className="text-xs text-slate-300 font-bold block">معدل وسرعة الزمن الحركي (Motion Speed):</label>
-              <select
-                value={veoMotionSpeed}
-                onChange={(e) => {
-                  setVeoMotionSpeed(e.target.value);
-                  showToast('⏱️ تم تعيين سرعة الحركة في الفيديو');
-                }}
-                className="w-full text-xs p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-white outline-none focus:border-indigo-500 font-medium"
-              >
-                <option value="medium">تأثير زمني طبيعي متزن (Real-time speed)</option>
-                <option value="slow">حركة حالمة بطيئة تظهر التفاصيل (Slow Motion)</option>
-                <option value="fast">ديناميكية سريعة وسعيدة ومحفزة (Time-lapse speed)</option>
-              </select>
-            </div>
-
-            {/* Depth of field */}
-            <div className="space-y-1.5">
-              <label className="text-xs text-slate-300 font-bold block">معدل العزل والبعد البؤري (Depth of field):</label>
-              <select
-                value={veoDepthOfField}
-                onChange={(e) => {
-                  setVeoDepthOfField(e.target.value);
-                  showToast('🔍 تم ضبط مستوى العزل البؤري');
-                }}
-                className="w-full text-xs p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-white outline-none focus:border-indigo-500 font-medium"
-              >
-                <option value="medium">توازن واجهة الإعلان والعمق</option>
-                <option value="low">عزل ناعم مريح كلاسيكي</option>
-                <option value="high">عزل ضبابي قوي جداً وتركيز سينمائي مفرط</option>
-              </select>
-            </div>
-
-            {/* Frame rate */}
-            <div className="space-y-1.5">
-              <label className="text-xs text-slate-300 font-bold block">معدل تحديث الإطارات (Target Frame-Rate):</label>
-              <select
-                value={veoFrameRate}
-                onChange={(e) => {
-                  setVeoFrameRate(e.target.value);
-                  showToast('📟 تم تعيين دقة الإطارات في Veo 3');
-                }}
-                className="w-full text-xs p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-white outline-none focus:border-indigo-500 font-medium font-mono"
-              >
-                <option value="60fps">60 FPS - سلاسة خارقة للإعلانات الرقمية</option>
-                <option value="24fps">24 FPS - المظهر السينمائي الروائي العذب</option>
-                <option value="120fps">120 FPS - دقة عالية للمشاهد المتقطعة وحركة السوائل</option>
-              </select>
-            </div>
-
-            {/* Perspective */}
-            <div className="space-y-1.5">
-              <label className="text-xs text-slate-300 font-bold block">اتجاه ومنظور عين الكاميرا (Camera Perspective):</label>
-              <select
-                value={veoPerspective}
-                onChange={(e) => {
-                  setVeoPerspective(e.target.value);
-                  showToast('📐 تم تعديل منظور البث لعدسة الفيديو');
-                }}
-                className="w-full text-xs p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-white outline-none focus:border-indigo-500 font-medium"
-              >
-                <option value="eye_level">مستوى العين القياسي (Natural Eye-Level)</option>
-                <option value="high_angle">زاوية علوية مهيبة تكشف الأبعاد (High Angle)</option>
-                <option value="worms_eye">زاوية سفلية تبرز الفخامة والقوة (Worms-Eye)</option>
-                <option value="pov">منظور عين المستخدم الشخصي الفاعل (POV Experience)</option>
-              </select>
-            </div>
-
-          </div>
-
-          {/* Column 3: Gemini 1.5 Pro */}
-          <div className="bg-slate-950/40 p-5 rounded-2xl border border-slate-850 space-y-5">
-            <div className="flex items-center justify-between border-b border-slate-850 pb-2.5">
-              <span className="font-extrabold text-sm text-indigo-400 flex items-center gap-1.5">
-                🧠 Gemini 1.5 Pro
-              </span>
-              <span className="text-[9px] bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 px-2 py-0.5 rounded-md font-mono font-bold">
-                v1.5.ProEngine
-              </span>
-            </div>
-
-            {/* Gemini Persona */}
-            <div className="space-y-1.5">
-              <label className="text-xs text-slate-300 font-bold block">هوية المستشار والمنهجية الفكرية (Persona):</label>
-              <select
-                value={geminiPersona}
-                onChange={(e) => {
-                  setGeminiPersona(e.target.value);
-                  showToast('🧠 تم تعيين شخصية وخبير Gemini 1.5');
-                }}
-                className="w-full text-xs p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-white outline-none focus:border-indigo-500 font-medium"
-              >
-                <option value="saudi_growth">مستشار نمو هكر سعودي ذكي وموجّه للسوق</option>
-                <option value="global_agency">خبير دمج البيانات الإعلانية وصحف الـ copy</option>
-                <option value="brand_storyteller">راوي حكائي ذكي يخاطب مشاعر الجمهور وعقله</option>
-                <option value="conversion_expert">مستشار تكتيكي لإغلاق الصفقات وتحويل CTA</option>
-              </select>
-            </div>
-
-            {/* Semantic strictness */}
-            <div className="space-y-1.5">
-              <label className="text-xs text-slate-300 font-bold block">شروط الصرامة وبحور القواعد (Strictness style):</label>
-              <select
-                value={geminiStrictness}
-                onChange={(e) => {
-                  setGeminiStrictness(e.target.value);
-                  showToast('📖 تفعيل أسلوب التدقيق النحوي الدلالي');
-                }}
-                className="w-full text-xs p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-white outline-none focus:border-indigo-500 font-medium"
-              >
-                <option value="balanced">متوازن وودود وقريب للشارع الفصيح</option>
-                <option value="technical">رصين علمي يدعم الأرقام القاطعة والإيجاز</option>
-                <option value="poetry">نمط شاعري لغوي أدبي فائق الجاذبية</option>
-              </select>
-            </div>
-
-            {/* Tone of campaign */}
-            <div className="space-y-1.5">
-              <label className="text-xs text-slate-300 font-bold block">نبرة تسيير الخطاب وصوت الإقناع (Tone):</label>
-              <select
-                value={geminiTone}
-                onChange={(e) => {
-                  setGeminiTone(e.target.value);
-                  showToast('🗣️ تم تعيين نبرة دلالات الحملة التسويقية');
-                }}
-                className="w-full text-xs p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-white outline-none focus:border-indigo-500 font-medium"
-              >
-                <option value="professional">رسمي احترافي يركز على المزايا</option>
-                <option value="humorous">فكاهي طريف مع توظيف الكلمات الذكية</option>
-                <option value="empathetic">تعاطفي شديد الملاءمة لمشاعر الفئة المستهدفة</option>
-                <option value="bold">قوي وجريء ومحفز للبدء فوراً</option>
-              </select>
-            </div>
-
-            {/* CTA style focus */}
-            <div className="space-y-1.5">
-              <label className="text-xs text-slate-300 font-bold block">خصائص ومحاكاة الدعوة للإجراء (CTA Style):</label>
-              <select
-                value={geminiCtaType}
-                onChange={(e) => {
-                  setGeminiCtaType(e.target.value);
-                  showToast('📣 تم تحديد توجه الدعوة للإجراء بالإعلان');
-                }}
-                className="w-full text-xs p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-white outline-none focus:border-indigo-500 font-medium"
-              >
-                <option value="high_urgency">مرحلة العجلة بفرصة استثنائية (High Urgency)</option>
-                <option value="passive_friendly">دعوة ودية لبدء الاستكشاف الهادئ</option>
-                <option value="educational">تعليمي يركز على الفائدة المرجوة من المنتج أولاً</option>
-              </select>
-            </div>
-
-            {/* Max words bound slider */}
-            <div className="space-y-1.5 pt-1">
-              <div className="flex justify-between text-xs font-bold font-mono">
-                <span className="text-slate-300">الحد الأقصى للإنشاء اللفظي:</span>
-                <span className="text-indigo-400">{geminiMaxWords} كلمة</span>
-              </div>
-              <input
-                type="range"
-                min="50"
-                max="500"
-                step="25"
-                value={geminiMaxWords}
-                onChange={(e) => setGeminiMaxWords(parseInt(e.target.value))}
-                className="w-full accent-indigo-500 h-1 bg-slate-800 rounded-lg cursor-pointer"
-              />
-              <span className="text-[10px] text-slate-550 block font-medium">سقوف التوليد المسموحة لتقارير وتوصيات الإعلانات</span>
-            </div>
-
-            {/* Creativity Temperature */}
-            <div className="space-y-1.5 pt-1">
-              <div className="flex justify-between text-xs font-bold font-mono">
-                <span className="text-slate-300">درجة الحرارة الابتكارية لـ LLM:</span>
-                <span className="text-indigo-400">{geminiCreativity}</span>
-              </div>
-              <input
-                type="range"
-                min="0.2"
-                max="1.2"
-                step="0.05"
-                value={geminiCreativity}
-                onChange={(e) => setGeminiCreativity(parseFloat(e.target.value))}
-                className="w-full accent-indigo-500 h-1 bg-slate-800 rounded-lg cursor-pointer"
-              />
-              <span className="text-[10px] text-slate-550 block font-medium">درجة الابتكار؛ 0.2 رصانة فائقة، 1.2 عصف ذهني واسع وجموح</span>
-            </div>
-
-          </div>
-
         </div>
 
       </div>

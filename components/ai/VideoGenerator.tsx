@@ -26,8 +26,6 @@ const VideoGenerator: React.FC<{ initialPrompt?: string }> = ({ initialPrompt })
     const [image, setImage] = useState<{file: File, url: string, base64: string} | null>(null);
     const [videoResolution, setVideoResolution] = useState<'720p' | '1080p'>('720p');
     const [videoAspectRatio, setVideoAspectRatio] = useState<'16:9' | '9:16'>('16:9');
-    const [videoModel, setVideoModel] = useState<string>('veo-3.1-generate-preview');
-    const [videoDuration, setVideoDuration] = useState<number>(5);
 
     const [progress, setProgress] = useState<string[]>([]);
     const [isGenerating, setIsGenerating] = useState(false);
@@ -90,9 +88,7 @@ const VideoGenerator: React.FC<{ initialPrompt?: string }> = ({ initialPrompt })
                 image ? { base64: image.base64, mimeType: image.file.type } : null,
                 videoResolution,
                 videoAspectRatio,
-                (log) => setProgress(prev => [...prev, log]),
-                videoModel,
-                videoDuration
+                (log) => setProgress(prev => [...prev, log])
             );
             setVideoUrl(url);
             incrementUsage(ProjectType.GENERATE_VIDEO);
@@ -135,100 +131,39 @@ const VideoGenerator: React.FC<{ initialPrompt?: string }> = ({ initialPrompt })
     return (
         <div className="p-4 h-full flex flex-col md:flex-row gap-4 overflow-y-auto">
             <div className="w-full md:w-1/3 flex-shrink-0 space-y-4">
-                 <div className="space-y-1">
-                     <label className="text-sm font-medium text-slate-300">وصف الفيديو</label>
-                     <textarea
-                        value={prompt}
-                        onChange={e => setPrompt(e.target.value)}
-                        placeholder="صف الفيديو الذي تريد إنشاؤه..."
-                        rows={5}
-                        className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white"
-                     />
-                     <div className="flex flex-wrap gap-1.5 mt-1">
-                         <span className="text-[10px] text-slate-400 self-center">💡 أمثلة سريعة:</span>
-                         <button
-                             type="button"
-                             onClick={() => {
-                                 setPrompt("Saudi man wearing white thoub drinking Arabic coffee in desert, cinematic, luxury lighting, slow motion");
-                                 setVideoAspectRatio("9:16");
-                                 setVideoResolution("720p");
-                                 setVideoDuration(8);
-                                 setVideoModel("veo-3.1-generate-preview");
-                             }}
-                             className="text-[10px] bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 border border-indigo-500/20 px-2 py-0.5 rounded transition"
-                         >
-                             🇸🇦 قهوة عربية بالصحراء (Veo 3.1)
-                         </button>
-                         <button
-                             type="button"
-                             onClick={() => {
-                                 setPrompt("A futuristic cybermatic car driving through night neon-lit Riyadh city, 4k, hyper-detailed");
-                                 setVideoAspectRatio("16:9");
-                                 setVideoResolution("720p");
-                                 setVideoDuration(5);
-                             }}
-                             className="text-[10px] bg-slate-700/60 hover:bg-slate-700 text-slate-300 px-2 py-0.5 rounded transition"
-                         >
-                             🚗 غد نيونة الرياض
-                         </button>
-                     </div>
-                 </div>
-
-                 <div className="space-y-2">
-                     <label className="text-sm font-medium text-slate-300">صورة البداية (اختياري)</label>
-                     {image ? (
-                         <div className="relative group">
-                             <img src={image.url} alt="Start frame" className="w-full h-32 object-cover rounded-md"/>
-                             <button onClick={removeImage} className="absolute top-1 right-1 p-1 bg-black/60 rounded-full text-white opacity-0 group-hover:opacity-100"><TrashIcon className="w-4 h-4"/></button>
-                         </div>
-                     ) : (
-                         <label htmlFor="video-image-upload" className="cursor-pointer flex flex-col items-center justify-center border-2 border-dashed border-slate-600 rounded-lg p-4 text-center hover:border-indigo-500">
-                             <UploadIcon className="w-6 h-6 text-slate-500" />
-                             <span className="text-xs text-slate-400 mt-1">ارفع صورة</span>
-                         </label>
-                     )}
+                 <textarea
+                    value={prompt}
+                    onChange={e => setPrompt(e.target.value)}
+                    placeholder="صف الفيديو الذي تريد إنشاؤه..."
+                    rows={6}
+                    className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white"
+                />
+                <div className="space-y-2">
+                    <label className="text-sm font-medium text-slate-300">صورة البداية (اختياري)</label>
+                    {image ? (
+                        <div className="relative group">
+                            <img src={image.url} alt="Start frame" className="w-full h-32 object-cover rounded-md"/>
+                            <button onClick={removeImage} className="absolute top-1 right-1 p-1 bg-black/60 rounded-full text-white opacity-0 group-hover:opacity-100"><TrashIcon className="w-4 h-4"/></button>
+                        </div>
+                    ) : (
+                        <label htmlFor="video-image-upload" className="cursor-pointer flex flex-col items-center justify-center border-2 border-dashed border-slate-600 rounded-lg p-4 text-center hover:border-indigo-500">
+                            <UploadIcon className="w-6 h-6 text-slate-500" />
+                            <span className="text-xs text-slate-400 mt-1">ارفع صورة</span>
+                        </label>
+                    )}
                      <input id="video-image-upload" type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
-                 </div>
-
-                 <div className="space-y-3 bg-slate-800/40 p-3 rounded-lg border border-slate-700">
-                     <div>
-                         <label className="text-xs font-bold text-slate-400 block mb-1">المحرك (Model)</label>
-                         <select value={videoModel} onChange={e => setVideoModel(e.target.value)} className="w-full bg-slate-700 border border-slate-600 rounded-md p-1.5 text-xs text-white">
-                             <option value="veo-3.1-generate-preview">🎬 Veo 3.1 Pro (أعلى جودة / Preview)</option>
-                             <option value="veo-3.1-lite-generate-preview">⚡ Veo 3.1 Lite (أسرع رندرة)</option>
-                         </select>
-                     </div>
-
-                     <div className="grid grid-cols-2 gap-2">
-                         <div>
-                             <label className="text-xs font-bold text-slate-400 block mb-1">الدقة (Resolution)</label>
-                             <select value={videoResolution} onChange={e => setVideoResolution(e.target.value as any)} className="w-full bg-slate-700 border border-slate-600 rounded-md p-1.5 text-xs text-white">
-                                 <option value="720p">720p</option>
-                                 <option value="1080p">1080p</option>
-                             </select>
-                         </div>
-                         <div>
-                             <label className="text-xs font-bold text-slate-400 block mb-1">النسبة (Aspect Ratio)</label>
-                             <select value={videoAspectRatio} onChange={e => setVideoAspectRatio(e.target.value as any)} className="w-full bg-slate-700 border border-slate-600 rounded-md p-1.5 text-xs text-white">
-                                 <option value="16:9">16:9 (أفقي)</option>
-                                 <option value="9:16">9:16 (رأسي/إعلاني)</option>
-                             </select>
-                         </div>
-                     </div>
-
-                     <div>
-                         <label className="text-xs font-bold text-slate-400 block mb-1">المدة (Duration)</label>
-                         <select value={videoDuration} onChange={e => setVideoDuration(parseInt(e.target.value))} className="w-full bg-slate-700 border border-slate-600 rounded-md p-1.5 text-xs text-white">
-                             <option value="5">5 ثوانٍ</option>
-                             <option value="6">6 ثوانٍ</option>
-                             <option value="7">7 ثوانٍ</option>
-                             <option value="8">8 ثوانٍ</option>
-                             <option value="10">10 ثوانٍ (كحد أقصى)</option>
-                         </select>
-                     </div>
-                 </div>
-
-                 {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                    <select value={videoResolution} onChange={e => setVideoResolution(e.target.value as any)} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white">
+                        <option value="720p">720p</option>
+                        <option value="1080p">1080p</option>
+                    </select>
+                    <select value={videoAspectRatio} onChange={e => setVideoAspectRatio(e.target.value as any)} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white">
+                        <option value="16:9">16:9</option>
+                        <option value="9:16">9:16</option>
+                    </select>
+                </div>
+                {error && <p className="text-red-400 text-sm text-center">{error}</p>}
                 <button
                     onClick={handleGenerate}
                     disabled={isGenerating}
