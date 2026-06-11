@@ -316,7 +316,7 @@ const Marketing: React.FC<MarketingProps> = ({ context, navigate }) => {
 }
 `;
 
-      const aiResponse = await geminiService.generateText(modelPrompt, 'gemini-1.5-pro');
+      const aiResponse = await geminiService.generateText(modelPrompt, 'gemini-3.1-pro-preview');
       onLog('📥 [Gemini API] تم استقبال التعديلات والحلول لـ (المحتوى التسويقي). جاري تفعيل المكونات...');
       await new Promise(r => setTimeout(r, 500));
       
@@ -384,10 +384,10 @@ const Marketing: React.FC<MarketingProps> = ({ context, navigate }) => {
 - مقترح القيمة الجاذب: ${campaignData.valueProposition || ''}
 - الجمهور والمستهلكون: ${campaignData.targetAudience || ''}
 
-اقترح 3 توصيات تسويقية عملية، مبتكرة ومحددة جداً للمشروع لتحقيق انتشار فيروسي سريع واقتناص أفضل الفرص، واشرح كيف يسهم تكتيك Veo 3 للفيديو و Imagen 3 للصور الفائقة و Gemini 1.5 Pro للنصوص التوليدية في مضاعفة التحويل.
-اكتب التوصيات الثلاثة بأسلوب عربي فصيح رائد وموجز ومحفز في شكل نقاط مرقمة واضحة ومباشرة.`;
+اقترح 3 توصيات تسويقية عملية، مبتكرة ومحددة جداً للمشروع لتحقيق انتشار فيروسي سريع واقتناص أفضل الفرص، واشرح كيف يسهم تكتيك Veo 3 للفيديو و Imagen 3 للصور الفائقة و Gemini 3.1 Pro للنصوص التوليدية في مضاعفة التحويل.
+أكتب التوصيات الثلاثة بأسلوب عربي فصيح رائد وموجز ومحفز في شكل نقاط مرقمة واضحة ومباشرة.`;
       
-      const response = await geminiService.generateText(prompt, 'gemini-1.5-pro');
+      const response = await geminiService.generateText(prompt, 'gemini-3.1-pro-preview');
       const lines = response.split('\n').filter(l => l.trim().length > 6);
       setSuggestionsList(lines.length > 0 ? lines : [response]);
     } catch (e) {

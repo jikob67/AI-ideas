@@ -200,10 +200,10 @@ export const UnifiedMarketingWorkspace: React.FC<UnifiedMarketingWorkspaceProps>
     try {
       const prompt = `أنت مستشار تسويق ونمو ابتكاري في استوديو AI Ideas.
 المشروع الحالي هو "${selectedProject.name}" في قطاع "${campaignData.sector || 'التقنية'}".
-أعطني 3 توصيات مخصصة واستثنائية جداً للترويج الفعّال وزيادة معدل انتشار هذا المشروع، مشيراً إلى كيفية الاستفادة من معايير Veo 3 للفيديو و Imagen 3 للصور و Gemini 1.5 Pro للنصوص.
+أعطني 3 توصيات مخصصة واستثنائية جداً للترويج الفعّال وزيادة معدل انتشار هذا المشروع، مشيراً إلى كيفية الاستفادة من معايير Veo 3 للفيديو و Imagen 3 للصور و Gemini 3.1 Pro للنصوص.
 اكتب التوصيات بأسلوب رائد مباشر وموجز ومحفز في شكل نقاط مرقمة واضحة ومباشرة باللغة العربية الفصحى.`;
       
-      const response = await geminiService.generateText(prompt, 'gemini-1.5-pro');
+      const response = await geminiService.generateText(prompt, 'gemini-3.1-pro-preview');
       const lines = response.split('\n').filter(l => l.trim().length > 6);
       setSuggestions(lines.length > 0 ? lines : [response]);
     } catch (e) {

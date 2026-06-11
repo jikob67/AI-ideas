@@ -253,14 +253,19 @@ async function startServer() {
     const maxRetries = 3;
     let attempt = 0;
     
-    // Define fallback models if we hit a 429 RESOURCE_EXHAUSTED / Quota Exceeded error
-    const requestedModel = model || "gemini-flash-latest";
-    const modelQueue = [requestedModel];
+    // Safe model selection and fallback mapping
+    let requestedModel = model || "gemini-3.5-flash";
+    if (requestedModel === "gemini-1.5-pro" || requestedModel === "gemini-2.0-pro" || requestedModel === "gemini-flash-pro") {
+      requestedModel = "gemini-3.1-pro-preview";
+    } else if (requestedModel === "gemini-1.5-flash" || requestedModel === "gemini-2.0-flash" || requestedModel === "gemini-flash-latest" || requestedModel === "gemini-3.5-flash") {
+      requestedModel = "gemini-3.5-flash";
+    }
     
-    // If the requested model is 'gemini-3.5-flash' or 'gemini-flash-latest', let's add alternative flash models to fall back to
-    if (requestedModel === "gemini-3.5-flash" || requestedModel === "gemini-flash-latest") {
-      modelQueue.push("gemini-2.5-flash");
-      modelQueue.push("gemini-1.5-flash");
+    const modelQueue = [requestedModel];
+    if (requestedModel === "gemini-3.5-flash") {
+      modelQueue.push("gemini-3.1-flash-lite");
+    } else if (requestedModel === "gemini-3.1-pro-preview") {
+      modelQueue.push("gemini-3.5-flash");
     }
 
     let modelIndex = 0;
@@ -283,15 +288,18 @@ async function startServer() {
                                 errorMessage.includes("429") || 
                                 errorMessage.includes("quota") || 
                                 errorMessage.includes("RESOURCE_EXHAUSTED");
-        const isRetryable = isQuotaExceeded || errorStatus === 503 ||
-                            errorMessage.includes("503") ||
-                            errorMessage.includes("UNAVAILABLE");
+        const isBusyOrUnavailable = errorStatus === 503 ||
+                                    errorMessage.includes("503") ||
+                                    errorMessage.includes("UNAVAILABLE") ||
+                                    errorMessage.includes("demand");
+        const isBusyOrQuota = isQuotaExceeded || isBusyOrUnavailable;
+        const isRetryable = isBusyOrQuota;
 
-        // If it's a quota exceeded error status, check if we have a fallback model available
-        if (isQuotaExceeded && modelIndex < modelQueue.length - 1) {
+        // If it's a busy, unavailable, or quota exceeded error, check if we have a fallback model available
+        if (isBusyOrQuota && modelIndex < modelQueue.length - 1) {
           modelIndex++;
           attempt = 0; // Reset attempts for the fallback model
-          console.warn(`[Client/Server Fallback] Quota exceeded for model ${currentModel}. Falling back to model ${modelQueue[modelIndex]}...`);
+          console.warn(`[Client/Server Fallback] Model ${currentModel} is busy, unavailable, or rate-limited. Falling back to model ${modelQueue[modelIndex]}...`);
           // Let's print the fallback warning and wait 300ms before retrying on the new model
           await new Promise(resolve => setTimeout(resolve, 300));
           continue;
@@ -318,11 +326,19 @@ async function startServer() {
   app.post("/api/gemini/stream", async (req, res) => {
     const { model, contents, config } = req.body;
     
-    const requestedModel = model || "gemini-flash-latest";
+    // Safe model selection and fallback mapping
+    let requestedModel = model || "gemini-3.5-flash";
+    if (requestedModel === "gemini-1.5-pro" || requestedModel === "gemini-2.0-pro" || requestedModel === "gemini-flash-pro") {
+      requestedModel = "gemini-3.1-pro-preview";
+    } else if (requestedModel === "gemini-1.5-flash" || requestedModel === "gemini-2.0-flash" || requestedModel === "gemini-flash-latest" || requestedModel === "gemini-3.5-flash") {
+      requestedModel = "gemini-3.5-flash";
+    }
+    
     const modelQueue = [requestedModel];
-    if (requestedModel === "gemini-3.5-flash" || requestedModel === "gemini-flash-latest") {
-      modelQueue.push("gemini-2.5-flash");
-      modelQueue.push("gemini-1.5-flash");
+    if (requestedModel === "gemini-3.5-flash") {
+      modelQueue.push("gemini-3.1-flash-lite");
+    } else if (requestedModel === "gemini-3.1-pro-preview") {
+      modelQueue.push("gemini-3.5-flash");
     }
 
     let modelIndex = 0;
@@ -352,10 +368,15 @@ async function startServer() {
                                 errorMessage.includes("429") || 
                                 errorMessage.includes("quota") || 
                                 errorMessage.includes("RESOURCE_EXHAUSTED");
+        const isBusyOrUnavailable = errorStatus === 503 ||
+                                    errorMessage.includes("503") ||
+                                    errorMessage.includes("UNAVAILABLE") ||
+                                    errorMessage.includes("demand");
+        const isBusyOrQuota = isQuotaExceeded || isBusyOrUnavailable;
 
-        if (isQuotaExceeded && modelIndex < modelQueue.length - 1) {
+        if (isBusyOrQuota && modelIndex < modelQueue.length - 1) {
           modelIndex++;
-          console.warn(`[Client/Server Stream Fallback] Quota exceeded for model ${currentModel}. Falling back to model ${modelQueue[modelIndex]}...`);
+          console.warn(`[Client/Server Stream Fallback] Model ${currentModel} is busy, unavailable, or rate-limited. Falling back to model ${modelQueue[modelIndex]}...`);
           await new Promise(resolve => setTimeout(resolve, 300));
           continue;
         }
@@ -1407,7 +1428,7 @@ self.addEventListener('fetch', event => {
     console.log("Serving static files from dist");
   }
 
-  const PORT = Number(process.env.PORT) || 8080;
+  const PORT = Number(process.env.PORT) || 3000;
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on port ${PORT}`);
