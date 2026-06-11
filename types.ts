@@ -148,6 +148,15 @@ export interface ProjectFile {
   content: string;
 }
 
+export interface GeneratedAsset {
+  id: string;
+  type: 'image' | 'video' | 'audio';
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  previewUrl?: string;
+  downloadUrl?: string;
+  error?: string;
+}
+
 export interface StoreProduct {
     id: string;
     name: string;

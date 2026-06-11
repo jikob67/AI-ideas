@@ -1,6 +1,9 @@
 
+import { GoogleGenAI } from "@google/genai";
 import { Project } from "../types";
 import JSZip from 'jszip';
+
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
 export const generateFlutterCode = async (project: any): Promise<string> => {
   const prompt = `

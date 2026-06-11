@@ -3,7 +3,6 @@ import { Project, ProjectType, View } from '../types';
 import { geminiService } from '../services/geminiService';
 import { useAuth } from '../hooks/useAuth';
 import { useUsage } from '../hooks/useUsage';
-import { UnifiedMarketingWorkspace } from './UnifiedMarketingWorkspace';
 import UpgradeModal from './UpgradeModal';
 import { 
   Sparkles, 
@@ -66,7 +65,7 @@ interface MarketingCampaignData {
   xLinkedInPosts: { platform: 'X' | 'LinkedIn'; content: string }[];
   emails: { subject: string; body: string }[];
   pushNotifications: { title: string; body: string }[];
-  imagePrompts: { platform: string; size: string; prompt: string; imageUrl?: string; isGenerating?: boolean; isEditing?: boolean; editQuery?: string }[];
+  imagePrompts: { platform: string; size: string; prompt: string; arabicPrompt?: string; error?: string; imageUrl?: string; isGenerating?: boolean; isEditing?: boolean; editQuery?: string }[];
   videoTitle: string;
   videoDuration: number;
   videoScript: SceneScript[];
@@ -122,9 +121,24 @@ const DEFAULT_CAMPAIGN = (projectName: string, description: string): MarketingCa
       { title: `⚠️ عرض خاص من ${projectName} ينتهي قريباً!`, body: `لا تفوت فرصة الاستمتاع بالخصائص والامتيازات المفتوحة لتسريع أعمالك.` }
     ],
     imagePrompts: [
-      { platform: 'Instagram (Square 1:1)', size: '1080 x 1085', prompt: `A professional creative advertising post for ${projectName} featuring a minimalist clean interface showing abstract representations of ${briefDesc}, elegant soft studio lighting, color palette of indigo and cool dark gray, cinematic depth of field, 3D render` },
-      { platform: 'X & LinkedIn (Landscape 16:9)', size: '1200 x 675', prompt: `A sleek digital marketing banner for ${projectName} showing abstract speed, clean lines, professional navy blue light glow, ultra-clean web mockup relating to ${briefDesc}, high dynamic range, masterwork` },
-      { platform: 'TikTok & Stories (Portrait 9:16)', size: '1080 x 1920', prompt: `A mobile-first vibrant social media story layout for ${projectName} with premium textures, neon gradient light trails, modern abstract interface with dynamic dashboards related to ${briefDesc}, trending design` }
+      { 
+        platform: 'Instagram (Square 1:1)', 
+        size: '1080 x 1085', 
+        prompt: `A professional creative advertising post for ${projectName} featuring a minimalist clean interface showing abstract representations of ${briefDesc}, elegant soft studio lighting, color palette of indigo and cool dark gray, cinematic depth of field, 3D render`,
+        arabicPrompt: `بوستر ترويجي مربع لإنستقرام يسلط الضوء على فكرة ومميزات مشروع ${projectName} بأسلوب مالي وعصري أنيق.`
+      },
+      { 
+        platform: 'X & LinkedIn (Landscape 16:9)', 
+        size: '1200 x 675', 
+        prompt: `A sleek digital marketing banner for ${projectName} showing abstract speed, clean lines, professional navy blue light glow, ultra-clean web mockup relating to ${briefDesc}, high dynamic range, masterwork`,
+        arabicPrompt: `لافتة عريضة ومتميزة للشبكات المهنية (لينكدإن وإكس) تعبر عن كفاءة وسرعة أداء تطبيق ${projectName}.`
+      },
+      { 
+        platform: 'TikTok & Stories (Portrait 9:16)', 
+        size: '1080 x 1920', 
+        prompt: `A mobile-first vibrant social media story layout for ${projectName} with premium textures, neon gradient light trails, modern abstract interface with dynamic dashboards related to ${briefDesc}, trending design`,
+        arabicPrompt: `تصميم قصة رأسية جذابة تبرز تفاعل واجتهاد منصة ${projectName} مع واجهات مذهلة ومخصصة للهاتف.`
+      }
     ],
     videoTitle: `الفيديو الإعلاني لمشروع ${projectName}`,
     videoDuration: 30,
@@ -199,303 +213,6 @@ const Marketing: React.FC<MarketingProps> = ({ context, navigate }) => {
   const [renderedVideoUrl, setRenderedVideoUrl] = useState<string | null>(null);
   const [activeSceneIndex, setActiveSceneIndex] = useState<number>(0);
   const [videoFormat, setVideoFormat] = useState<'vertical' | 'landscape'>('vertical');
-
-  // --- Rebuilt Unified Marketing Workspace states ---
-  const [selectedDimension, setSelectedDimension] = useState<string>('1:1');
-  const [selectedDuration, setSelectedDuration] = useState<number>(30);
-  const [selectedType, setSelectedType] = useState<'text' | 'image' | 'video' | 'all'>('text');
-  const [selectedPlatform, setSelectedPlatform] = useState<string>('all');
-  const [userEditRequest, setUserEditRequest] = useState<string>('');
-  
-  // Audio state
-  const [selectedVoiceTone, setSelectedVoiceTone] = useState<string>('gulf_luxury');
-  const [selectedBgMusic, setSelectedBgMusic] = useState<string>('tech_rising');
-  const [audioUploadName, setAudioUploadName] = useState<string | null>(null);
-  const [isAudioModalOpen, setIsAudioModalOpen] = useState<boolean>(false);
-  
-  // Suggestions state
-  const [isSuggestionsModalOpen, setIsSuggestionsModalOpen] = useState<boolean>(false);
-  const [suggestionsList, setSuggestionsList] = useState<string[]>([]);
-  const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState<boolean>(false);
-  
-  // Actions helpers
-  const [isDownloading, setIsDownloading] = useState<boolean>(false);
-  const [downloadProgress, setDownloadProgress] = useState<number>(0);
-  const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
-  
-  // Local simulated video playing state
-  const [videoPlayState, setVideoPlayState] = useState<boolean>(false);
-  const [videoTimer, setVideoTimer] = useState<number>(0);
-  const [simulatedSceneIndex, setSimulatedSceneIndex] = useState<number>(0);
-
-  // Simulated Video Player loop based on selectedDuration
-  useEffect(() => {
-    let interval: any = null;
-    if (videoPlayState) {
-      interval = setInterval(() => {
-        setVideoTimer(prev => {
-          const nextSec = prev + 1;
-          if (nextSec >= selectedDuration) {
-            setVideoPlayState(false);
-            setSimulatedSceneIndex(0);
-            return 0;
-          }
-          
-          const totalScenes = campaignData?.videoScript?.length || 3;
-          const sceneSecs = selectedDuration / totalScenes;
-          const activeIndex = Math.floor(nextSec / sceneSecs);
-          setSimulatedSceneIndex(Math.min(activeIndex, totalScenes - 1));
-          
-          return nextSec;
-        });
-      }, 1000);
-    } else {
-      clearInterval(interval);
-    }
-    return () => clearInterval(interval);
-  }, [videoPlayState, selectedDuration, campaignData]);
-
-  // Handle active edit of the campaign contents using Gemini 1.5 Pro with clear logging
-  const performCampaignAdjustment = async () => {
-    if (!campaignData || !selectedProject || !userEditRequest.trim()) {
-      showToast('⚠️ يرجى كتابة طلب التعديل أولاً في الصندوق المخصص.');
-      return;
-    }
-    
-    setIsAnalyzing(true);
-    setMarketingLogs([]);
-    const onLog = (msg: string) => setMarketingLogs(prev => [...prev, `${new Date().toLocaleTimeString('ar-EG', { hour12: false })} > ${msg}`]);
-    
-    onLog(`📡 [AI Ideas Marketing] جاري إطلاق خط المعالجة الذكي بـ Gemini 1.5 Pro لتعديل الحملة...`);
-    onLog(`💡 طلبات المستخدم: "${userEditRequest}"`);
-    await new Promise(r => setTimeout(r, 600));
-    setAnalysisStep(1);
-    
-    onLog(`🔬 مواءمة ومطابقة الهيكل الإعلاني ليتكامل مع معايير Veo 3 للفيديو و Imagen 3 للصور الفنية لمشروع: ${selectedProject.name}`);
-    await new Promise(r => setTimeout(r, 700));
-    setAnalysisStep(3);
-    
-    try {
-      const modelPrompt = `أنت خبير تسويق ابتكاري فائق ومحرر إعلاني محترف.
-لديك خطة تسويق وحملات حالية بصيغة JSON لمشروع "${selectedProject.name}".
-المستخدم يطلب منك إجراء تحديثات مخصصة وتعديلات دقيقة جداً ومربوطة بمطالبه.
-
-طلبات التعديل المدخلة من المستخدم:
-"${userEditRequest}"
-
-البيانات الجارية الحالية للحملة للتعديل:
-- العنوان الرئيسي لصفحة الهبوط الحالية: ${campaignData.landingPage?.heroHeadline || ''}
-- الوصف الإقناعي الحالي: ${campaignData.landingPage?.heroDescription || ''}
-- الجمهور المستهدف الحالي: ${campaignData.targetAudience || ''}
-- القيمة المقترحة الجارية: ${campaignData.valueProposition || ''}
-- تصنيف قطاع المشروع: ${campaignData.sector || ''}
-
-أعد صياغة وهيكلة البيانات لتنفيذ رغبات المستخدم بالدقة القصوى باللغة العربية الفصحى. يجب وضع أسس معايير Veo 3 و Imagen 3 في صياغة الأوصاف والمدخرات الإعلانية المنسجمة مع منصات تواصل مثل (instagram, TikTok, Facebook, WhatsApp, X, Snapchat, YouTube, LinkedIn).
-
-أرجع النتيجة بصيغة JSON نظيفة فقط، بدون أي تحديدات ماركداون (بدون \`\`\`json).
-يجب أن يحتوي الـ JSON المرتجع على نفس هذه المفاتيح بالضبط:
-{
-  "sector": "القطاع المحدث والمطوّر",
-  "targetAudience": "الجمهور المستهدف المحدث بدقة ليتماشى مع طلب العميل",
-  "valueProposition": "مقترح القيمة المحدث الصياغة والتركيز",
-  "googleAds": [
-    { "headline": "العنوان الإعلاني الأول المحدث", "description": "الوصف الأول المعدل جداً" },
-    { "headline": "العنوان الإعلاني الثاني المحدث", "description": "الوصف الثاني المطور" }
-  ],
-  "facebookInstagramAds": [
-    {
-      "headline": "العنوان المحدث لفيسبوك وإنستقرام",
-      "primaryText": "النص الإقناعي المؤثر جداً والموافق لمطالب المستخدم والمنصات التفاعلية بروح عصرية وكتابة قوية",
-      "description": "الوصف التفصيلي والزر"
-    }
-  ],
-  "landingPage": {
-    "heroHeadline": "العنوان الرئيسي الجديد لصفحة الهبوط",
-    "heroDescription": "الوصف الموجه المعدل لـ Landing Page"
-  }
-}
-`;
-
-      const aiResponse = await geminiService.generateText(modelPrompt, 'gemini-3.1-pro-preview');
-      onLog('📥 [Gemini API] تم استقبال التعديلات والحلول لـ (المحتوى التسويقي). جاري تفعيل المكونات...');
-      await new Promise(r => setTimeout(r, 500));
-      
-      let cleanedJson = aiResponse.trim();
-      if (cleanedJson.startsWith('```json')) {
-        cleanedJson = cleanedJson.replace(/^```json/, '').replace(/```$/, '').trim();
-      } else if (cleanedJson.startsWith('```')) {
-        cleanedJson = cleanedJson.replace(/^```/, '').replace(/```$/, '').trim();
-      }
-      
-      const parsedData = JSON.parse(cleanedJson);
-      
-      const updated = { ...campaignData };
-      if (parsedData.sector) updated.sector = parsedData.sector;
-      if (parsedData.targetAudience) updated.targetAudience = parsedData.targetAudience;
-      if (parsedData.valueProposition) updated.valueProposition = parsedData.valueProposition;
-      if (parsedData.googleAds) updated.googleAds = parsedData.googleAds;
-      if (parsedData.facebookInstagramAds) updated.facebookInstagramAds = parsedData.facebookInstagramAds;
-      if (parsedData.landingPage?.heroHeadline) {
-        if (!updated.landingPage) updated.landingPage = {} as any;
-        updated.landingPage.heroHeadline = parsedData.landingPage.heroHeadline;
-      }
-      if (parsedData.landingPage?.heroDescription) {
-        if (!updated.landingPage) updated.landingPage = {} as any;
-        updated.landingPage.heroDescription = parsedData.landingPage.heroDescription;
-      }
-      
-      setCampaignData(updated);
-      setAnalysisStep(6);
-      setUserEditRequest('');
-      showToast('🎉 تم تعديل وتحديث المحتوى التسويقي بنجاح تام ليتوافق مع رغباتك وتطلعاتك بـ Gemini 1.5 Pro!');
-    } catch (e) {
-      console.error(e);
-      onLog('⚠️ تنبيه: فشل تحليل الهيكلية المسترسلة. جاري استدعاء معالج الاستبدال الموضعي المحلي لدمج مدخلاتك...');
-      await new Promise(r => setTimeout(r, 500));
-      
-      const updated = { ...campaignData };
-      updated.valueProposition = `[توجيه مدمج]: ${userEditRequest} | ${updated.valueProposition}`;
-      if (updated.googleAds.length > 0) {
-        updated.googleAds[0].description = `${updated.googleAds[0].description} - معدل خصيصاً ليناسب: ${userEditRequest}`;
-      }
-      setCampaignData(updated);
-      setAnalysisStep(6);
-      setUserEditRequest('');
-      showToast('🎉 تم دمج وتعديل المنظومة الإعلانية بمرونة فائقة بالنموذج الصوتي!');
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
-
-  // Strategic AI suggestions using Gemini 1.5 Pro
-  const handleGetAIsuggestions = async () => {
-    if (!selectedProject || !campaignData) {
-      showToast('⚠️ لا يوجد مشروع متاح حالياً للتوصيات.');
-      return;
-    }
-    setIsGeneratingSuggestions(true);
-    setIsSuggestionsModalOpen(true);
-    setSuggestionsList([]);
-    
-    try {
-      const prompt = `أنت مستشار نمو واستراتيجي تسويق رقمي فائق الذكاء وتتحكم بأحدث الأدوات.
-المشروع الحالي هو "${selectedProject.name}" في قطاع "${campaignData.sector || 'الحلول الذكية'}".
-وتفاصيل Campaign الجارية هي:
-- مقترح القيمة الجاذب: ${campaignData.valueProposition || ''}
-- الجمهور والمستهلكون: ${campaignData.targetAudience || ''}
-
-اقترح 3 توصيات تسويقية عملية، مبتكرة ومحددة جداً للمشروع لتحقيق انتشار فيروسي سريع واقتناص أفضل الفرص، واشرح كيف يسهم تكتيك Veo 3 للفيديو و Imagen 3 للصور الفائقة و Gemini 3.1 Pro للنصوص التوليدية في مضاعفة التحويل.
-أكتب التوصيات الثلاثة بأسلوب عربي فصيح رائد وموجز ومحفز في شكل نقاط مرقمة واضحة ومباشرة.`;
-      
-      const response = await geminiService.generateText(prompt, 'gemini-3.1-pro-preview');
-      const lines = response.split('\n').filter(l => l.trim().length > 6);
-      setSuggestionsList(lines.length > 0 ? lines : [response]);
-    } catch (e) {
-      console.error(e);
-      setSuggestionsList([
-        '💡 فكرة أولى للانتشار: إشراك المستهلك في صناعة اللوحات الرقمية لمشكلته وتجسيدها بمحرك Imagen 3 ومكافأة المنشورات الأكثر تصويتاً ببطاقات اشتراك.',
-        '💡 تكتيك الفيديو: استخدام Veo 3 لإنتاج سيناريوهات متحركة 15 ثانية للشباب تستعرض تيسير المهام ومقارنة السرعة الفائقة للتطبيق بصرياً.',
-        '💡 معالجة البريد: صياغة أسبوعية لرسائل بريدية شيقة وجاذبة تتسق مع نبرات الصوت الخليجية والمهنية لجذب متخذي القرار.'
-      ]);
-    } finally {
-      setIsGeneratingSuggestions(false);
-    }
-  };
-
-  // Mock-download implementation with physical local export
-  const handleTriggerMockDownload = () => {
-    setIsDownloading(true);
-    setDownloadProgress(0);
-    const interval = setInterval(() => {
-      setDownloadProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setTimeout(() => {
-            setIsDownloading(false);
-            
-            if (!campaignData || !selectedProject) return;
-            const content = `=====================================================
-🎯 حقيبة الحملة التسويقية الشاملة لـ: ${selectedProject.name}
-💡 مدعوم بأنظمة الذكاء والإنتاج: Veo 3 | Imagen 3 | Gemini 1.5 Pro
-📅 تاريخ التصدير والتجهيز: ${new Date().toLocaleDateString('ar-EG')}
-=====================================================
-
-[1] الهوية والمعالم الاستراتيجية للمشروع:
------------------------------------------
-• القطاع المستهدف: ${campaignData.sector}
-• القيمة الفريدة المقترحة: ${campaignData.valueProposition}
-• الجمهور والمستهلكون: ${campaignData.targetAudience}
-• الاتجاه البصري والتصميم: ${campaignData.designStyle}
-
-[2] نبرة الصوت والموسيقى المعتمدة:
------------------------------------------
-• معلق ومؤدي الصوت: ${selectedVoiceTone === 'gulf_luxury' ? 'لهجة خليجية ملكية فخمة ومبهرة' : selectedVoiceTone === 'egypt_active' ? 'عامية مصرية حماسية وخفيفة' : selectedVoiceTone === 'shami_warm' ? 'لهجة شامية ودودة دافئة' : 'لهجة فصحى حوارية مهنية'}
-• الموسيقى الخلفية: ${selectedBgMusic === 'tech_rising' ? 'إيقاع تقني صاعد لتوليد الاندماج' : selectedBgMusic === 'cinematic_inspire' ? 'سينمائي ملهم وعميق' : 'هادئ وبسيط للتكامل والراحة'}
-
-[3] عناصر مقاسات ومحددات التصميم المعاينة:
------------------------------------------
-• الأبعاد الجارية: ${selectedDimension}
-• مدة الإعلان التقديرية للفيديو: ${selectedDuration} ثانية
-
-[4] الإعلانات والنصوص التسويقية المجهزة للمنصات:
------------------------------------------
-• إعلانات Google Ads:
-${campaignData.googleAds ? campaignData.googleAds.map((ad, i) => `  - الإعلان ${i + 1}:
-    العنوان الإملائي: ${ad.headline}
-    الوصف الإقناعي: ${ad.description}`).join('\n\n') : 'لا يوجد'}
-
-• منشورات السوشيال (Facebook / Instagram):
-${campaignData.facebookInstagramAds ? campaignData.facebookInstagramAds.map((ad, i) => `  - منشور ${i + 1}:
-    العنوان المرئي: ${ad.headline}
-    النص الإقناعي الأساسي: ${ad.primaryText}
-    التحويل لزر (CTA): ${ad.description}`).join('\n\n') : 'لا يوجد'}
-
-• منشورات المنصات الأخرى (X / LinkedIn):
-${campaignData.xLinkedInPosts ? campaignData.xLinkedInPosts.map((post, i) => `  - منصة ${post.platform}:
-    المحتوى الإعلاني: ${post.content}`).join('\n\n') : 'لا يوجد'}
-
-• قوالب البريد التسويقي والرسائل لـ Gmail:
-${campaignData.emails ? campaignData.emails.map((email, i) => `  - رسالة ${i + 1}:
-    الموضوع: ${email.subject}
-    المحتوى والتحية: ${email.body}`).join('\n\n') : 'لا يوجد'}
-
-• الإشعارات السريعة المباشرة (Mobile Push):
-${campaignData.pushNotifications ? campaignData.pushNotifications.map((push, i) => `  - الإشعار ${i + 1}:
-    العنوان: ${push.title}
-    نص الإشعار الفوري: ${push.body}`).join('\n\n') : 'لا يوجد'}
-
-[5] سيناريو وجدول مشاهد الفيديو الترويجي (Veo 3 Engine Storyboard):
------------------------------------------
-${campaignData.videoScript ? campaignData.videoScript.map((sc, i) => `  • المشهد ${sc.scene} [المدة المخصصة للمشهد: ${sc.duration} ثانية]:
-    - الاتجاه واللقطة البصرية: ${sc.visual}
-    - التعليق والتمثيل الصوتي: ${sc.voiceover}`).join('\n\n') : 'لا يوجد'}
-
-[6] مصفوفة صفحة الهبوط وتحسين الـ SEO ومحركات البحث:
------------------------------------------
-• العنوان الفوقي لصفحة الاستقبال: ${campaignData.landingPage?.heroHeadline || ''}
-• الوصف الإقناعي الفرعي: ${campaignData.landingPage?.heroDescription || ''}
-• أهم ثلاث مزايا مبتكرة للمشروع:
-${campaignData.landingPage?.features ? campaignData.landingPage.features.map((f, i) => `  - الميزة ${i + 1} [${f.title}]: ${f.desc}`).join('\n') : 'لا يوجد ميزات حالية'}
-`;
-
-            const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `Marketing_Strategy_${selectedProject.name.replace(/\s+/g, '_')}.txt`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-            
-            showToast('✅ اكتمل تنزيل وتصدير حقيبة الأصول التسويقية الكاملة بنجاح!');
-          }, 400);
-          return 100;
-        }
-        return prev + 10;
-      });
-    }, 100);
-  };
 
   // Copy Alert Status
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -742,6 +459,39 @@ ${campaignData.landingPage?.features ? campaignData.landingPage.features.map((f,
     }
   };
 
+  const autoGenerateImages = async (campaign: MarketingCampaignData) => {
+    let currentCampaign = { ...campaign };
+    for (let i = 0; i < currentCampaign.imagePrompts.length; i++) {
+      if (currentCampaign.imagePrompts[i].imageUrl) continue;
+      
+      currentCampaign.imagePrompts = currentCampaign.imagePrompts.map((img, idx) => 
+        idx === i ? { ...img, isGenerating: true, error: undefined } : img
+      );
+      setCampaignData({ ...currentCampaign });
+      
+      try {
+        const scale = i === 0 ? '1:1' : i === 1 ? '16:9' : '9:16';
+        const base64 = await geminiService.generateImage(currentCampaign.imagePrompts[i].prompt, scale);
+        
+        currentCampaign.imagePrompts = currentCampaign.imagePrompts.map((img, idx) => 
+          idx === i ? { ...img, imageUrl: `data:image/jpeg;base64,${base64}`, isGenerating: false } : img
+        );
+      } catch (err: any) {
+        console.error(err);
+        const errMsg = err?.message || String(err);
+        currentCampaign.imagePrompts = currentCampaign.imagePrompts.map((img, idx) => 
+          idx === i ? { 
+            ...img, 
+            imageUrl: `https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=600&auto=format&fit=crop`, 
+            isGenerating: false,
+            error: errMsg.includes('API key') || errMsg.includes('safety') ? 'تعذر التحقق من مفاتيح التشغيل أو سياسة الأمان لتوليد الصورة.' : 'حدث خطأ في الاتصال بخدمة توليد الصور من غوغل.'
+          } : img
+        );
+      }
+      setCampaignData({ ...currentCampaign });
+    }
+  };
+
   const runMarketingPipeline = async (project: Project) => {
     setIsAnalyzing(true);
     setCampaignData(null);
@@ -833,17 +583,20 @@ ${campaignData.landingPage?.features ? campaignData.landingPage.features.map((f,
     { 
       "platform": "Instagram (Square 1:1)", 
       "size": "1080 x 1080", 
-      "prompt": "Sleek professional creative photorealistic marketing visual for user project ${project.name} representing abstract digital solutions, cool colors, elegant modern branding concept design, ultra detailed, depth of field, 3D render, high fidelity" 
+      "prompt": "Create a custom English prompt (around 40 words) for a professional, photorealistic modern marketing image specific to ${project.name}: illustrating its core features, gorgeous futuristic branding aesthetics, soft professional lighting, 3D render look, 8k resolution, elegant cool depth of field",
+      "arabicPrompt": "اكتب هنا وصفاً إبداعياً وجذاباً جداً باللغة العربية يشرح بوضوح وجمال تفاصيل المشهد البصري الفني المبتكر أعلاه ليعرضه للمستخدم بدلاً من النص الإنجليزي"
     },
     { 
       "platform": "X & LinkedIn (Landscape 16:9)", 
       "size": "1200 x 675", 
-      "prompt": "A landscape professional business banner for ${project.name} representing high productivity, modern neon light accents, elegant presentation, realistic high resolution, 8k" 
+      "prompt": "Create a custom English prompt (around 40 words) for a professional wide corporate banner for ${project.name}: displaying high-performance workspace context, neat web screens, metallic and deep indigo blue glow, modern graphic design, highly detailed",
+      "arabicPrompt": "اكتب هنا وصفاً إبداعياً وجذاباً جداً باللغة العربية يشرح للمستخدم بوضوح تصميم وغلاف اللافتة المهنية العريضة للمشروع"
     },
     { 
       "platform": "TikTok & Stories (Portrait 9:16)", 
       "size": "1080 x 1920", 
-      "prompt": "A modern dynamic visual story screen for mobile app ${project.name} with vibrant layout design, highly responsive elements, gorgeous design style, aesthetic setup" 
+      "prompt": "Create a custom English prompt (around 40 words) for a dynamic mobile story visual for ${project.name}: depicting an elegant hand holding a high-end smartphone showcasing vibrant visual dashboard gradients, futuristic active user stats, energetic aesthetic elements",
+      "arabicPrompt": "اكتب هنا وصفاً تفصيلياً رائعاً باللغة العربية يصف جمال حيوية وتصميم قصة الهاتف الذكي الترويجية للمشروع"
     }
   ],
   "videos": [
@@ -1004,6 +757,7 @@ ${campaignData.landingPage?.features ? campaignData.landingPage.features.map((f,
           platform: ip.platform,
           size: ip.size,
           prompt: ip.prompt,
+          arabicPrompt: ip.arabicPrompt || 'تصميم ترويجي مخصص للعلامة التجارية يبرز مزايا وأسلوب ريادي وبصري دافئ للمنتج.',
           imageUrl: undefined,
           isGenerating: false,
           isEditing: false,
@@ -1028,6 +782,9 @@ ${campaignData.landingPage?.features ? campaignData.landingPage.features.map((f,
       setCampaignData(formattedCampaign);
       setAnalysisStep(6);
       showToast('🎉 تم تحليل المشروع وبناء استوديو التسويق الذكي بنجاح بنسبة مطابقة فائقة الجودة!');
+      
+      // Auto-trigger image generation
+      autoGenerateImages(formattedCampaign);
     } catch (e) {
       console.error("Gemini failed, loading premium tailored campaign fallback...", e);
       onLog('⚠️ تنبيه: خوادم الخدمة الخارجية مشغولة حالياً بشكل مكثف.');
@@ -1044,6 +801,9 @@ ${campaignData.landingPage?.features ? campaignData.landingPage.features.map((f,
       setCampaignData(fallback);
       setAnalysisStep(6);
       showToast('🎉 تم استحضار خطة تسويق متناسقة تتماشى تماماً مع ثيم وهوية مشروعك!');
+      
+      // Auto-trigger image generation on fallback
+      autoGenerateImages(fallback);
     } finally {
       setIsAnalyzing(false);
     }
@@ -1153,14 +913,17 @@ ${campaignData.landingPage?.features ? campaignData.landingPage.features.map((f,
     const updated = { ...campaignData };
     const target = updated.imagePrompts[index];
     target.isGenerating = true;
+    target.error = undefined;
     setCampaignData({ ...updated });
 
     try {
       const base64 = await geminiService.generateImage(target.prompt, index === 0 ? '1:1' : index === 1 ? '16:9' : '9:16');
       target.imageUrl = `data:image/jpeg;base64,${base64}`;
       showToast(`🎨 تم رسم الصورة وحفظها بنجاح مقاس ${target.platform}!`);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      const errMsg = e?.message || String(e);
+      target.error = errMsg.includes('API key') || errMsg.includes('safety') ? errMsg : 'تعذر الاتصال بخدمات التوليد حالياً. يرجى مراجعة الصلاحيات.';
       // Give beautiful safe canvas fallback
       target.imageUrl = `https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=600&auto=format&fit=crop`;
       showToast(`🎨 تم تطبيق تصميم تجريدي فني راقي للصورة لتنسجم مع الثيم!`);
@@ -1176,16 +939,20 @@ ${campaignData.landingPage?.features ? campaignData.landingPage.features.map((f,
     const target = updated.imagePrompts[index];
     target.isGenerating = true;
     target.isEditing = false;
+    target.error = undefined;
     setCampaignData({ ...updated });
 
     try {
       const combinedPrompt = `A revised design based on: "${target.prompt}". Adjusted with the following changes: "${instruction}", beautiful modern presentation, crisp vector detail`;
       const base64 = await geminiService.generateImage(combinedPrompt, index === 0 ? '1:1' : index === 1 ? '16:9' : '9:16');
       target.prompt = combinedPrompt;
+      target.arabicPrompt = `تم التعديل: ${instruction}`;
       target.imageUrl = `data:image/jpeg;base64,${base64}`;
       showToast(`✨ تم تعديل الصورة وإعادة كتابة البرومبت بنجاح!`);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      const errMsg = e?.message || String(e);
+      target.error = errMsg.includes('API key') || errMsg.includes('safety') ? errMsg : 'تعذر إتمام تعديل الصورة على الخادم حالياً.';
       showToast(`⚠️ تعذر تعديل الصورة عبر الخادم حالياً. تم تغيير البرومبت النصي فقط.`);
     } finally {
       target.isGenerating = false;
@@ -1723,22 +1490,6 @@ ${campaignData.landingPage?.features ? campaignData.landingPage.features.map((f,
                 </div>
               </div>
             ) : campaignData ? (
-              <UnifiedMarketingWorkspace
-                campaignData={campaignData}
-                setCampaignData={setCampaignData}
-                selectedProject={selectedProject}
-                showToast={showToast}
-                runMarketingPipeline={runMarketingPipeline}
-                performCampaignAdjustment={performCampaignAdjustment}
-                userEditRequest={userEditRequest}
-                setUserEditRequest={setUserEditRequest}
-                isAnalyzing={isAnalyzing}
-                setIsAnalyzing={setIsAnalyzing}
-                marketingLogs={marketingLogs}
-                setMarketingLogs={setMarketingLogs}
-                setAnalysisStep={setAnalysisStep}
-              />
-            ) : false ? (
               <div className="space-y-6">
                 
                 {/* AI Marketing Showcase Banner (Toggleable) */}
@@ -2243,9 +1994,16 @@ ${campaignData.landingPage?.features ? campaignData.landingPage.features.map((f,
                                     </div>
                                   </div>
                                 ) : (
-                                  <p className="text-slate-300 text-xs leading-relaxed line-clamp-3 hover:line-clamp-none cursor-pointer p-1 rounded hover:bg-slate-950 transition-all">
-                                    {img.prompt}
-                                  </p>
+                                  <div>
+                                    <p className="text-slate-300 text-xs leading-relaxed line-clamp-3 hover:line-clamp-none cursor-pointer p-1 rounded hover:bg-slate-950 transition-all">
+                                      {img.arabicPrompt || img.prompt}
+                                    </p>
+                                    {img.error && (
+                                      <div className="text-red-400 text-[10px] mt-2 bg-red-950/30 p-2 rounded border border-red-900/40">
+                                        ⚠️ {img.error}
+                                      </div>
+                                    )}
+                                  </div>
                                 )}
                               </div>
 
