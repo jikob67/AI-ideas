@@ -671,6 +671,62 @@ async function startServer() {
     return true;
   }
 
+  async function ensureValidApk(addLog?: (msg: string) => void): Promise<boolean> {
+    const localApkPath = path.join(BINARIES_DIR, "ai_ideas_webview_launcher.apk");
+    
+    if (fs.existsSync(localApkPath)) {
+      try {
+        const cachedData = fs.readFileSync(localApkPath);
+        if (cachedData.byteLength > 50000) {
+          const cachedZip = await JSZip.loadAsync(cachedData);
+          if (cachedZip.file("classes.dex") || cachedZip.file("AndroidManifest.xml")) {
+            return true;
+          }
+        }
+        if (addLog) addLog("⚠️ قالب APK الحالي تالف أو غير صالح للتشغيل. جاري إزالته وإعادة جلبه آمنًا...");
+        fs.unlinkSync(localApkPath);
+      } catch (err) {
+        try { fs.unlinkSync(localApkPath); } catch (e) {}
+      }
+    }
+
+    if (addLog) addLog("⬇️ الحزمة غير مخزنة أو غير صالحة. بدء جلب نواة APK التأسيسية الموقعة من خوادم بديلة...");
+    
+    const candidateUrls = [
+      "https://github.com/ShibinCo/Webview/releases/download/v1.0/app-release.apk",
+      "https://github.com/ShibinCo/Webview/releases/download/v1.0.0/app-release.apk",
+      "https://raw.githubusercontent.com/ShibinCo/Webview/master/app/release/app-release.apk",
+      "https://raw.githubusercontent.com/ShibinCo/Webview/main/app/release/app-release.apk",
+      "https://github.com/m7md-sajid/simple-webview-android/releases/download/v1.0/app-release.apk",
+      "https://raw.githubusercontent.com/appium/io.appium.settings/master/apks/settings_apk-debug.apk"
+    ];
+
+    for (const url of candidateUrls) {
+      try {
+        if (addLog) addLog(`🌐 محاولة جلب من المصدر: ${url}`);
+        const response = await axios({
+          method: "get",
+          url: url,
+          responseType: "arraybuffer",
+          timeout: 10000
+        });
+        
+        if (response.data && response.data.byteLength > 50000) {
+          const testZip = await JSZip.loadAsync(Buffer.from(response.data));
+          if (testZip.file("classes.dex") || testZip.file("AndroidManifest.xml")) {
+            fs.writeFileSync(localApkPath, Buffer.from(response.data));
+            if (addLog) addLog("✅ تم تنزيل حزمة APK التأسيسية الموقعة وحفظها مؤقتاً بنجاح!");
+            return true;
+          }
+        }
+      } catch (err: any) {
+        if (addLog) addLog(`❌ فشل الاتصال برابط الجلب (${url}): ${err.message}`);
+      }
+    }
+    
+    return false;
+  }
+
   const PUBLISHED_DIR = path.join(process.cwd(), "published_apps");
   if (!fs.existsSync(PUBLISHED_DIR)) {
     fs.mkdirSync(PUBLISHED_DIR, { recursive: true });
@@ -1051,29 +1107,14 @@ This complete Flutter project runs your web app natively on Android and iOS.
       const localApkPath = path.join(BINARIES_DIR, "ai_ideas_webview_launcher.apk");
       const destApkPath = path.join(buildProjectDir, "app.apk");
 
-      if (fs.existsSync(localApkPath)) {
+      const validApkAvailable = await ensureValidApk(addLog);
+      if (validApkAvailable && fs.existsSync(localApkPath)) {
         fs.copyFileSync(localApkPath, destApkPath);
       } else {
-        // Try fetching or checking fallback
-        addLog("⬇️ الحزمة غير مخزنة مؤقتاً بالخادم. بدء جلب نواة APK التأسيسية الموقعة...");
-        try {
-          const apkResponse = await axios({
-            method: "get",
-            url: "https://github.com/ShibinCo/Webview/releases/download/v1.0/app-release.apk",
-            responseType: "arraybuffer",
-            timeout: 8000
-          });
-          if (apkResponse.data && apkResponse.data.byteLength > 1000) {
-            fs.writeFileSync(localApkPath, Buffer.from(apkResponse.data));
-            fs.copyFileSync(localApkPath, destApkPath);
-          }
-        } catch (e: any) {
-          // If we can't fetch but need an APK file to download successfully, write a valid stub zip-apk structure
-          addLog("⚠️ لم يتوفر اتصال خارجي بالجيت، جاري توليد وتجهيز حزمة APK مخصصة للنظام...");
-          const dummyApk = await webZip.generateAsync({ type: 'nodebuffer' });
-          fs.writeFileSync(localApkPath, dummyApk);
-          fs.copyFileSync(localApkPath, destApkPath);
-        }
+        // Only write dummy APK locally if all downloads failed
+        addLog("⚠️ لم يتوفر اتصال بمستودعات APK، جاري توليد وتجهيز حزمة APK مخصصة للنظام كـ fallback...");
+        const dummyApk = await webZip.generateAsync({ type: 'nodebuffer' });
+        fs.writeFileSync(destApkPath, dummyApk);
       }
     };
 
@@ -1370,49 +1411,9 @@ self.addEventListener('fetch', event => {
     const localApkPath = path.join(BINARIES_DIR, "ai_ideas_webview_launcher.apk");
 
     try {
-      // If the template of APK doesn't exist locally on the server, fetch it first
-      if (!fs.existsSync(localApkPath)) {
-        console.log("Template APK not found locally. Fetching a highly secure WebView Shell APK...");
-        
-        const candidateUrls = [
-          "https://github.com/ShibinCo/Webview/releases/download/v1.0/app-release.apk",
-          "https://github.com/ShibinCo/Webview/releases/download/v1.0.0/app-release.apk",
-          "https://raw.githubusercontent.com/ShibinCo/Webview/master/app/release/app-release.apk",
-          "https://raw.githubusercontent.com/ShibinCo/Webview/main/app/release/app-release.apk",
-          "https://github.com/m7md-sajid/simple-webview-android/releases/download/v1.0/app-release.apk",
-          "https://raw.githubusercontent.com/appium/io.appium.settings/master/apks/settings_apk-debug.apk"
-        ];
-
-        let downloaded = false;
-        let lastError = null;
-
-        for (const url of candidateUrls) {
-          try {
-            console.log(`Attempting to fetch APK from: ${url}`);
-            const response = await axios({
-              method: "get",
-              url: url,
-              responseType: "arraybuffer",
-              timeout: 12000 // 12 seconds per try
-            });
-            
-            if (response.data && response.data.byteLength > 1000) {
-              fs.writeFileSync(localApkPath, Buffer.from(response.data));
-              console.log(`Successfully downloaded and cached WebView template APK from: ${url}`);
-              downloaded = true;
-              break;
-            } else {
-              throw new Error("Downloaded file is empty or corrupted.");
-            }
-          } catch (err: any) {
-            console.error(`Failed fetching from ${url}:`, err.message);
-            lastError = err;
-          }
-        }
-
-        if (!downloaded) {
-          throw lastError || new Error("All APK download mirrors returned failures.");
-        }
+      const validApkAvailable = await ensureValidApk();
+      if (!validApkAvailable || !fs.existsSync(localApkPath)) {
+        throw new Error("All APK download mirrors returned failures.");
       }
 
       // Stream the valid, installable APK file to client
