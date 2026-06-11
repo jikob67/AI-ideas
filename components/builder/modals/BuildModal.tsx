@@ -49,21 +49,28 @@ export const BuildModal: React.FC<BuildModalProps> = ({ isOpen, onClose, project
                 return `${window.location.protocol}//${window.location.host}${url}`;
             }
             const parsed = new URL(url);
-            if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') {
-                parsed.href = parsed.href.replace(/https?:\/\/localhost(:\d+)?/g, `${window.location.protocol}//${window.location.host}`);
-            }
-            const finalUrl = parsed.toString();
-            if (finalUrl.includes('localhost') || finalUrl.startsWith('file:') || finalUrl.startsWith('blob:')) {
-                return null;
-            }
-            return finalUrl;
-        } catch (e) {
-            if (url.includes('localhost') || url.startsWith('file:') || url.startsWith('blob:')) {
-                const clean = url.replace(/https?:\/\/localhost(:\d+)?/g, `${window.location.protocol}//${window.location.host}`);
-                if (clean.startsWith('blob:') || clean.startsWith('file:')) {
-                    return null;
+            const currentHost = window.location.host;
+            const currentProto = window.location.protocol;
+            
+            // If the parent page is loaded via HTTPS, we MUST force HTTPS for any resource on the same or external non-local domain.
+            if (window.location.protocol === 'https:' && parsed.protocol === 'http:') {
+                if (parsed.hostname !== 'localhost' && parsed.hostname !== '127.0.0.1') {
+                    parsed.protocol = 'https:';
                 }
-                return clean;
+            }
+            
+            // If url points to local server (localhost / 127.0.0.1) but the app is accessed externally,
+            // we map it to the external domain so that the client browser can resolve and download the file.
+            if ((parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') && 
+                !window.location.hostname.includes('localhost') && 
+                !window.location.hostname.includes('127.0.0.1')) {
+                return `${currentProto}//${currentHost}${parsed.pathname}${parsed.search}`;
+            }
+            return parsed.toString();
+        } catch (e) {
+            // Re-check protocol fallback
+            if (window.location.protocol === 'https:' && url.startsWith('http://') && !url.includes('localhost') && !url.includes('127.0.0.1')) {
+                return url.replace('http://', 'https://');
             }
             return url;
         }
@@ -78,6 +85,7 @@ export const BuildModal: React.FC<BuildModalProps> = ({ isOpen, onClose, project
     // Local in-memory Blobs for robust direct download bypassing CORS / Firebase limits
     const [localWebZipBlob, setLocalWebZipBlob] = useState<Blob | null>(null);
     const [localFlutterZipBlob, setLocalFlutterZipBlob] = useState<Blob | null>(null);
+    const [localApkBlob, setLocalApkBlob] = useState<Blob | null>(null);
     const [showInstructions, setShowInstructions] = useState(false);
     
     const [error, setError] = useState<string | null>(null);
@@ -254,6 +262,16 @@ export const BuildModal: React.FC<BuildModalProps> = ({ isOpen, onClose, project
                     console.warn("Failed to bake flutter zip download into client memory.", blobErr);
                 }
             }
+            if (resolvedApkUrl) {
+                try {
+                    const apkRes = await fetch(resolvedApkUrl);
+                    if (apkRes.ok) {
+                        setLocalApkBlob(await apkRes.blob());
+                    }
+                } catch (blobErr) {
+                    console.warn("Failed to bake apk download into client memory.", blobErr);
+                }
+            }
 
             addLog('🚀 تم الانتهاء من دورة البناء والـ CI/CD بنجاح حقيقي 100%!');
             addLog(`🔗 رابط الويب المباشر المؤكد: ${resolvedLiveUrl}`);
@@ -284,53 +302,100 @@ export const BuildModal: React.FC<BuildModalProps> = ({ isOpen, onClose, project
     const handleDownloadZip = () => {
         const blobToDownload = localWebZipBlob;
         if (blobToDownload) {
-            const url = URL.createObjectURL(blobToDownload);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `${project.name.replace(/\s+/g, '_')}_web_source.zip`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            setTimeout(() => URL.revokeObjectURL(url), 100);
-        } else if (srcZipUrl) {
-            const link = document.createElement('a');
-            link.href = srcZipUrl;
-            link.download = `${project.name.replace(/\s+/g, '_')}_web_source.zip`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            try {
+                const url = URL.createObjectURL(blobToDownload);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `${project.name.replace(/\s+/g, '_')}_web_source.zip`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                setTimeout(() => URL.revokeObjectURL(url), 100);
+                return;
+            } catch (err) {
+                console.error("Local Web Zip download failed, falling back to direct URL", err);
+            }
+        }
+        
+        if (srcZipUrl) {
+            try {
+                const link = document.createElement('a');
+                link.href = srcZipUrl;
+                link.target = '_blank';
+                link.download = `${project.name.replace(/\s+/g, '_')}_web_source.zip`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } catch (e) {
+                window.open(srcZipUrl, '_blank');
+            }
         }
     };
 
     const handleDownloadApk = () => {
-        if (!apkUrl) return;
-        const link = document.createElement('a');
-        link.href = apkUrl;
-        link.download = `${project.name.replace(/\s+/g, '_')}_app.apk`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        const blobToDownload = localApkBlob;
+        if (blobToDownload) {
+            try {
+                const url = URL.createObjectURL(blobToDownload);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `${project.name.replace(/\s+/g, '_')}_app.apk`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                setTimeout(() => URL.revokeObjectURL(url), 100);
+                return;
+            } catch (err) {
+                console.error("Local APK download failed, falling back to direct URL", err);
+            }
+        }
+        
+        if (apkUrl) {
+            try {
+                const link = document.createElement('a');
+                link.href = apkUrl;
+                link.target = '_blank';
+                link.download = `${project.name.replace(/\s+/g, '_')}_app.apk`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } catch (e) {
+                window.open(apkUrl, '_blank');
+            }
+        }
     };
 
     const handleDownloadFlutterZip = () => {
         const blobToDownload = localFlutterZipBlob;
         if (blobToDownload) {
-            const url = URL.createObjectURL(blobToDownload);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `${project.name.replace(/\s+/g, '_')}_flutter_project.zip`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            setTimeout(() => URL.revokeObjectURL(url), 100);
-        } else if (srcZipUrl) {
-            const link = document.createElement('a');
-            // We can download the stored flutter zip from firebase storage or similar if available
-            link.href = srcZipUrl; // fall back to source code
-            link.download = `${project.name.replace(/\s+/g, '_')}_flutter_project.zip`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            try {
+                const url = URL.createObjectURL(blobToDownload);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `${project.name.replace(/\s+/g, '_')}_flutter_project.zip`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                setTimeout(() => URL.revokeObjectURL(url), 100);
+                return;
+            } catch (err) {
+                console.error("Local Flutter Zip download failed, falling back to direct URL", err);
+            }
+        }
+        
+        const backupUrl = srcZipUrl; // fall back to source code
+        if (backupUrl) {
+            try {
+                const link = document.createElement('a');
+                link.href = backupUrl;
+                link.target = '_blank';
+                link.download = `${project.name.replace(/\s+/g, '_')}_flutter_project.zip`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } catch (e) {
+                window.open(backupUrl, '_blank');
+            }
         }
     };
 

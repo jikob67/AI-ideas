@@ -638,7 +638,10 @@ async function startServer() {
     const forwardedProto = req.headers['x-forwarded-proto'] as string;
     
     let hostUrl = forwardedHost || req.headers.host || req.get('host') || "localhost:3000";
-    let protocol = forwardedProto || (req.protocol === 'http' || hostUrl.includes('localhost') ? 'http' : 'https');
+    
+    // Default to 'https' unless we are running on local environment (localhost, 127.0.0.1, 0.0.0.0)
+    const isLocal = hostUrl.includes('localhost') || hostUrl.includes('127.0.0.1') || hostUrl.includes('0.0.0.0') || hostUrl.startsWith('3000');
+    let protocol = isLocal ? (forwardedProto || 'http') : 'https';
     
     // Clean protocol to ensure it just contains the scheme without symbols
     protocol = protocol.replace(/[:\/]/g, '');
