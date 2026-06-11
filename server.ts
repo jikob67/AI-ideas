@@ -1351,9 +1351,10 @@ self.addEventListener('fetch', event => {
     }
   }));
 
-  // Fallback 404 handler for published apps when folder or file does not exist
-  app.get(["/published/:projectId", "/published/:projectId/:subpath*"], (req, res) => {
-    const projectId = req.params.projectId as string;
+  // Fallback 404 handler for published apps when folder or file does not exist (executed only if static file middleware didn't match)
+  app.use("/published", (req, res) => {
+    const parts = req.path.split("/").filter(Boolean);
+    const projectId = parts[0] || "unknown";
     return res.status(404).send(`
       <div style="font-family: system-ui, sans-serif; text-align: center; padding: 55px 15px; background: #0f172a; color: #f8fafc; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center;">
         <h1 style="color: #ef4444; font-size: 32px; margin-bottom: 8px;">الصفحة غير موجودة | Not Found</h1>
