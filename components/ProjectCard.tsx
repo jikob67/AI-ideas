@@ -18,9 +18,9 @@ interface ProjectCardProps {
     project: Project;
     onDelete: (id: string, skipConfirm?: boolean) => void;
     onEdit: (project: Project) => void;
-    onUpdate: (project: Project) => void;
-    categories: string[];
-    onAddCategory: (name: string) => void;
+    onUpdate?: (project: Project) => void;
+    categories?: string[];
+    onAddCategory?: (name: string) => void;
 }
 
 const ConfirmationModal: React.FC<{
@@ -78,124 +78,246 @@ const ShareModal: React.FC<{
     isOpen: boolean;
     onClose: () => void;
     project: Project;
-    onUpdate: (project: Project) => void;
+    onUpdate?: (project: Project) => void;
 }> = ({ isOpen, onClose, project, onUpdate }) => {
+    const [localProject, setLocalProject] = useState<Project>(project);
     const [email, setEmail] = useState('');
     const [permission, setPermission] = useState<'view' | 'edit'>('view');
     const [copySuccess, setCopySuccess] = useState(false);
+    const [notification, setNotification] = useState<string | null>(null);
+
+    useEffect(() => {
+        setLocalProject(project);
+    }, [project, isOpen]);
 
     if (!isOpen) return null;
 
-    const handleAddUser = () => {
-        if (!email) return;
-        const sharedWith = project.sharedWith || [];
-        if (sharedWith.some(s => s.email === email)) return;
+    const showNotification = (msg: string) => {
+        setNotification(msg);
+        setTimeout(() => setNotification(null), 3000);
+    };
+
+    const handleActualUpdate = (updatedProj: Project) => {
+        setLocalProject(updatedProj);
+        if (onUpdate) {
+            onUpdate(updatedProj);
+        } else {
+            persistenceService.saveProjectMetadata(updatedProj)
+                .then(() => {
+                    // Update key-value stored project as well in localstorage
+                    try {
+                        const localKey = 'current_project_metadata_cache';
+                        localStorage.setItem(`${localKey}_${updatedProj.id}`, JSON.stringify(updatedProj));
+                    } catch (e) {
+                        console.error(e);
+                    }
+                })
+                .catch(console.error);
+        }
+    };
+
+    const handleAddUser = (e?: React.MouseEvent) => {
+        if (e) {
+            e.stopPropagation();
+            e.preventDefault();
+        }
+        if (!email.trim()) return;
+        const sharedWith = localProject.sharedWith || [];
+        if (sharedWith.some(s => s.email.toLowerCase() === email.toLowerCase().trim())) {
+            showNotification('هذا المستخدم مضاف بالفعل');
+            return;
+        }
         
         const updatedProject = {
-            ...project,
-            sharedWith: [...sharedWith, { email, permission }]
+            ...localProject,
+            sharedWith: [...sharedWith, { email: email.toLowerCase().trim(), permission }]
         };
-        onUpdate(updatedProject);
+        handleActualUpdate(updatedProject);
         setEmail('');
+        showNotification('تم إضافة المستخدم بنجاح');
     };
 
-    const handleRemoveUser = (emailToRemove: string) => {
+    const handleRemoveUser = (emailToRemove: string, e?: React.MouseEvent) => {
+        if (e) {
+            e.stopPropagation();
+            e.preventDefault();
+        }
         const updatedProject = {
-            ...project,
-            sharedWith: (project.sharedWith || []).filter(s => s.email !== emailToRemove)
+            ...localProject,
+            sharedWith: (localProject.sharedWith || []).filter(s => s.email !== emailToRemove)
         };
-        onUpdate(updatedProject);
+        handleActualUpdate(updatedProject);
+        showNotification('تم إزالة المستخدم');
     };
 
-    const generatePublicLink = () => {
+    const generatePublicLink = (e?: React.MouseEvent) => {
+        if (e) {
+            e.stopPropagation();
+            e.preventDefault();
+        }
         const shareId = Math.random().toString(36).substring(2, 15);
         const updatedProject = {
-            ...project,
+            ...localProject,
             publicShareId: shareId
         };
-        onUpdate(updatedProject);
+        handleActualUpdate(updatedProject);
+        showNotification('تم إنشاء الرابط العام بنجاح');
     };
 
-    const revokePublicLink = () => {
+    const revokePublicLink = (e?: React.MouseEvent) => {
+        if (e) {
+            e.stopPropagation();
+            e.preventDefault();
+        }
         const updatedProject = {
-            ...project,
+            ...localProject,
             publicShareId: ''
         };
-        onUpdate(updatedProject);
+        handleActualUpdate(updatedProject);
+        showNotification('تم إلغاء الرابط العام وجعله خاصاً');
     };
 
-    const copyLink = () => {
-        const link = `${window.location.origin}/share/${project.publicShareId}`;
+    const copyLink = (e?: React.MouseEvent) => {
+        if (e) {
+            e.stopPropagation();
+            e.preventDefault();
+        }
+        const link = `${window.location.origin}/share/${localProject.publicShareId}`;
         navigator.clipboard.writeText(link);
         setCopySuccess(true);
         setTimeout(() => setCopySuccess(false), 2000);
+        showNotification('📋 تم نسخ الرابط إلى الحافظة!');
+    };
+
+    const handleCloseModal = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        e.preventDefault();
+        onClose();
     };
 
     return (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[60] p-4" onClick={onClose}>
-            <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
-                <h3 className="text-xl font-bold mb-4">مشاركة المشروع</h3>
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[100] p-4 text-right" dir="rtl" onClick={handleCloseModal}>
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md p-6 relative text-white shadow-2xl animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
                 
-                <div className="mb-6">
-                    <label className="block text-sm text-slate-400 mb-2">مشاركة مع مستخدم (بريد إلكتروني)</label>
+                {/* Header with Title and explicit Close button */}
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3.5 mb-5 select-none">
+                    <h3 className="text-lg font-black text-white flex items-center gap-2">
+                        <Share2Icon className="w-5 h-5 text-indigo-400" />
+                        <span>مشاركة المشروع</span>
+                    </h3>
+                    <button 
+                        onClick={handleCloseModal} 
+                        className="p-1.5 rounded-lg bg-slate-800/60 text-slate-400 hover:text-white hover:bg-slate-850 transition-all font-bold text-sm"
+                        style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                        ✕
+                    </button>
+                </div>
+
+                {/* Notification Area */}
+                {notification && (
+                    <div className="mb-4 p-2 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-center text-xs text-indigo-400 font-bold animate-pulse">
+                        {notification}
+                    </div>
+                )}
+                
+                {/* Email Share Form */}
+                <div className="mb-6 space-y-2">
+                    <label className="block text-xs text-slate-400 font-bold">📧 مشاركة مع مستخدم (بريد إلكتروني)</label>
                     <div className="flex gap-2">
                         <input 
                             type="email" 
                             value={email}
                             onChange={e => setEmail(e.target.value)}
                             placeholder="example@mail.com"
-                            className="flex-grow bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500"
+                            className="flex-grow bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm outline-none focus:border-indigo-500 text-left font-sans text-white focus:ring-1 focus:ring-indigo-500/50"
                         />
                         <select 
                             value={permission}
                             onChange={e => setPermission(e.target.value as any)}
-                            className="bg-slate-900 border border-slate-700 rounded-lg px-2 py-2 text-sm outline-none"
+                            className="bg-slate-950 border border-slate-800 rounded-xl px-2 py-2 text-xs outline-none text-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50"
                         >
                             <option value="view">مشاهدة</option>
                             <option value="edit">تعديل</option>
                         </select>
-                        <button onClick={handleAddUser} className="bg-indigo-600 px-3 py-2 rounded-lg text-sm font-bold">إضافة</button>
+                        <button 
+                            onClick={handleAddUser} 
+                            className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all flex-shrink-0"
+                        >
+                            إضافة
+                        </button>
                     </div>
                 </div>
 
-                {project.sharedWith && project.sharedWith.length > 0 && (
-                    <div className="mb-6 max-h-32 overflow-y-auto border-t border-slate-700 pt-4">
-                        {project.sharedWith.map(s => (
-                            <div key={s.email} className="flex items-center justify-between mb-2 text-sm">
-                                <div className="flex items-center gap-2">
-                                    <UserIcon className="w-4 h-4 text-slate-400" />
-                                    <span>{s.email}</span>
-                                    <span className="text-xs text-slate-500">({s.permission === 'view' ? 'مشاهدة' : 'تعديل'})</span>
+                {/* List of Shared Users */}
+                {localProject.sharedWith && localProject.sharedWith.length > 0 && (
+                    <div className="mb-6 max-h-36 overflow-y-auto border-t border-slate-800 pt-4 space-y-2 pr-1">
+                        <span className="block text-[10px] text-slate-500 font-bold">المستخدمون المشترك معهم حالياً:</span>
+                        {localProject.sharedWith.map(s => (
+                            <div key={s.email} className="flex items-center justify-between p-2.5 bg-slate-950/60 border border-slate-850/60 rounded-xl text-xs">
+                                <div className="flex items-center gap-2 max-w-[75%]">
+                                    <UserIcon className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                                    <span className="truncate font-sans font-medium text-slate-300" title={s.email}>{s.email}</span>
+                                    <span className={`text-[9px] px-1.5 py-0.5 rounded-md font-bold flex-shrink-0 ${
+                                        s.permission === 'view' ? 'bg-indigo-500/10 text-indigo-400' : 'bg-emerald-500/10 text-emerald-400'
+                                    }`}>
+                                        {s.permission === 'view' ? 'مشاهدة' : 'تعديل'}
+                                    </span>
                                 </div>
-                                <button onClick={() => handleRemoveUser(s.email)} className="text-red-400 hover:text-red-300">إزالة</button>
+                                <button 
+                                    onClick={(e) => handleRemoveUser(s.email, e)} 
+                                    className="text-red-400 hover:text-red-300 text-xs font-bold px-2 py-1 rounded hover:bg-red-500/10 transition-all"
+                                >
+                                    إزالة
+                                </button>
                             </div>
                         ))}
                     </div>
                 )}
 
-                <div className="border-t border-slate-700 pt-4">
-                    <label className="block text-sm text-slate-400 mb-2">رابط عام</label>
-                    {project.publicShareId ? (
-                        <div className="flex flex-col gap-2">
-                            <div className="flex gap-2">
+                {/* Public Share Section */}
+                <div className="border-t border-slate-800 pt-4 mb-6">
+                    <label className="block text-xs text-slate-400 font-bold mb-2">🌐 رابط عام للمشروع</label>
+                    {localProject.publicShareId ? (
+                        <div className="flex flex-col gap-2.5">
+                            <div className="flex gap-2 bg-slate-950 p-1 rounded-xl border border-slate-800">
                                 <input 
                                     readOnly 
-                                    value={`${window.location.origin}/share/${project.publicShareId}`}
-                                    className="flex-grow bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-400 outline-none"
+                                    value={`${window.location.origin}/share/${localProject.publicShareId}`}
+                                    className="flex-grow bg-transparent px-2.5 py-1.5 text-[10px] text-slate-400 outline-none font-mono text-left select-all truncate"
                                 />
-                                <button onClick={copyLink} className="bg-slate-700 px-3 py-2 rounded-lg text-sm flex items-center gap-1">
-                                    <LinkIcon className="w-4 h-4" />
-                                    {copySuccess ? 'تم النسخ' : 'نسخ'}
+                                <button 
+                                    onClick={copyLink} 
+                                    className="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all flex-shrink-0"
+                                >
+                                    <LinkIcon className="w-3.5 h-3.5" />
+                                    <span>{copySuccess ? 'تم النسخ' : 'نسخ'}</span>
                                 </button>
                             </div>
-                            <button onClick={revokePublicLink} className="text-sm text-red-400 hover:text-red-300 self-start mt-1">جعل الرابط خاص</button>
+                            <button 
+                                onClick={revokePublicLink} 
+                                className="text-xs text-red-400 hover:text-red-300 self-start font-bold py-1 px-1.5 rounded hover:bg-red-500/10 transition-all"
+                            >
+                                🔒 جعل الرابط عاماً خاصاً (إلغاء التفعيل)
+                            </button>
                         </div>
                     ) : (
-                        <button onClick={generatePublicLink} className="w-full bg-slate-700 py-2 rounded-lg text-sm font-bold">إنشاء رابط عام</button>
+                        <button 
+                            onClick={generatePublicLink} 
+                            className="w-full bg-slate-800 hover:bg-slate-755 text-slate-200 border border-slate-700 py-2.5 rounded-xl text-xs font-bold transition-all hover:text-white"
+                        >
+                            🔗 إنشاء رابط عام للمشروع
+                        </button>
                     )}
                 </div>
 
-                <button onClick={onClose} className="w-full mt-6 py-2 border border-slate-700 rounded-lg text-sm font-bold hover:bg-slate-700">إغلاق</button>
+                {/* Explicit Bottom Close Button */}
+                <button 
+                    onClick={handleCloseModal} 
+                    className="w-full py-2.5 bg-slate-850 hover:bg-slate-800 text-white rounded-xl text-xs font-extrabold transition-all border border-slate-800 hover:border-slate-750 font-bold uppercase tracking-wide focus:scale-[0.99] select-none"
+                >
+                    إغلاق النافذة
+                </button>
             </div>
         </div>
     );
