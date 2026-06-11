@@ -42,6 +42,32 @@ import {
   Sparkle
 } from 'lucide-react';
 
+export const MarketingAIConfig = { 
+  contentGeneration: { 
+    text: { provider: "google", model: "gemini-1.5-pro" },
+    image: {
+      provider: "google",
+      model: "imagen-3"
+    },
+    video: {
+      provider: "google",
+      model: "veo-3"
+    },
+    audio: {
+      provider: "google",
+      narrationModel: "gemini-1.5-pro",
+      voiceEngine: "google-tts"
+    }
+  },
+  marketingRules: { 
+    forceGeminiForCopywriting: true, 
+    forceImagenForImages: true, 
+    forceVeoForVideos: true, 
+    autoPreviewRefresh: true, 
+    autoOptimization: true 
+  } 
+};
+
 interface MarketingProps {
   context?: any;
   navigate: (view: View, context?: any) => void;
@@ -343,7 +369,10 @@ const Marketing: React.FC<MarketingProps> = ({ context, navigate }) => {
 يرجى توليد نص تسويقي مصقول واحترافي فريد من نوعه ومكتوب باللغة العربية الفصحى الأنيقة ليلهم صاحب المشروع ويساعده في جلسة تركيزه.
 أرجع فقط النص التسويقي الصافي كمسودة جاهزة للتحديث أو النسخ، بدون أي تحيات ولا فواصل ولا علامات ماركداون (مثل \`\`\`)...`;
 
-      const aiResponse = await geminiService.generateText(prompt, 'gemini-3.5-flash');
+      const modelToUse = MarketingAIConfig.marketingRules.forceGeminiForCopywriting 
+        ? MarketingAIConfig.contentGeneration.text.model 
+        : 'gemini-3.5-flash';
+      const aiResponse = await geminiService.generateText(prompt, modelToUse);
       setPomelliWorkspaceText(aiResponse.trim());
       showToast('🎉 تم توليد المسودة التسويقية الذكية بنجاح! جاهزة للتطوير.');
     } catch (e) {
@@ -398,7 +427,10 @@ const Marketing: React.FC<MarketingProps> = ({ context, navigate }) => {
   "feedback": "تحليل نقدي مفصل لترتيب النبرة، وتحديد نقاط القوة الحالية في النص متبوعة بـ 3 توصيات صريحة وموجزة وراوية باللغة العربية الفصحى للتنفيذ الفوري لتحويل الزوّار لعملاء فعليين"
 }`;
 
-      const aiResponse = await geminiService.generateText(prompt, 'gemini-3.5-flash');
+      const modelToUse = MarketingAIConfig.marketingRules.forceGeminiForCopywriting 
+        ? MarketingAIConfig.contentGeneration.text.model 
+        : 'gemini-3.5-flash';
+      const aiResponse = await geminiService.generateText(prompt, modelToUse);
       
       // Clean up markdown block wraps if present
       let cleanedJson = aiResponse.trim();
@@ -709,7 +741,10 @@ const Marketing: React.FC<MarketingProps> = ({ context, navigate }) => {
 تنبيه حاسم لا يقبل النقاش: تخلص تماماً من كافة الأقواس والإرشادات التوضيحية واجعل المخرجات عبارة عن محتوى حقيقي متقن صُمّم خصيصاً للتنفيذ كأنك وكالة تسويق عالمية تشرف على مشروع "${project.name}" الباهر!
 `;
 
-      const aiResponse = await geminiService.generateText(modelPrompt, 'gemini-3.5-flash');
+      const modelToUse = MarketingAIConfig.marketingRules.forceGeminiForCopywriting 
+        ? MarketingAIConfig.contentGeneration.text.model 
+        : 'gemini-3.5-flash';
+      const aiResponse = await geminiService.generateText(modelPrompt, modelToUse);
       onLog('📥 [Gemini API] تم استقبال بيانات خطة التسويق والحملات الذكية حركياً.');
       await new Promise(resolve => setTimeout(resolve, 400));
 
@@ -826,7 +861,10 @@ const Marketing: React.FC<MarketingProps> = ({ context, navigate }) => {
 القطاع: ${campaignData.sector}
 النوع المطلوب إعادة صياغته: ${type}.
 اكتبه بأسلوب جديد وابتكاري وفريد باللغة العربية الفصحى. أرجع النتيجة كنص نظيف فقط بدون أي أقواس أو وسوم.`;
-      const response = await geminiService.generateText(prompt, 'gemini-3.5-flash');
+      const modelToUse = MarketingAIConfig.marketingRules.forceGeminiForCopywriting 
+        ? MarketingAIConfig.contentGeneration.text.model 
+        : 'gemini-3.5-flash';
+      const response = await geminiService.generateText(prompt, modelToUse);
       
       const updated = { ...campaignData };
       if (type === 'ad' && updated.googleAds.length > 0) {
@@ -1103,7 +1141,10 @@ const Marketing: React.FC<MarketingProps> = ({ context, navigate }) => {
   "visual": "الوصف البصري والرسوم المتحركة للمشهد ${sceneNum} باللغة العربية الفصحى الفاخرة",
   "voiceover": "التعليق الصوتي والخطاب المقترح لهذا المشهد باللغة العربية الفصحى لجذب الجمهور"
 }`;
-      const response = await geminiService.generateText(prompt, 'gemini-3.5-flash');
+      const modelToUse = MarketingAIConfig.marketingRules.forceGeminiForCopywriting 
+        ? MarketingAIConfig.contentGeneration.text.model 
+        : 'gemini-3.5-flash';
+      const response = await geminiService.generateText(prompt, modelToUse);
       let cleaned = response.trim();
       if (cleaned.startsWith('```json')) {
         cleaned = cleaned.replace(/^```json/, '').replace(/```$/, '').trim();
