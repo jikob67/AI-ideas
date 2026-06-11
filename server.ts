@@ -471,11 +471,10 @@ async function startServer() {
       }
       
       const response = await getAi().models.generateContent({
-        model: 'gemini-2.0-flash', // Fully released gemini-2.0-flash with native tts
+        model: 'gemini-3.1-flash-tts-preview',
         contents: [{ role: 'user', parts: [{ text }] }],
         config: {
-          responseModalities: ['AUDIO'],
-          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } }
+          responseModalities: ['AUDIO']
         }
       });
       
@@ -487,6 +486,77 @@ async function startServer() {
     } catch (error: any) {
       console.error("Gemini Generate Speech Error:", error.message);
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Dedicated Voice-to-Voice Multimodal Assistant Endpoint
+  app.post("/api/gemini/audio-chat", async (req, res) => {
+    const { base64Audio } = req.body;
+    try {
+      if (!base64Audio) {
+        return res.status(400).json({ error: "الرجاء إدخال بيانات صوتية صالحة." });
+      }
+
+      // Step 1: Transcribe user voice audio via gemini-3.5-flash (multimodal audio)
+      const transcribeResponse = await getAi().models.generateContent({
+        model: 'gemini-3.5-flash',
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              {
+                inlineData: {
+                  data: base64Audio,
+                  mimeType: 'audio/webm'
+                }
+              },
+              {
+                text: "أعد كتابة الكلام المسموع بدقة بالغة وباللغة العربية الفصحى أو اللهجة المنطوقة. لا تضيف أي تعليقات خارجية، اكتب النص المنطوق فقط."
+              }
+            ]
+          }
+        ]
+      });
+
+      const userText = transcribeResponse.text?.trim() || "";
+      if (!userText) {
+        throw new Error("لم نتمكن من تمييز الكلام المنطوق بوضوح. يرجى تجربة التحدث مرة أخرى.");
+      }
+
+      // Step 2: Get AI response via gemini-3.5-flash
+      const responseTextModel = await getAi().models.generateContent({
+        model: 'gemini-3.5-flash',
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: `أنت المساعد الذكي "AI ideas" لتوليد الأفكار والمشاريع وتوليد المحتوى والكود. أجب العميل مباشرة باختصار مفييد للغاية وبطريقة جميلة تناسب الردود الصوتية السريعة (حدود جملتين أو ثلاث جمل في سياق: ${userText})` }]
+          }
+        ]
+      });
+
+      const assistantText = responseTextModel.text?.trim() || "أهلاً بك! تواصل معي في أي وقت.";
+
+      // Step 3: Speak the AI answer using gemini-3.1-flash-tts-preview
+      const speechModelResponse = await getAi().models.generateContent({
+        model: 'gemini-3.1-flash-tts-preview',
+        contents: [{ role: 'user', parts: [{ text: assistantText }] }],
+        config: {
+          responseModalities: ['AUDIO']
+        }
+      });
+
+      const audioPart = speechModelResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+      const assistantAudioBase64 = audioPart && audioPart.data ? audioPart.data : "";
+
+      return res.json({
+        userTranscription: userText,
+        assistantTranscription: assistantText,
+        assistantAudio: assistantAudioBase64
+      });
+
+    } catch (error: any) {
+      console.error("Gemini Audio Chat Error:", error.message);
+      res.status(500).json({ error: error.message || "فشلت معالجة الصوت المباشر." });
     }
   });
 
