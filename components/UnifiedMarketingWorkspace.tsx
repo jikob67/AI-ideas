@@ -84,6 +84,7 @@ export const UnifiedMarketingWorkspace: React.FC<UnifiedMarketingWorkspaceProps>
   const [customProjectSlug, setCustomProjectSlug] = useState<string>(
     selectedProject?.name?.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-') || 'my-project'
   );
+  const [customProjectDomain, setCustomProjectDomain] = useState<string>('ai-ideas.com');
 
   // Sharing drawer
   const [showShareModal, setShowShareModal] = useState<boolean>(false);
@@ -1223,17 +1224,44 @@ ${campaignData.videoScript?.map((sc: any) => `  * المشهد ${sc.scene} (${sc
             </div>
 
             {/* Custom Project Link Box */}
-            <div className="bg-slate-950/50 p-4 border border-slate-850 rounded-2xl space-y-2">
-              <label className="text-[10px] text-slate-400 font-bold block">🚨 رابط تشغيل مشروع المستخدم (User Project Link):</label>
-              <div className="flex gap-1.5 bg-slate-950 border border-slate-800 p-2.5 rounded-xl">
-                <span className="text-[10px] text-emerald-400 font-mono self-center">https://ai-ideas/</span>
-                <input 
-                  type="text" 
-                  value={customProjectSlug} 
-                  onChange={(e) => setCustomProjectSlug(e.target.value.toLowerCase().replace(/[^a-z0-9\-]/g, ''))}
-                  placeholder="اسم-مشروعك" 
-                  className="flex-grow bg-transparent text-xs text-white outline-none font-mono text-left font-bold"
-                />
+            <div className="bg-slate-950/50 p-4 border border-slate-850 rounded-2xl space-y-3">
+              <label className="text-[10px] text-slate-400 font-bold block">🚨 رابط تشغيل ودومين مشروع المستخدم (Project Link & Domain):</label>
+              
+              <div className="grid grid-cols-2 gap-2">
+                {/* Domain Input */}
+                <div className="space-y-1">
+                  <span className="text-[9px] text-slate-400 block text-right">⚙️ دومين المشروع:</span>
+                  <div className="flex gap-1 bg-slate-950 border border-slate-800 p-2 rounded-xl">
+                    <span className="text-[9px] text-emerald-400 font-mono self-center">https://</span>
+                    <input 
+                      type="text" 
+                      value={customProjectDomain} 
+                      onChange={(e) => setCustomProjectDomain(e.target.value.toLowerCase().replace(/[^a-z0-9\.\-]/g, ''))}
+                      placeholder="ai-ideas.com" 
+                      className="w-full bg-transparent text-[11px] text-white outline-none font-mono text-left font-bold"
+                    />
+                  </div>
+                </div>
+
+                {/* Slug Input */}
+                <div className="space-y-1">
+                  <span className="text-[9px] text-slate-400 block text-right">✍️ مسار المشروع الفرعي:</span>
+                  <div className="flex gap-1 bg-slate-950 border border-slate-800 p-2 rounded-xl">
+                    <span className="text-[9px] text-indigo-400 font-mono self-center">/</span>
+                    <input 
+                      type="text" 
+                      value={customProjectSlug} 
+                      onChange={(e) => setCustomProjectSlug(e.target.value.toLowerCase().replace(/[^a-z0-9\-]/g, ''))}
+                      placeholder="اسم-مشروعك" 
+                      className="w-full bg-transparent text-[11px] text-white outline-none font-mono text-left font-bold"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Dynamic Preview URL */}
+              <div className="text-[9px] text-indigo-400 text-left font-mono truncate pt-1 border-t border-slate-900 leading-relaxed">
+                🔗 الرابط الحركي: https://{customProjectDomain || 'ai-ideas.com'}/{customProjectSlug || 'project'}
               </div>
               <p className="text-[9px] text-slate-500 text-right">ملاحظة: سيتم تغليف هذا الرابط والوسائل الترويجية تلقائياً في حزم الأجهزة لضمان التشغيل الصحيح دون أخطاء.</p>
             </div>
@@ -1330,29 +1358,51 @@ ${campaignData.videoScript?.map((sc: any) => `  * المشهد ${sc.scene} (${sc
 
             {/* Custom Project Slug Input */}
             <div className="space-y-1 text-right">
-              <label className="text-[10px] text-slate-400 font-bold block mb-1">✍️ تخصيص رابط المشروع (User Project Link):</label>
-              <div className="flex gap-1.5 bg-slate-950 border border-slate-800 p-2.5 rounded-xl">
-                <span className="text-[10px] text-indigo-400 font-mono self-center">https://ai-ideas/</span>
-                <input 
-                  type="text" 
-                  value={customProjectSlug} 
-                  onChange={(e) => setCustomProjectSlug(e.target.value.toLowerCase().replace(/[^a-z0-9\-]/g, ''))}
-                  placeholder="اسم-مشروعك" 
-                  className="flex-grow bg-transparent text-xs text-white outline-none font-mono text-left"
-                />
+              <label className="text-[10px] text-slate-400 font-bold block mb-1">✍️ تخصيص دومين ورابط المشروع (Project Link & Domain):</label>
+              
+              <div className="space-y-2">
+                {/* Domain Input */}
+                <div className="space-y-1">
+                  <span className="text-[9px] text-slate-400 block">🌐 دومين المشاريع المخصص:</span>
+                  <div className="flex gap-1.5 bg-slate-950 border border-slate-800 p-2.5 rounded-xl">
+                    <span className="text-[10px] text-indigo-400 font-mono self-center">https://</span>
+                    <input 
+                      type="text" 
+                      value={customProjectDomain} 
+                      onChange={(e) => setCustomProjectDomain(e.target.value.toLowerCase().replace(/[^a-z0-9\.\-]/g, ''))}
+                      placeholder="ai-ideas.com" 
+                      className="flex-grow bg-transparent text-xs text-white outline-none font-mono text-left font-bold"
+                    />
+                  </div>
+                </div>
+
+                {/* Slug Input */}
+                <div className="space-y-1">
+                  <span className="text-[9px] text-slate-400 block">✍️ مسار الرابط (Slug):</span>
+                  <div className="flex gap-1.5 bg-slate-950 border border-slate-800 p-2.5 rounded-xl">
+                    <span className="text-[10px] text-indigo-400 font-mono self-center">/</span>
+                    <input 
+                      type="text" 
+                      value={customProjectSlug} 
+                      onChange={(e) => setCustomProjectSlug(e.target.value.toLowerCase().replace(/[^a-z0-9\-]/g, ''))}
+                      placeholder="اسم-مشروعك" 
+                      className="flex-grow bg-transparent text-xs text-white outline-none font-mono text-left font-bold"
+                    />
+                  </div>
+                </div>
               </div>
-              <p className="text-[9px] text-slate-500 mt-1">يمكن للمستخدم إدخال اسم مشروعه بعد https://ai-ideas ليتم حزمه كلياً مع مشاريعه.</p>
+              <p className="text-[9px] text-slate-500 mt-1">يمكنك إدخال الدومين الخاص ببراندك ومسار المشروع الفريد لتخصيص الهوية كلياً.</p>
             </div>
 
             {/* Finalized original URL */}
             <div className="bg-slate-950 p-3.5 border border-slate-850 rounded-2xl text-xs space-y-2">
               <span className="text-[9px] text-indigo-400 font-bold block">الرابط المطور الجاهز للنشر:</span>
               <p className="text-white text-[11px] font-bold font-mono tracking-tight text-left select-all truncate bg-slate-900 px-2 py-1.5 rounded border border-slate-800">
-                https://ai-ideas/{customProjectSlug || 'project'}
+                https://{customProjectDomain || 'ai-ideas.com'}/{customProjectSlug || 'project'}
               </p>
               <button
                 onClick={() => {
-                  const finalUrl = `https://ai-ideas/${customProjectSlug || 'project'}`;
+                  const finalUrl = `https://${customProjectDomain || 'ai-ideas.com'}/${customProjectSlug || 'project'}`;
                   navigator.clipboard.writeText(finalUrl);
                   showToast(`📋 تم نسخ رابط مشروعك الفريد:\n${finalUrl}`);
                 }}
