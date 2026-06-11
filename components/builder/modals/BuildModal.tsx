@@ -52,25 +52,25 @@ export const BuildModal: React.FC<BuildModalProps> = ({ isOpen, onClose, project
             const currentHost = window.location.host;
             const currentProto = window.location.protocol;
             
-            // If the parent page is loaded via HTTPS, we MUST force HTTPS for any resource on the same or external non-local domain.
+            // If it is our local app platform resource (contains /published/ or /builds/)
+            if (parsed.pathname.includes('/published/') || parsed.pathname.includes('/builds/')) {
+                return `${currentProto}//${currentHost}${parsed.pathname}${parsed.search}`;
+            }
+            
+            // If the parent page is loaded via HTTPS, force HTTPS for non-local resources to bypass mixed content blocks
             if (window.location.protocol === 'https:' && parsed.protocol === 'http:') {
                 if (parsed.hostname !== 'localhost' && parsed.hostname !== '127.0.0.1') {
                     parsed.protocol = 'https:';
                 }
             }
             
-            // If url points to local server (localhost / 127.0.0.1) but the app is accessed externally,
-            // we map it to the external domain so that the client browser can resolve and download the file.
-            if ((parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') && 
-                !window.location.hostname.includes('localhost') && 
-                !window.location.hostname.includes('127.0.0.1')) {
-                return `${currentProto}//${currentHost}${parsed.pathname}${parsed.search}`;
-            }
             return parsed.toString();
         } catch (e) {
-            // Re-check protocol fallback
-            if (window.location.protocol === 'https:' && url.startsWith('http://') && !url.includes('localhost') && !url.includes('127.0.0.1')) {
-                return url.replace('http://', 'https://');
+            // Manual fallback if url parsing failed
+            if (url.includes('/published/') || url.includes('/builds/')) {
+                const searchStr = url.includes('/published/') ? '/published/' : '/builds/';
+                const cleanPath = url.substring(url.indexOf(searchStr));
+                return `${window.location.protocol}//${window.location.host}${cleanPath}`;
             }
             return url;
         }
@@ -648,16 +648,22 @@ export const BuildModal: React.FC<BuildModalProps> = ({ isOpen, onClose, project
                                         <div className="flex items-center gap-4 bg-slate-950/40 p-4 rounded-2xl border border-slate-800/80 justify-end flex-row-reverse w-full">
                                             <div className="bg-white p-2 rounded-xl shrink-0">
                                                 <img 
-                                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=100&data=${encodeURIComponent(resultLink)}`} 
+                                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=150&data=${encodeURIComponent(resultLink)}`} 
                                                     alt="Scan QR code" 
                                                     className="w-[100px] h-[100px]"
                                                 />
                                             </div>
-                                            <div className="text-right font-sans">
+                                            <div className="text-right font-sans flex-1">
                                                 <h5 className="text-white font-bold text-xs mb-1">امسح الكود للتثبيت بالهاتف</h5>
-                                                <p className="text-[10px] text-slate-400 leading-relaxed font-sans">
+                                                <p className="text-[10px] text-slate-400 leading-relaxed font-sans mb-2">
                                                     امسح هذا الرمز باستخدام كاميرا هاتفك لتفتح التطبيق وتثبته مباشرة كـ PWA أو ربطه بمشغل الويب الذكي.
                                                 </p>
+                                                <div className="flex items-center justify-between bg-slate-900 border border-slate-800 rounded-lg p-1 px-2 text-[9px] text-indigo-400 font-mono gap-1.5 break-all max-w-[200px] ml-auto">
+                                                    <span className="truncate flex-1 select-all">{resultLink}</span>
+                                                    <button onClick={handleCopyLink} className="p-0.5 hover:text-white text-slate-400 transition-colors shrink-0">
+                                                        {copied ? <CheckIcon className="w-3 h-3 text-green-400" /> : <CopyIcon className="w-3 h-3" />}
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                     )}

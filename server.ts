@@ -720,10 +720,19 @@ async function startServer() {
 
     // Function to assemble and write all build products to disk
     const writeFiles = async () => {
-      // 1. Write the published web files for direct URL serving
+      // 1. Write the published web files for direct URL serving, with nested folder structure support
       for (const file of files) {
-        const safeName = path.basename(file.name);
-        fs.writeFileSync(path.join(projectDir, safeName), file.content, "utf8");
+        const cleanedName = file.name.replace(/^\/+/, '').replace(/\.\.\//g, '');
+        const targetPath = path.join(projectDir, cleanedName);
+        
+        // Ensure it doesn't escape projectDir
+        if (targetPath.startsWith(projectDir)) {
+          const folder = path.dirname(targetPath);
+          if (!fs.existsSync(folder)) {
+            fs.mkdirSync(folder, { recursive: true });
+          }
+          fs.writeFileSync(targetPath, file.content, "utf8");
+        }
       }
 
       // 2. Generate PWA manifest.json
@@ -1209,10 +1218,19 @@ This complete Flutter project runs your web app natively on Android and iOS.
         fs.mkdirSync(projectDir, { recursive: true });
       }
 
-      // Write code files
+      // Write code files with support for nested folder structures safely
       for (const file of files) {
-        const safeName = path.basename(file.name);
-        fs.writeFileSync(path.join(projectDir, safeName), file.content, "utf8");
+        const cleanedName = file.name.replace(/^\/+/, '').replace(/\.\.\//g, '');
+        const targetPath = path.join(projectDir, cleanedName);
+        
+        // Ensure it doesn't escape projectDir
+        if (targetPath.startsWith(projectDir)) {
+          const folder = path.dirname(targetPath);
+          if (!fs.existsSync(folder)) {
+            fs.mkdirSync(folder, { recursive: true });
+          }
+          fs.writeFileSync(targetPath, file.content, "utf8");
+        }
       }
 
       // 1. Generate elegant PWA manifest.json
@@ -1310,36 +1328,39 @@ self.addEventListener('fetch', event => {
     }
   });
 
-  // Serve the published files
-  app.get(["/published/:projectId", "/published/:projectId/:filename"], (req, res) => {
-    const projectId = req.params.projectId as string;
-    const filename = (req.params as any).filename || "index.html";
-
-    const safeFilename = path.basename(filename);
-    const filePath = path.join(PUBLISHED_DIR, projectId, safeFilename);
-
-    if (fs.existsSync(filePath)) {
-      if (safeFilename.endsWith(".html")) {
+  // Serve the published files with full recursive folder support and correct headers
+  app.use("/published", express.static(PUBLISHED_DIR, {
+    setHeaders: (res, filePath) => {
+      const ext = path.extname(filePath).toLowerCase();
+      if (ext === ".html") {
         res.setHeader("Content-Type", "text/html; charset=UTF-8");
-      } else if (safeFilename.endsWith(".css")) {
+      } else if (ext === ".css") {
         res.setHeader("Content-Type", "text/css; charset=UTF-8");
-      } else if (safeFilename.endsWith(".js")) {
+      } else if (ext === ".js" || ext === ".mjs") {
         res.setHeader("Content-Type", "application/javascript; charset=UTF-8");
-      } else if (safeFilename.endsWith(".json")) {
+      } else if (ext === ".json") {
         res.setHeader("Content-Type", "application/json; charset=UTF-8");
+      } else if (ext === ".svg") {
+        res.setHeader("Content-Type", "image/svg+xml");
+      } else if (ext === ".png") {
+        res.setHeader("Content-Type", "image/png");
+      } else if (ext === ".jpg" || ext === ".jpeg") {
+        res.setHeader("Content-Type", "image/jpeg");
       }
-      // Production Cache-control for faster asset loading and reduced server load
       res.setHeader("Cache-Control", "public, max-age=3600, must-revalidate");
-      return res.sendFile(filePath);
-    } else {
-      return res.status(404).send(`
-        <div style="font-family: system-ui, sans-serif; text-align: center; padding: 55px 15px; background: #0f172a; color: #f8fafc; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center;">
-          <h1 style="color: #ef4444; font-size: 32px; margin-bottom: 8px;">الصفحة غير موجودة | Not Found</h1>
-          <p style="color: #94a3b8; font-size: 16px;">لم يتم النشر أو العثور على الملف المطلوب للمشروع (${projectId})</p>
-          <a href="/" style="margin-top: 24px; padding: 12px 24px; background: #6366f1; color: white; border-radius: 12px; text-decoration: none; font-weight: bold; font-size: 14px;">العودة للمنصة</a>
-        </div>
-      `);
     }
+  }));
+
+  // Fallback 404 handler for published apps when folder or file does not exist
+  app.get(["/published/:projectId", "/published/:projectId/:subpath*"], (req, res) => {
+    const projectId = req.params.projectId as string;
+    return res.status(404).send(`
+      <div style="font-family: system-ui, sans-serif; text-align: center; padding: 55px 15px; background: #0f172a; color: #f8fafc; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+        <h1 style="color: #ef4444; font-size: 32px; margin-bottom: 8px;">الصفحة غير موجودة | Not Found</h1>
+        <p style="color: #94a3b8; font-size: 16px;">لم يتم النشر أو العثور على الملف المطلوب للمشروع (${projectId})</p>
+        <a href="/" style="margin-top: 24px; padding: 12px 24px; background: #6366f1; color: white; border-radius: 12px; text-decoration: none; font-weight: bold; font-size: 14px;">العودة للمنصة</a>
+      </div>
+    `);
   });
 
   // API to stream/serve real pre-compiled WebView launcher Android `.apk`
