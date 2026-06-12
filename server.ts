@@ -250,13 +250,10 @@ async function startServer() {
 
   function normalizeModelName(model: string): string {
     const m = (model || "").toLowerCase();
-    if (m.includes("gemini-3.5-flash") || m.includes("gemini-flash-latest")) {
-      return "gemini-2.5-flash";
+    if (m.includes("pro") || m.includes("3.1-pro")) {
+      return "gemini-3.1-pro-preview";
     }
-    if (m.includes("gemini-3.5-pro") || m.includes("gemini-pro-latest")) {
-      return "gemini-2.5-pro";
-    }
-    return model || "gemini-2.5-flash";
+    return "gemini-3.5-flash";
   }
 
   app.post("/api/gemini/generate", async (req, res) => {
@@ -268,13 +265,11 @@ async function startServer() {
     const modelQueue = [requestedModel];
     
     if (requestedModel.includes("pro")) {
-      modelQueue.push("gemini-2.5-pro");
-      modelQueue.push("gemini-1.5-pro");
-      modelQueue.push("gemini-2.5-flash");
+      modelQueue.push("gemini-3.1-pro-preview");
+      modelQueue.push("gemini-3.5-flash");
     } else {
-      modelQueue.push("gemini-2.5-flash");
-      modelQueue.push("gemini-2.0-flash");
-      modelQueue.push("gemini-1.5-flash");
+      modelQueue.push("gemini-3.5-flash");
+      modelQueue.push("gemini-3.1-pro-preview");
     }
 
     const uniqueModelQueue = Array.from(new Set(modelQueue));
@@ -335,13 +330,11 @@ async function startServer() {
     const requestedModel = normalizeModelName(model || "gemini-flash-latest");
     const modelQueue = [requestedModel];
     if (requestedModel.includes("pro")) {
-      modelQueue.push("gemini-2.5-pro");
-      modelQueue.push("gemini-1.5-pro");
-      modelQueue.push("gemini-2.5-flash");
+      modelQueue.push("gemini-3.1-pro-preview");
+      modelQueue.push("gemini-3.5-flash");
     } else {
-      modelQueue.push("gemini-2.5-flash");
-      modelQueue.push("gemini-2.0-flash");
-      modelQueue.push("gemini-1.5-flash");
+      modelQueue.push("gemini-3.5-flash");
+      modelQueue.push("gemini-3.1-pro-preview");
     }
 
     const uniqueModelQueue = Array.from(new Set(modelQueue));
