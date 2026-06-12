@@ -248,25 +248,40 @@ async function startServer() {
     }
   });
 
+  function normalizeModelName(model: string): string {
+    const m = (model || "").toLowerCase();
+    if (m.includes("gemini-3.5-flash") || m.includes("gemini-flash-latest")) {
+      return "gemini-2.5-flash";
+    }
+    if (m.includes("gemini-3.5-pro") || m.includes("gemini-pro-latest")) {
+      return "gemini-2.5-pro";
+    }
+    return model || "gemini-2.5-flash";
+  }
+
   app.post("/api/gemini/generate", async (req, res) => {
     const { model, contents, config } = req.body;
     const maxRetries = 3;
     let attempt = 0;
     
-    // Define fallback models if we hit a 429 RESOURCE_EXHAUSTED / Quota Exceeded error
-    const requestedModel = model || "gemini-flash-latest";
+    const requestedModel = normalizeModelName(model);
     const modelQueue = [requestedModel];
     
-    // If the requested model is 'gemini-3.5-flash' or 'gemini-flash-latest', let's add alternative flash models to fall back to
-    if (requestedModel === "gemini-3.5-flash" || requestedModel === "gemini-flash-latest") {
+    if (requestedModel.includes("pro")) {
+      modelQueue.push("gemini-2.5-pro");
+      modelQueue.push("gemini-1.5-pro");
       modelQueue.push("gemini-2.5-flash");
-      modelQueue.push("gemini-2.0-flash-exp");
+    } else {
+      modelQueue.push("gemini-2.5-flash");
+      modelQueue.push("gemini-2.0-flash");
+      modelQueue.push("gemini-1.5-flash");
     }
 
+    const uniqueModelQueue = Array.from(new Set(modelQueue));
     let modelIndex = 0;
 
-    while (modelIndex < modelQueue.length) {
-      const currentModel = modelQueue[modelIndex];
+    while (modelIndex < uniqueModelQueue.length) {
+      const currentModel = uniqueModelQueue[modelIndex];
       try {
         const response = await getAi().models.generateContent({
           model: currentModel,
@@ -288,11 +303,10 @@ async function startServer() {
                             errorMessage.includes("UNAVAILABLE");
 
         // If it's a quota exceeded error status, check if we have a fallback model available
-        if (isQuotaExceeded && modelIndex < modelQueue.length - 1) {
+        if (isQuotaExceeded && modelIndex < uniqueModelQueue.length - 1) {
           modelIndex++;
           attempt = 0; // Reset attempts for the fallback model
-          console.warn(`[Client/Server Fallback] Quota exceeded for model ${currentModel}. Falling back to model ${modelQueue[modelIndex]}...`);
-          // Let's print the fallback warning and wait 300ms before retrying on the new model
+          console.warn(`[Client/Server Fallback] Quota exceeded for model ${currentModel}. Falling back to model ${uniqueModelQueue[modelIndex]}...`);
           await new Promise(resolve => setTimeout(resolve, 300));
           continue;
         }
@@ -318,16 +332,22 @@ async function startServer() {
   app.post("/api/gemini/stream", async (req, res) => {
     const { model, contents, config } = req.body;
     
-    const requestedModel = model || "gemini-flash-latest";
+    const requestedModel = normalizeModelName(model || "gemini-flash-latest");
     const modelQueue = [requestedModel];
-    if (requestedModel === "gemini-3.5-flash" || requestedModel === "gemini-flash-latest") {
+    if (requestedModel.includes("pro")) {
+      modelQueue.push("gemini-2.5-pro");
+      modelQueue.push("gemini-1.5-pro");
       modelQueue.push("gemini-2.5-flash");
-      modelQueue.push("gemini-2.0-flash-exp");
+    } else {
+      modelQueue.push("gemini-2.5-flash");
+      modelQueue.push("gemini-2.0-flash");
+      modelQueue.push("gemini-1.5-flash");
     }
 
+    const uniqueModelQueue = Array.from(new Set(modelQueue));
     let modelIndex = 0;
-    while (modelIndex < modelQueue.length) {
-      const currentModel = modelQueue[modelIndex];
+    while (modelIndex < uniqueModelQueue.length) {
+      const currentModel = uniqueModelQueue[modelIndex];
       try {
         const response = await getAi().models.generateContentStream({
           model: currentModel,
@@ -353,9 +373,9 @@ async function startServer() {
                                 errorMessage.includes("quota") || 
                                 errorMessage.includes("RESOURCE_EXHAUSTED");
 
-        if (isQuotaExceeded && modelIndex < modelQueue.length - 1) {
+        if (isQuotaExceeded && modelIndex < uniqueModelQueue.length - 1) {
           modelIndex++;
-          console.warn(`[Client/Server Stream Fallback] Quota exceeded for model ${currentModel}. Falling back to model ${modelQueue[modelIndex]}...`);
+          console.warn(`[Client/Server Stream Fallback] Quota exceeded for model ${currentModel}. Falling back to model ${uniqueModelQueue[modelIndex]}...`);
           await new Promise(resolve => setTimeout(resolve, 300));
           continue;
         }
