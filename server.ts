@@ -250,6 +250,10 @@ async function startServer() {
 
   function normalizeModelName(model: string): string {
     const m = (model || "").toLowerCase();
+    // Keep image, video, live, translation, music, audio, embedding, or tts models as-is
+    if (m.includes("image") || m.includes("veo") || m.includes("live") || m.includes("translate") || m.includes("lyria") || m.includes("tts") || m.includes("audio") || m.includes("embedding")) {
+      return model;
+    }
     if (m.includes("pro") || m.includes("3.1-pro")) {
       return "gemini-3.1-pro-preview";
     }
@@ -289,6 +293,17 @@ async function startServer() {
         const errorMessage = error.message || "";
         const errorStatus = error.status || 0;
         
+        console.warn(`[Gemini Generate] Error on model ${currentModel}: ${errorMessage} (Status: ${errorStatus})`);
+
+        // Check if there's a fallback model available inside our queue
+        if (modelIndex < uniqueModelQueue.length - 1) {
+          modelIndex++;
+          attempt = 0; // Reset attempts for the next model
+          console.warn(`[Client/Server Fallback] Error occurred for model ${currentModel}. Falling back to model ${uniqueModelQueue[modelIndex]}...`);
+          await new Promise(resolve => setTimeout(resolve, 300));
+          continue;
+        }
+
         const isQuotaExceeded = errorStatus === 429 || 
                                 errorMessage.includes("429") || 
                                 errorMessage.includes("quota") || 
@@ -296,15 +311,6 @@ async function startServer() {
         const isRetryable = isQuotaExceeded || errorStatus === 503 ||
                             errorMessage.includes("503") ||
                             errorMessage.includes("UNAVAILABLE");
-
-        // If it's a quota exceeded error status, check if we have a fallback model available
-        if (isQuotaExceeded && modelIndex < uniqueModelQueue.length - 1) {
-          modelIndex++;
-          attempt = 0; // Reset attempts for the fallback model
-          console.warn(`[Client/Server Fallback] Quota exceeded for model ${currentModel}. Falling back to model ${uniqueModelQueue[modelIndex]}...`);
-          await new Promise(resolve => setTimeout(resolve, 300));
-          continue;
-        }
 
         if (isRetryable && attempt <= maxRetries) {
           const waitTime = attempt * 2000 + Math.random() * 1000;
@@ -361,14 +367,12 @@ async function startServer() {
         const errorMessage = error.message || "";
         const errorStatus = error.status || 0;
         
-        const isQuotaExceeded = errorStatus === 429 || 
-                                errorMessage.includes("429") || 
-                                errorMessage.includes("quota") || 
-                                errorMessage.includes("RESOURCE_EXHAUSTED");
+        console.warn(`[Gemini Stream] Error on model ${currentModel}: ${errorMessage} (Status: ${errorStatus})`);
 
-        if (isQuotaExceeded && modelIndex < uniqueModelQueue.length - 1) {
+        // Check if there's a fallback model available inside our queue
+        if (modelIndex < uniqueModelQueue.length - 1) {
           modelIndex++;
-          console.warn(`[Client/Server Stream Fallback] Quota exceeded for model ${currentModel}. Falling back to model ${uniqueModelQueue[modelIndex]}...`);
+          console.warn(`[Client/Server Stream Fallback] Error occurred for model ${currentModel}. Falling back to model ${uniqueModelQueue[modelIndex]}...`);
           await new Promise(resolve => setTimeout(resolve, 300));
           continue;
         }
