@@ -1,22 +1,4 @@
-export enum Type {
-    TYPE_UNSPECIFIED = "TYPE_UNSPECIFIED",
-    STRING = "STRING",
-    NUMBER = "NUMBER",
-    INTEGER = "INTEGER",
-    BOOLEAN = "BOOLEAN",
-    ARRAY = "ARRAY",
-    OBJECT = "OBJECT",
-    NULL = "NULL",
-}
-
-export enum Modality {
-    MODALITY_UNSPECIFIED = "MODALITY_UNSPECIFIED",
-    TEXT = "TEXT",
-    IMAGE = "IMAGE",
-    AUDIO = "AUDIO",
-    VIDEO = "VIDEO",
-}
-
+import { Type, Modality } from '@google/genai';
 import { Project, ProjectFile, ProjectSection, ProjectType, DesignConfig, MarketingSuggestion, MarketingAsset, Message, SectionType, User, ProjectIdea } from '../types';
 import { SECTION_DEFINITIONS, getInitialSectionsForProjectType, PLAN_SECTIONS } from '../constants';
 

@@ -1,8 +1,48 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { GoogleGenAI, LiveServerMessage, Modality, Blob as GenaiBlob } from '@google/genai';
 import { MicrophoneIcon, StopIcon, SpinnerIcon, ArrowDownTrayIcon, CopyIcon, TrashIcon, CheckIcon, Share2Icon } from './Icons';
 import { useAuth } from '../hooks/useAuth';
 
-type ConversationState = 'idle' | 'connecting' | 'active' | 'processing' | 'error';
+// --- Audio Helper Functions from Docs ---
+function encode(bytes: Uint8Array): string {
+  let binary = '';
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+function decode(base64: string): Uint8Array {
+  const binaryString = atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
+
+async function decodeAudioData(
+  data: Uint8Array,
+  ctx: AudioContext,
+  sampleRate: number,
+  numChannels: number
+): Promise<AudioBuffer> {
+  const dataInt16 = new Int16Array(data.buffer);
+  const frameCount = dataInt16.length / numChannels;
+  const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
+
+  for (let channel = 0; channel < numChannels; channel++) {
+    const channelData = buffer.getChannelData(channel);
+    for (let i = 0; i < frameCount; i++) {
+      channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
+    }
+  }
+  return buffer;
+}
+
+type ConversationState = 'idle' | 'connecting' | 'active' | 'error';
 type Transcript = { user: string; bot: string };
 
 const LiveConversation: React.FC = () => {
@@ -12,10 +52,13 @@ const LiveConversation: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
+  const sessionPromiseRef = useRef<Promise<any> | null>(null);
+  const inputAudioContextRef = useRef<AudioContext | null>(null);
+  const outputAudioContextRef = useRef<AudioContext | null>(null);
+  const scriptProcessorRef = useRef<ScriptProcessorNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const sourcesRef = useRef(new Set<AudioBufferSourceNode>());
+  const nextStartTimeRef = useRef(0);
   const conversationEndRef = useRef<HTMLDivElement>(null);
   const { currentUser, updateUser } = useAuth();
 
@@ -24,22 +67,29 @@ const LiveConversation: React.FC = () => {
   }, [transcripts, currentTranscript]);
 
   const cleanup = useCallback(() => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-        try {
-            mediaRecorderRef.current.stop();
-        } catch (e) {}
+    if (sessionPromiseRef.current) {
+        sessionPromiseRef.current.then(session => session.close());
+        sessionPromiseRef.current = null;
     }
-    mediaRecorderRef.current = null;
-    
     if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
         streamRef.current = null;
     }
-
-    if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
+    if (scriptProcessorRef.current) {
+        scriptProcessorRef.current.disconnect();
+        scriptProcessorRef.current = null;
     }
+    if (inputAudioContextRef.current && inputAudioContextRef.current.state !== 'closed') {
+        inputAudioContextRef.current.close();
+        inputAudioContextRef.current = null;
+    }
+    if (outputAudioContextRef.current && outputAudioContextRef.current.state !== 'closed') {
+        outputAudioContextRef.current.close();
+        outputAudioContextRef.current = null;
+    }
+    sourcesRef.current.forEach(source => source.stop());
+    sourcesRef.current.clear();
+    nextStartTimeRef.current = 0;
   }, []);
 
   useEffect(() => {
@@ -48,115 +98,119 @@ const LiveConversation: React.FC = () => {
     };
   }, [cleanup]);
 
-  const processVoiceInteraction = async (base64Audio: string) => {
-    setState('processing');
-    try {
-        const response = await fetch('/api/gemini/audio-chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ base64Audio, history: transcripts })
-        });
-
-        if (!response.ok) {
-            throw new Error('فشل نظام الصوت في الاستجابة.');
-        }
-
-        const data = await response.json();
-        
-        if (data.error) {
-            throw new Error(data.error);
-        }
-
-        const newTranscript = { 
-            user: data.userTranscription || 'صوت مسموع', 
-            bot: data.assistantTranscription || 'أهلاً بك!' 
-        };
-
-        // Update real time UI matching standard transcripts
-        setCurrentTranscript(newTranscript);
-        setTranscripts(prev => [...prev, newTranscript]);
-
-        if (data.assistantAudio) {
-            if (audioRef.current) {
-                audioRef.current.pause();
-            }
-            const snd = new Audio("data:audio/mp3;base64," + data.assistantAudio);
-            audioRef.current = snd;
-            
-            snd.onended = () => {
-                setState('idle');
-                setCurrentTranscript({ user: '', bot: '' });
-            };
-            
-            await snd.play();
-        } else {
-            setState('idle');
-            setCurrentTranscript({ user: '', bot: '' });
-        }
-    } catch (err: any) {
-        console.error("Audio transaction failed:", err);
-        setError(err.message || 'حدث خطأ أثناء معالجة الصوت.');
-        setState('error');
-        setTimeout(() => setState('idle'), 3000);
-    }
-  };
-
   const connect = async () => {
     setState('connecting');
     setError(null);
-    audioChunksRef.current = [];
+    setTranscripts([]);
+    setCurrentTranscript({ user: '', bot: '' });
     
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        streamRef.current = stream;
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        
+        inputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
+        outputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+        streamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-        // Chrome/Firefox compatible recording mime types
-        let options = {};
-        if (MediaRecorder.isTypeSupported('audio/webm')) {
-            options = { mimeType: 'audio/webm' };
-        } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
-            options = { mimeType: 'audio/mp4' };
-        }
+        sessionPromiseRef.current = ai.live.connect({
+            model: 'gemini-2.5-flash-native-audio-preview-09-2025',
+            callbacks: {
+                onopen: () => {
+                    const inputAudioContext = inputAudioContextRef.current!;
+                    const source = inputAudioContext.createMediaStreamSource(streamRef.current!);
+                    const scriptProcessor = inputAudioContext.createScriptProcessor(4096, 1, 1);
+                    scriptProcessorRef.current = scriptProcessor;
 
-        const mediaRecorder = new MediaRecorder(stream, options);
-        mediaRecorderRef.current = mediaRecorder;
+                    scriptProcessor.onaudioprocess = (audioProcessingEvent) => {
+                        const inputData = audioProcessingEvent.inputBuffer.getChannelData(0);
+                        const l = inputData.length;
+                        const int16 = new Int16Array(l);
+                        for (let i = 0; i < l; i++) {
+                            int16[i] = inputData[i] * 32768;
+                        }
+                        const pcmBlob: GenaiBlob = {
+                            data: encode(new Uint8Array(int16.buffer)),
+                            mimeType: 'audio/pcm;rate=16000',
+                        };
+                        
+                        sessionPromiseRef.current?.then((session) => {
+                            session.sendRealtimeInput({ media: pcmBlob });
+                        });
+                    };
+                    source.connect(scriptProcessor);
+                    scriptProcessor.connect(inputAudioContext.destination);
+                    setState('active');
+                },
+                onmessage: async (message: LiveServerMessage) => {
+                    if (message.serverContent?.outputTranscription) {
+                        const text = message.serverContent.outputTranscription.text;
+                        setCurrentTranscript(prev => ({ ...prev, bot: prev.bot + text }));
+                    } else if (message.serverContent?.inputTranscription) {
+                        const text = message.serverContent.inputTranscription.text;
+                        setCurrentTranscript(prev => ({ ...prev, user: prev.user + text }));
+                    }
 
-        mediaRecorder.ondataavailable = (event) => {
-            if (event.data.size > 0) {
-                audioChunksRef.current.push(event.data);
-            }
-        };
+                    if (message.serverContent?.turnComplete) {
+                        setTranscripts(prev => [...prev, currentTranscript]);
+                        setCurrentTranscript({ user: '', bot: '' });
+                    }
 
-        mediaRecorder.onstop = async () => {
-            const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-            const reader = new FileReader();
-            reader.readAsDataURL(audioBlob);
-            reader.onloadend = async () => {
-                const base64Audio = (reader.result as string).split(',')[1];
-                if (base64Audio) {
-                    await processVoiceInteraction(base64Audio);
-                } else {
+                    const base64Audio = message.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
+                    if (base64Audio) {
+                        const outputAudioContext = outputAudioContextRef.current!;
+                        nextStartTimeRef.current = Math.max(nextStartTimeRef.current, outputAudioContext.currentTime);
+                        
+                        const audioBuffer = await decodeAudioData(decode(base64Audio), outputAudioContext, 24000, 1);
+                        const source = outputAudioContext.createBufferSource();
+                        source.buffer = audioBuffer;
+                        source.connect(outputAudioContext.destination);
+                        
+                        source.addEventListener('ended', () => sourcesRef.current.delete(source));
+                        
+                        source.start(nextStartTimeRef.current);
+                        nextStartTimeRef.current += audioBuffer.duration;
+                        sourcesRef.current.add(source);
+                    }
+                    
+                    if (message.serverContent?.interrupted) {
+                        sourcesRef.current.forEach(source => {
+                            source.stop();
+                            sourcesRef.current.delete(source);
+                        });
+                        nextStartTimeRef.current = 0;
+                    }
+                },
+                onerror: (e: ErrorEvent) => {
+                    setError('حدث خطأ في الاتصال.');
+                    console.error('Live session error:', e);
+                    setState('error');
+                    cleanup();
+                },
+                onclose: (e: CloseEvent) => {
                     setState('idle');
-                }
-            };
-        };
+                    cleanup();
+                },
+            },
+            config: {
+                responseModalities: [Modality.AUDIO],
+                outputAudioTranscription: {},
+                inputAudioTranscription: {},
+                systemInstruction: 'You are a friendly and helpful AI assistant.',
+            },
+        });
 
-        mediaRecorder.start();
-        setState('active');
-    } catch (err: any) {
-        console.error("Failed to start media device capture:", err);
-        setError('فشل في الوصول للميكروفون أو تسجيل الصوت. يرجى التحقق من الصلاحيات.');
+    } catch (err) {
+        setError(err instanceof Error ? err.message : 'فشل في بدء المحادثة.');
         setState('error');
-        setTimeout(() => setState('idle'), 4000);
+        cleanup();
     }
   };
 
   const disconnect = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-        mediaRecorderRef.current.stop();
-    }
-    if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
+    if (sessionPromiseRef.current) {
+        sessionPromiseRef.current.then(session => session.close());
+    } else {
+        cleanup();
+        setState('idle');
     }
   };
 

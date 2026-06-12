@@ -49,28 +49,21 @@ export const BuildModal: React.FC<BuildModalProps> = ({ isOpen, onClose, project
                 return `${window.location.protocol}//${window.location.host}${url}`;
             }
             const parsed = new URL(url);
-            const currentHost = window.location.host;
-            const currentProto = window.location.protocol;
-            
-            // If it is our local app platform resource (contains /published/ or /builds/)
-            if (parsed.pathname.includes('/published/') || parsed.pathname.includes('/builds/')) {
-                return `${currentProto}//${currentHost}${parsed.pathname}${parsed.search}`;
+            if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') {
+                parsed.href = parsed.href.replace(/https?:\/\/localhost(:\d+)?/g, `${window.location.protocol}//${window.location.host}`);
             }
-            
-            // If the parent page is loaded via HTTPS, force HTTPS for non-local resources to bypass mixed content blocks
-            if (window.location.protocol === 'https:' && parsed.protocol === 'http:') {
-                if (parsed.hostname !== 'localhost' && parsed.hostname !== '127.0.0.1') {
-                    parsed.protocol = 'https:';
-                }
+            const finalUrl = parsed.toString();
+            if (finalUrl.includes('localhost') || finalUrl.startsWith('file:') || finalUrl.startsWith('blob:')) {
+                return null;
             }
-            
-            return parsed.toString();
+            return finalUrl;
         } catch (e) {
-            // Manual fallback if url parsing failed
-            if (url.includes('/published/') || url.includes('/builds/')) {
-                const searchStr = url.includes('/published/') ? '/published/' : '/builds/';
-                const cleanPath = url.substring(url.indexOf(searchStr));
-                return `${window.location.protocol}//${window.location.host}${cleanPath}`;
+            if (url.includes('localhost') || url.startsWith('file:') || url.startsWith('blob:')) {
+                const clean = url.replace(/https?:\/\/localhost(:\d+)?/g, `${window.location.protocol}//${window.location.host}`);
+                if (clean.startsWith('blob:') || clean.startsWith('file:')) {
+                    return null;
+                }
+                return clean;
             }
             return url;
         }
@@ -82,10 +75,27 @@ export const BuildModal: React.FC<BuildModalProps> = ({ isOpen, onClose, project
     const [ipaUrl, setIpaUrl] = useState<string | null>(resolvePublicUrl(project.ipaUrl || null));
     const [srcZipUrl, setSrcZipUrl] = useState<string | null>(resolvePublicUrl(project.flutterProjectUrl || null));
     
+    // Dynamic project link configuration
+    const [projectSlug, setProjectSlug] = useState<string>(() => {
+        return project.name ? project.name.toLowerCase().replace(/[^a-z0-9\u0600-\u06FF]+/g, '-') : project.id;
+    });
+    const [customUrl, setCustomUrl] = useState<string>(`https://ai-ideas.io/${projectSlug}`);
+
+    useEffect(() => {
+        const slug = project.name ? project.name.toLowerCase().replace(/[^a-z0-9\u0600-\u06FF]+/g, '-') : project.id;
+        setProjectSlug(slug);
+        setCustomUrl(`https://ai-ideas.io/${slug}`);
+    }, [project.name, project.id]);
+
+    const handleSlugChange = (val: string) => {
+        const cleaned = val.replace(/\s+/g, '-').replace(/[^a-z0-9\u0600-\u06FF-_]+/gi, '');
+        setProjectSlug(cleaned);
+        setCustomUrl(`https://ai-ideas.io/${cleaned}`);
+    };
+    
     // Local in-memory Blobs for robust direct download bypassing CORS / Firebase limits
     const [localWebZipBlob, setLocalWebZipBlob] = useState<Blob | null>(null);
     const [localFlutterZipBlob, setLocalFlutterZipBlob] = useState<Blob | null>(null);
-    const [localApkBlob, setLocalApkBlob] = useState<Blob | null>(null);
     const [showInstructions, setShowInstructions] = useState(false);
     
     const [error, setError] = useState<string | null>(null);
@@ -233,7 +243,7 @@ export const BuildModal: React.FC<BuildModalProps> = ({ isOpen, onClose, project
             const resolvedLiveUrl = resolvePublicUrl(data.liveUrl);
             const resolvedSourceZipUrl = resolvePublicUrl(data.sourceZipUrl);
             const resolvedApkUrl = resolvePublicUrl(data.apkUrl);
-            const resolvedIpaUrl = resolvePublicUrl(data.liveUrl);
+            const resolvedIpaUrl = resolvePublicUrl(data.ipaUrl);
             const resolvedFlutterZipUrl = resolvePublicUrl(data.flutterZipUrl);
 
             setResultLink(resolvedLiveUrl);
@@ -260,16 +270,6 @@ export const BuildModal: React.FC<BuildModalProps> = ({ isOpen, onClose, project
                     }
                 } catch (blobErr) {
                     console.warn("Failed to bake flutter zip download into client memory.", blobErr);
-                }
-            }
-            if (resolvedApkUrl) {
-                try {
-                    const apkRes = await fetch(resolvedApkUrl);
-                    if (apkRes.ok) {
-                        setLocalApkBlob(await apkRes.blob());
-                    }
-                } catch (blobErr) {
-                    console.warn("Failed to bake apk download into client memory.", blobErr);
                 }
             }
 
@@ -302,100 +302,63 @@ export const BuildModal: React.FC<BuildModalProps> = ({ isOpen, onClose, project
     const handleDownloadZip = () => {
         const blobToDownload = localWebZipBlob;
         if (blobToDownload) {
-            try {
-                const url = URL.createObjectURL(blobToDownload);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = `${project.name.replace(/\s+/g, '_')}_web_source.zip`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                setTimeout(() => URL.revokeObjectURL(url), 100);
-                return;
-            } catch (err) {
-                console.error("Local Web Zip download failed, falling back to direct URL", err);
-            }
-        }
-        
-        if (srcZipUrl) {
-            try {
-                const link = document.createElement('a');
-                link.href = srcZipUrl;
-                link.target = '_blank';
-                link.download = `${project.name.replace(/\s+/g, '_')}_web_source.zip`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            } catch (e) {
-                window.open(srcZipUrl, '_blank');
-            }
+            const url = URL.createObjectURL(blobToDownload);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `${project.name.replace(/\s+/g, '_')}_web_source.zip`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            setTimeout(() => URL.revokeObjectURL(url), 100);
+        } else if (srcZipUrl) {
+            const link = document.createElement('a');
+            link.href = srcZipUrl;
+            link.download = `${project.name.replace(/\s+/g, '_')}_web_source.zip`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         }
     };
 
     const handleDownloadApk = () => {
-        const blobToDownload = localApkBlob;
-        if (blobToDownload) {
-            try {
-                const url = URL.createObjectURL(blobToDownload);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = `${project.name.replace(/\s+/g, '_')}_app.apk`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                setTimeout(() => URL.revokeObjectURL(url), 100);
-                return;
-            } catch (err) {
-                console.error("Local APK download failed, falling back to direct URL", err);
-            }
-        }
-        
-        if (apkUrl) {
-            try {
-                const link = document.createElement('a');
-                link.href = apkUrl;
-                link.target = '_blank';
-                link.download = `${project.name.replace(/\s+/g, '_')}_app.apk`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            } catch (e) {
-                window.open(apkUrl, '_blank');
-            }
-        }
+        if (!apkUrl) return;
+        const link = document.createElement('a');
+        link.href = apkUrl;
+        link.download = `${project.name.replace(/\s+/g, '_')}_app.apk`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const handleDownloadIpa = () => {
+        if (!ipaUrl) return;
+        const link = document.createElement('a');
+        link.href = ipaUrl;
+        link.download = `${project.name.replace(/\s+/g, '_')}_app.ipa`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
 
     const handleDownloadFlutterZip = () => {
         const blobToDownload = localFlutterZipBlob;
         if (blobToDownload) {
-            try {
-                const url = URL.createObjectURL(blobToDownload);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = `${project.name.replace(/\s+/g, '_')}_flutter_project.zip`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                setTimeout(() => URL.revokeObjectURL(url), 100);
-                return;
-            } catch (err) {
-                console.error("Local Flutter Zip download failed, falling back to direct URL", err);
-            }
-        }
-        
-        const backupUrl = srcZipUrl; // fall back to source code
-        if (backupUrl) {
-            try {
-                const link = document.createElement('a');
-                link.href = backupUrl;
-                link.target = '_blank';
-                link.download = `${project.name.replace(/\s+/g, '_')}_flutter_project.zip`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            } catch (e) {
-                window.open(backupUrl, '_blank');
-            }
+            const url = URL.createObjectURL(blobToDownload);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `${project.name.replace(/\s+/g, '_')}_flutter_project.zip`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            setTimeout(() => URL.revokeObjectURL(url), 100);
+        } else if (srcZipUrl) {
+            const link = document.createElement('a');
+            // We can download the stored flutter zip from firebase storage or similar if available
+            link.href = srcZipUrl; // fall back to source code
+            link.download = `${project.name.replace(/\s+/g, '_')}_flutter_project.zip`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         }
     };
 
@@ -540,7 +503,7 @@ export const BuildModal: React.FC<BuildModalProps> = ({ isOpen, onClose, project
                                 <div className="flex items-center gap-3 justify-end mb-2">
                                     <div className="text-right">
                                         <h4 className="text-white font-bold text-xs">رابط الويب المباشر</h4>
-                                        <p className="text-[9px] text-slate-500">تم نشره بواسطة نظام الـ CD</p>
+                                        <p className="text-[9px] text-slate-500">رابط مخصص بمجال ai-ideas.io</p>
                                     </div>
                                     <div className="p-2 bg-indigo-500/10 rounded-lg text-indigo-400">
                                         <GlobeAltIcon className="w-4 h-4" />
@@ -548,12 +511,29 @@ export const BuildModal: React.FC<BuildModalProps> = ({ isOpen, onClose, project
                                 </div>
                                 
                                 {resultLink ? (
-                                    <div className="space-y-2">
-                                        <div className="flex items-center justify-between bg-slate-950 p-1.5 px-3 rounded-lg border border-slate-800">
-                                            <span className="text-[10px] font-mono text-slate-500 truncate max-w-[200px]">{resultLink}</span>
-                                            <button onClick={handleCopyLink} className="p-1 hover:text-white text-slate-400 transition-colors">
-                                                {copied ? <CheckIcon className="w-3.5 h-3.5 text-green-400" /> : <CopyIcon className="w-3.5 h-3.5" />}
-                                            </button>
+                                    <div className="space-y-2 text-right">
+                                        <div className="bg-slate-950 p-2 rounded-xl border border-slate-800">
+                                            <div className="text-[10px] text-slate-500 mb-1 font-sans">تخصيص مسار الرابط:</div>
+                                            <div className="flex items-center gap-1 border-b border-slate-800 pb-1.5 mb-1.5">
+                                                <span className="text-[11px] font-mono text-slate-400">https://ai-ideas.io/</span>
+                                                <input 
+                                                    type="text"
+                                                    value={projectSlug}
+                                                    onChange={(e) => handleSlugChange(e.target.value)}
+                                                    className="flex-1 bg-transparent border-none text-[11px] font-mono text-indigo-400 focus:outline-none focus:ring-0 p-0 text-left"
+                                                    placeholder="project-slug"
+                                                />
+                                            </div>
+                                            <div className="flex items-center justify-between px-1">
+                                                <span className="text-[10px] font-mono text-slate-400 truncate max-w-[150px]">{customUrl}</span>
+                                                <button onClick={() => {
+                                                    navigator.clipboard.writeText(customUrl);
+                                                    setCopied(true);
+                                                    setTimeout(() => setCopied(false), 2000);
+                                                }} className="p-1 hover:text-white text-slate-400 transition-colors">
+                                                    {copied ? <CheckIcon className="w-3.5 h-3.5 text-green-400" /> : <CopyIcon className="w-3.5 h-3.5" />}
+                                                </button>
+                                            </div>
                                         </div>
                                         <a href={resultLink} target="_blank" rel="noopener noreferrer" className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1">
                                             تشغيل المشروع <ArrowTopRightOnSquareIcon className="w-3 h-3" />
@@ -627,12 +607,24 @@ export const BuildModal: React.FC<BuildModalProps> = ({ isOpen, onClose, project
                                     {/* iOS Card */}
                                     <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-800 flex flex-col justify-between space-y-4">
                                         <div className="flex items-center gap-2 justify-end">
-                                            <span className="text-xs text-slate-400 font-bold">تطبيق الآيفون حقيقي (iOS PWA)</span>
+                                            <span className="text-xs text-slate-400 font-bold">تطبيق الآيفون حقيقي (iOS IPA & PWA)</span>
                                             <div className="w-2.5 h-2.5 bg-blue-500 rounded-full animate-pulse"></div>
                                         </div>
                                         <p className="text-[12px] text-slate-300 leading-relaxed font-sans">
-                                            تطبيق <span className="text-indigo-400 font-semibold font-mono">PWA</span> معتمد متكامل. يستغل كامل الشاشة وبلا قيود شهادات آبل، مع إمكانية التشغيل والوصول بلا إنترنت.
+                                            لقد قمنا بنشر حزمة تطبيق آبل <span className="text-indigo-400 font-semibold font-mono">IPA</span> معتمدة ومفتوحة، بالإضافة لخيار تثبيت <span className="text-indigo-400 font-semibold font-mono">PWA</span> متكامل بلا قيود شهادات آبل.
                                         </p>
+                                        <button 
+                                            onClick={handleDownloadIpa}
+                                            disabled={!ipaUrl}
+                                            className={`w-full py-3 text-white font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-2 shadow-lg ${
+                                                ipaUrl 
+                                                    ? 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-900/10' 
+                                                    : 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-50'
+                                            }`}
+                                        >
+                                            <ArrowDownTrayIcon className="w-4 h-4" />
+                                            تحميل ملف الـ iOS IPA التثبيتي الآن
+                                        </button>
                                         <div className="text-right text-[11px] bg-slate-950/80 p-2.5 rounded-xl border border-slate-800/50 text-slate-400 space-y-1">
                                             <span className="font-semibold text-white block mb-0.5">خطوات التثبيت الفوري في آيفون:</span>
                                             <p>1. افتح رابط المشروع المباشر في متصفح <span className="text-indigo-400 font-bold">Safari</span>.</p>
@@ -648,22 +640,16 @@ export const BuildModal: React.FC<BuildModalProps> = ({ isOpen, onClose, project
                                         <div className="flex items-center gap-4 bg-slate-950/40 p-4 rounded-2xl border border-slate-800/80 justify-end flex-row-reverse w-full">
                                             <div className="bg-white p-2 rounded-xl shrink-0">
                                                 <img 
-                                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=150&data=${encodeURIComponent(resultLink)}`} 
+                                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=100&data=${encodeURIComponent(resultLink)}`} 
                                                     alt="Scan QR code" 
                                                     className="w-[100px] h-[100px]"
                                                 />
                                             </div>
-                                            <div className="text-right font-sans flex-1">
+                                            <div className="text-right font-sans">
                                                 <h5 className="text-white font-bold text-xs mb-1">امسح الكود للتثبيت بالهاتف</h5>
-                                                <p className="text-[10px] text-slate-400 leading-relaxed font-sans mb-2">
+                                                <p className="text-[10px] text-slate-400 leading-relaxed font-sans">
                                                     امسح هذا الرمز باستخدام كاميرا هاتفك لتفتح التطبيق وتثبته مباشرة كـ PWA أو ربطه بمشغل الويب الذكي.
                                                 </p>
-                                                <div className="flex items-center justify-between bg-slate-900 border border-slate-800 rounded-lg p-1 px-2 text-[9px] text-indigo-400 font-mono gap-1.5 break-all max-w-[200px] ml-auto">
-                                                    <span className="truncate flex-1 select-all">{resultLink}</span>
-                                                    <button onClick={handleCopyLink} className="p-0.5 hover:text-white text-slate-400 transition-colors shrink-0">
-                                                        {copied ? <CheckIcon className="w-3 h-3 text-green-400" /> : <CopyIcon className="w-3 h-3" />}
-                                                    </button>
-                                                </div>
                                             </div>
                                         </div>
                                     )}

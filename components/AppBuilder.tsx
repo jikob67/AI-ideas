@@ -229,7 +229,7 @@ const AppBuilder: React.FC<AppBuilderProps> = ({ initialProject, onExit }) => {
       <BuildModal
         isOpen={isBuildModalOpen}
         onClose={() => setIsBuildModalOpen(false)}
-        project={{ ...project, files: project.files || [] }}
+        project={project}
         platform={buildPlatform}
       />
 

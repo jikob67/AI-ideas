@@ -3,7 +3,6 @@ import { Project, ProjectType, View } from '../types';
 import { geminiService } from '../services/geminiService';
 import { useAuth } from '../hooks/useAuth';
 import { useUsage } from '../hooks/useUsage';
-import { UnifiedMarketingWorkspace } from './UnifiedMarketingWorkspace';
 import UpgradeModal from './UpgradeModal';
 import { 
   Sparkles, 
@@ -167,7 +166,6 @@ const DEFAULT_CAMPAIGN = (projectName: string, description: string): MarketingCa
 const Marketing: React.FC<MarketingProps> = ({ context, navigate }) => {
   const { currentUser } = useAuth();
   const { incrementUsage } = useUsage();
-  const logsEndRef = useRef<HTMLDivElement>(null);
 
   const [allProjects, setAllProjects] = useState<Project[]>([]);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
@@ -176,7 +174,6 @@ const Marketing: React.FC<MarketingProps> = ({ context, navigate }) => {
   // Analysis Loading Steps state
   const [analysisStep, setAnalysisStep] = useState<number>(0); 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [marketingLogs, setMarketingLogs] = useState<string[]>([]);
   const [validationScore, setValidationScore] = useState<number>(97);
   const [campaignData, setCampaignData] = useState<MarketingCampaignData | null>(null);
 
@@ -199,303 +196,6 @@ const Marketing: React.FC<MarketingProps> = ({ context, navigate }) => {
   const [renderedVideoUrl, setRenderedVideoUrl] = useState<string | null>(null);
   const [activeSceneIndex, setActiveSceneIndex] = useState<number>(0);
   const [videoFormat, setVideoFormat] = useState<'vertical' | 'landscape'>('vertical');
-
-  // --- Rebuilt Unified Marketing Workspace states ---
-  const [selectedDimension, setSelectedDimension] = useState<string>('1:1');
-  const [selectedDuration, setSelectedDuration] = useState<number>(30);
-  const [selectedType, setSelectedType] = useState<'text' | 'image' | 'video' | 'all'>('text');
-  const [selectedPlatform, setSelectedPlatform] = useState<string>('all');
-  const [userEditRequest, setUserEditRequest] = useState<string>('');
-  
-  // Audio state
-  const [selectedVoiceTone, setSelectedVoiceTone] = useState<string>('gulf_luxury');
-  const [selectedBgMusic, setSelectedBgMusic] = useState<string>('tech_rising');
-  const [audioUploadName, setAudioUploadName] = useState<string | null>(null);
-  const [isAudioModalOpen, setIsAudioModalOpen] = useState<boolean>(false);
-  
-  // Suggestions state
-  const [isSuggestionsModalOpen, setIsSuggestionsModalOpen] = useState<boolean>(false);
-  const [suggestionsList, setSuggestionsList] = useState<string[]>([]);
-  const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState<boolean>(false);
-  
-  // Actions helpers
-  const [isDownloading, setIsDownloading] = useState<boolean>(false);
-  const [downloadProgress, setDownloadProgress] = useState<number>(0);
-  const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
-  
-  // Local simulated video playing state
-  const [videoPlayState, setVideoPlayState] = useState<boolean>(false);
-  const [videoTimer, setVideoTimer] = useState<number>(0);
-  const [simulatedSceneIndex, setSimulatedSceneIndex] = useState<number>(0);
-
-  // Simulated Video Player loop based on selectedDuration
-  useEffect(() => {
-    let interval: any = null;
-    if (videoPlayState) {
-      interval = setInterval(() => {
-        setVideoTimer(prev => {
-          const nextSec = prev + 1;
-          if (nextSec >= selectedDuration) {
-            setVideoPlayState(false);
-            setSimulatedSceneIndex(0);
-            return 0;
-          }
-          
-          const totalScenes = campaignData?.videoScript?.length || 3;
-          const sceneSecs = selectedDuration / totalScenes;
-          const activeIndex = Math.floor(nextSec / sceneSecs);
-          setSimulatedSceneIndex(Math.min(activeIndex, totalScenes - 1));
-          
-          return nextSec;
-        });
-      }, 1000);
-    } else {
-      clearInterval(interval);
-    }
-    return () => clearInterval(interval);
-  }, [videoPlayState, selectedDuration, campaignData]);
-
-  // Handle active edit of the campaign contents using Gemini 1.5 Pro with clear logging
-  const performCampaignAdjustment = async () => {
-    if (!campaignData || !selectedProject || !userEditRequest.trim()) {
-      showToast('⚠️ يرجى كتابة طلب التعديل أولاً في الصندوق المخصص.');
-      return;
-    }
-    
-    setIsAnalyzing(true);
-    setMarketingLogs([]);
-    const onLog = (msg: string) => setMarketingLogs(prev => [...prev, `${new Date().toLocaleTimeString('ar-EG', { hour12: false })} > ${msg}`]);
-    
-    onLog(`📡 [AI Ideas Marketing] جاري إطلاق خط المعالجة الذكي بـ Gemini 1.5 Pro لتعديل الحملة...`);
-    onLog(`💡 طلبات المستخدم: "${userEditRequest}"`);
-    await new Promise(r => setTimeout(r, 600));
-    setAnalysisStep(1);
-    
-    onLog(`🔬 مواءمة ومطابقة الهيكل الإعلاني ليتكامل مع معايير Veo 3 للفيديو و Imagen 3 للصور الفنية لمشروع: ${selectedProject.name}`);
-    await new Promise(r => setTimeout(r, 700));
-    setAnalysisStep(3);
-    
-    try {
-      const modelPrompt = `أنت خبير تسويق ابتكاري فائق ومحرر إعلاني محترف.
-لديك خطة تسويق وحملات حالية بصيغة JSON لمشروع "${selectedProject.name}".
-المستخدم يطلب منك إجراء تحديثات مخصصة وتعديلات دقيقة جداً ومربوطة بمطالبه.
-
-طلبات التعديل المدخلة من المستخدم:
-"${userEditRequest}"
-
-البيانات الجارية الحالية للحملة للتعديل:
-- العنوان الرئيسي لصفحة الهبوط الحالية: ${campaignData.landingPage?.heroHeadline || ''}
-- الوصف الإقناعي الحالي: ${campaignData.landingPage?.heroDescription || ''}
-- الجمهور المستهدف الحالي: ${campaignData.targetAudience || ''}
-- القيمة المقترحة الجارية: ${campaignData.valueProposition || ''}
-- تصنيف قطاع المشروع: ${campaignData.sector || ''}
-
-أعد صياغة وهيكلة البيانات لتنفيذ رغبات المستخدم بالدقة القصوى باللغة العربية الفصحى. يجب وضع أسس معايير Veo 3 و Imagen 3 في صياغة الأوصاف والمدخرات الإعلانية المنسجمة مع منصات تواصل مثل (instagram, TikTok, Facebook, WhatsApp, X, Snapchat, YouTube, LinkedIn).
-
-أرجع النتيجة بصيغة JSON نظيفة فقط، بدون أي تحديدات ماركداون (بدون \`\`\`json).
-يجب أن يحتوي الـ JSON المرتجع على نفس هذه المفاتيح بالضبط:
-{
-  "sector": "القطاع المحدث والمطوّر",
-  "targetAudience": "الجمهور المستهدف المحدث بدقة ليتماشى مع طلب العميل",
-  "valueProposition": "مقترح القيمة المحدث الصياغة والتركيز",
-  "googleAds": [
-    { "headline": "العنوان الإعلاني الأول المحدث", "description": "الوصف الأول المعدل جداً" },
-    { "headline": "العنوان الإعلاني الثاني المحدث", "description": "الوصف الثاني المطور" }
-  ],
-  "facebookInstagramAds": [
-    {
-      "headline": "العنوان المحدث لفيسبوك وإنستقرام",
-      "primaryText": "النص الإقناعي المؤثر جداً والموافق لمطالب المستخدم والمنصات التفاعلية بروح عصرية وكتابة قوية",
-      "description": "الوصف التفصيلي والزر"
-    }
-  ],
-  "landingPage": {
-    "heroHeadline": "العنوان الرئيسي الجديد لصفحة الهبوط",
-    "heroDescription": "الوصف الموجه المعدل لـ Landing Page"
-  }
-}
-`;
-
-      const aiResponse = await geminiService.generateText(modelPrompt, 'gemini-3.1-pro-preview');
-      onLog('📥 [Gemini API] تم استقبال التعديلات والحلول لـ (المحتوى التسويقي). جاري تفعيل المكونات...');
-      await new Promise(r => setTimeout(r, 500));
-      
-      let cleanedJson = aiResponse.trim();
-      if (cleanedJson.startsWith('```json')) {
-        cleanedJson = cleanedJson.replace(/^```json/, '').replace(/```$/, '').trim();
-      } else if (cleanedJson.startsWith('```')) {
-        cleanedJson = cleanedJson.replace(/^```/, '').replace(/```$/, '').trim();
-      }
-      
-      const parsedData = JSON.parse(cleanedJson);
-      
-      const updated = { ...campaignData };
-      if (parsedData.sector) updated.sector = parsedData.sector;
-      if (parsedData.targetAudience) updated.targetAudience = parsedData.targetAudience;
-      if (parsedData.valueProposition) updated.valueProposition = parsedData.valueProposition;
-      if (parsedData.googleAds) updated.googleAds = parsedData.googleAds;
-      if (parsedData.facebookInstagramAds) updated.facebookInstagramAds = parsedData.facebookInstagramAds;
-      if (parsedData.landingPage?.heroHeadline) {
-        if (!updated.landingPage) updated.landingPage = {} as any;
-        updated.landingPage.heroHeadline = parsedData.landingPage.heroHeadline;
-      }
-      if (parsedData.landingPage?.heroDescription) {
-        if (!updated.landingPage) updated.landingPage = {} as any;
-        updated.landingPage.heroDescription = parsedData.landingPage.heroDescription;
-      }
-      
-      setCampaignData(updated);
-      setAnalysisStep(6);
-      setUserEditRequest('');
-      showToast('🎉 تم تعديل وتحديث المحتوى التسويقي بنجاح تام ليتوافق مع رغباتك وتطلعاتك بـ Gemini 1.5 Pro!');
-    } catch (e) {
-      console.error(e);
-      onLog('⚠️ تنبيه: فشل تحليل الهيكلية المسترسلة. جاري استدعاء معالج الاستبدال الموضعي المحلي لدمج مدخلاتك...');
-      await new Promise(r => setTimeout(r, 500));
-      
-      const updated = { ...campaignData };
-      updated.valueProposition = `[توجيه مدمج]: ${userEditRequest} | ${updated.valueProposition}`;
-      if (updated.googleAds.length > 0) {
-        updated.googleAds[0].description = `${updated.googleAds[0].description} - معدل خصيصاً ليناسب: ${userEditRequest}`;
-      }
-      setCampaignData(updated);
-      setAnalysisStep(6);
-      setUserEditRequest('');
-      showToast('🎉 تم دمج وتعديل المنظومة الإعلانية بمرونة فائقة بالنموذج الصوتي!');
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
-
-  // Strategic AI suggestions using Gemini 1.5 Pro
-  const handleGetAIsuggestions = async () => {
-    if (!selectedProject || !campaignData) {
-      showToast('⚠️ لا يوجد مشروع متاح حالياً للتوصيات.');
-      return;
-    }
-    setIsGeneratingSuggestions(true);
-    setIsSuggestionsModalOpen(true);
-    setSuggestionsList([]);
-    
-    try {
-      const prompt = `أنت مستشار نمو واستراتيجي تسويق رقمي فائق الذكاء وتتحكم بأحدث الأدوات.
-المشروع الحالي هو "${selectedProject.name}" في قطاع "${campaignData.sector || 'الحلول الذكية'}".
-وتفاصيل Campaign الجارية هي:
-- مقترح القيمة الجاذب: ${campaignData.valueProposition || ''}
-- الجمهور والمستهلكون: ${campaignData.targetAudience || ''}
-
-اقترح 3 توصيات تسويقية عملية، مبتكرة ومحددة جداً للمشروع لتحقيق انتشار فيروسي سريع واقتناص أفضل الفرص، واشرح كيف يسهم تكتيك Veo 3 للفيديو و Imagen 3 للصور الفائقة و Gemini 3.1 Pro للنصوص التوليدية في مضاعفة التحويل.
-أكتب التوصيات الثلاثة بأسلوب عربي فصيح رائد وموجز ومحفز في شكل نقاط مرقمة واضحة ومباشرة.`;
-      
-      const response = await geminiService.generateText(prompt, 'gemini-3.1-pro-preview');
-      const lines = response.split('\n').filter(l => l.trim().length > 6);
-      setSuggestionsList(lines.length > 0 ? lines : [response]);
-    } catch (e) {
-      console.error(e);
-      setSuggestionsList([
-        '💡 فكرة أولى للانتشار: إشراك المستهلك في صناعة اللوحات الرقمية لمشكلته وتجسيدها بمحرك Imagen 3 ومكافأة المنشورات الأكثر تصويتاً ببطاقات اشتراك.',
-        '💡 تكتيك الفيديو: استخدام Veo 3 لإنتاج سيناريوهات متحركة 15 ثانية للشباب تستعرض تيسير المهام ومقارنة السرعة الفائقة للتطبيق بصرياً.',
-        '💡 معالجة البريد: صياغة أسبوعية لرسائل بريدية شيقة وجاذبة تتسق مع نبرات الصوت الخليجية والمهنية لجذب متخذي القرار.'
-      ]);
-    } finally {
-      setIsGeneratingSuggestions(false);
-    }
-  };
-
-  // Mock-download implementation with physical local export
-  const handleTriggerMockDownload = () => {
-    setIsDownloading(true);
-    setDownloadProgress(0);
-    const interval = setInterval(() => {
-      setDownloadProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setTimeout(() => {
-            setIsDownloading(false);
-            
-            if (!campaignData || !selectedProject) return;
-            const content = `=====================================================
-🎯 حقيبة الحملة التسويقية الشاملة لـ: ${selectedProject.name}
-💡 مدعوم بأنظمة الذكاء والإنتاج: Veo 3 | Imagen 3 | Gemini 1.5 Pro
-📅 تاريخ التصدير والتجهيز: ${new Date().toLocaleDateString('ar-EG')}
-=====================================================
-
-[1] الهوية والمعالم الاستراتيجية للمشروع:
------------------------------------------
-• القطاع المستهدف: ${campaignData.sector}
-• القيمة الفريدة المقترحة: ${campaignData.valueProposition}
-• الجمهور والمستهلكون: ${campaignData.targetAudience}
-• الاتجاه البصري والتصميم: ${campaignData.designStyle}
-
-[2] نبرة الصوت والموسيقى المعتمدة:
------------------------------------------
-• معلق ومؤدي الصوت: ${selectedVoiceTone === 'gulf_luxury' ? 'لهجة خليجية ملكية فخمة ومبهرة' : selectedVoiceTone === 'egypt_active' ? 'عامية مصرية حماسية وخفيفة' : selectedVoiceTone === 'shami_warm' ? 'لهجة شامية ودودة دافئة' : 'لهجة فصحى حوارية مهنية'}
-• الموسيقى الخلفية: ${selectedBgMusic === 'tech_rising' ? 'إيقاع تقني صاعد لتوليد الاندماج' : selectedBgMusic === 'cinematic_inspire' ? 'سينمائي ملهم وعميق' : 'هادئ وبسيط للتكامل والراحة'}
-
-[3] عناصر مقاسات ومحددات التصميم المعاينة:
------------------------------------------
-• الأبعاد الجارية: ${selectedDimension}
-• مدة الإعلان التقديرية للفيديو: ${selectedDuration} ثانية
-
-[4] الإعلانات والنصوص التسويقية المجهزة للمنصات:
------------------------------------------
-• إعلانات Google Ads:
-${campaignData.googleAds ? campaignData.googleAds.map((ad, i) => `  - الإعلان ${i + 1}:
-    العنوان الإملائي: ${ad.headline}
-    الوصف الإقناعي: ${ad.description}`).join('\n\n') : 'لا يوجد'}
-
-• منشورات السوشيال (Facebook / Instagram):
-${campaignData.facebookInstagramAds ? campaignData.facebookInstagramAds.map((ad, i) => `  - منشور ${i + 1}:
-    العنوان المرئي: ${ad.headline}
-    النص الإقناعي الأساسي: ${ad.primaryText}
-    التحويل لزر (CTA): ${ad.description}`).join('\n\n') : 'لا يوجد'}
-
-• منشورات المنصات الأخرى (X / LinkedIn):
-${campaignData.xLinkedInPosts ? campaignData.xLinkedInPosts.map((post, i) => `  - منصة ${post.platform}:
-    المحتوى الإعلاني: ${post.content}`).join('\n\n') : 'لا يوجد'}
-
-• قوالب البريد التسويقي والرسائل لـ Gmail:
-${campaignData.emails ? campaignData.emails.map((email, i) => `  - رسالة ${i + 1}:
-    الموضوع: ${email.subject}
-    المحتوى والتحية: ${email.body}`).join('\n\n') : 'لا يوجد'}
-
-• الإشعارات السريعة المباشرة (Mobile Push):
-${campaignData.pushNotifications ? campaignData.pushNotifications.map((push, i) => `  - الإشعار ${i + 1}:
-    العنوان: ${push.title}
-    نص الإشعار الفوري: ${push.body}`).join('\n\n') : 'لا يوجد'}
-
-[5] سيناريو وجدول مشاهد الفيديو الترويجي (Veo 3 Engine Storyboard):
------------------------------------------
-${campaignData.videoScript ? campaignData.videoScript.map((sc, i) => `  • المشهد ${sc.scene} [المدة المخصصة للمشهد: ${sc.duration} ثانية]:
-    - الاتجاه واللقطة البصرية: ${sc.visual}
-    - التعليق والتمثيل الصوتي: ${sc.voiceover}`).join('\n\n') : 'لا يوجد'}
-
-[6] مصفوفة صفحة الهبوط وتحسين الـ SEO ومحركات البحث:
------------------------------------------
-• العنوان الفوقي لصفحة الاستقبال: ${campaignData.landingPage?.heroHeadline || ''}
-• الوصف الإقناعي الفرعي: ${campaignData.landingPage?.heroDescription || ''}
-• أهم ثلاث مزايا مبتكرة للمشروع:
-${campaignData.landingPage?.features ? campaignData.landingPage.features.map((f, i) => `  - الميزة ${i + 1} [${f.title}]: ${f.desc}`).join('\n') : 'لا يوجد ميزات حالية'}
-`;
-
-            const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `Marketing_Strategy_${selectedProject.name.replace(/\s+/g, '_')}.txt`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-            
-            showToast('✅ اكتمل تنزيل وتصدير حقيبة الأصول التسويقية الكاملة بنجاح!');
-          }, 400);
-          return 100;
-        }
-        return prev + 10;
-      });
-    }, 100);
-  };
 
   // Copy Alert Status
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -562,13 +262,6 @@ ${campaignData.landingPage?.features ? campaignData.landingPage.features.map((f,
     }
   }, [selectedProject]);
 
-  // Auto-scroll marketing logs to bottom
-  useEffect(() => {
-    if (logsEndRef.current) {
-      logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [marketingLogs]);
-
   const showToast = (message: string) => {
     setAlertMessage(message);
     setTimeout(() => setAlertMessage(null), 3500);
@@ -626,7 +319,7 @@ ${campaignData.landingPage?.features ? campaignData.landingPage.features.map((f,
 يرجى توليد نص تسويقي مصقول واحترافي فريد من نوعه ومكتوب باللغة العربية الفصحى الأنيقة ليلهم صاحب المشروع ويساعده في جلسة تركيزه.
 أرجع فقط النص التسويقي الصافي كمسودة جاهزة للتحديث أو النسخ، بدون أي تحيات ولا فواصل ولا علامات ماركداون (مثل \`\`\`)...`;
 
-      const aiResponse = await geminiService.generateText(prompt, 'gemini-3.5-flash');
+      const aiResponse = await geminiService.generateText(prompt, 'gemini-1.5-pro');
       setPomelliWorkspaceText(aiResponse.trim());
       showToast('🎉 تم توليد المسودة التسويقية الذكية بنجاح! جاهزة للتطوير.');
     } catch (e) {
@@ -681,7 +374,7 @@ ${campaignData.landingPage?.features ? campaignData.landingPage.features.map((f,
   "feedback": "تحليل نقدي مفصل لترتيب النبرة، وتحديد نقاط القوة الحالية في النص متبوعة بـ 3 توصيات صريحة وموجزة وراوية باللغة العربية الفصحى للتنفيذ الفوري لتحويل الزوّار لعملاء فعليين"
 }`;
 
-      const aiResponse = await geminiService.generateText(prompt, 'gemini-3.5-flash');
+      const aiResponse = await geminiService.generateText(prompt, 'gemini-1.5-pro');
       
       // Clean up markdown block wraps if present
       let cleanedJson = aiResponse.trim();
@@ -747,237 +440,102 @@ ${campaignData.landingPage?.features ? campaignData.landingPage.features.map((f,
     setCampaignData(null);
     setRenderedVideoUrl(null);
     setVideoRenderLogs([]);
-    setMarketingLogs([]);
     
-    const onLog = (log: string) => setMarketingLogs(prev => [...prev, `${new Date().toLocaleTimeString('ar-EG', { hour12: false })} > ${log}`]);
+    const steps = [
+      'بدء فحص وتحليل فكرة مشروعك واستخلاص الهوية والخصائص المميزة...',
+      'استخراج وتحليل القطاع المناسب والأسواق المستهدفة والمنافسين...',
+      'رصد وتحليل الجمهور المهتم جغرافياً واهتماماً وصياغة ملفاتهم بدقة...',
+      'توليد القيمة التسويقية الأساسية (Value Proposition) وصياغة الحملة...',
+      'فحص جودة المحتوى والتحقق من موثوقية الارتباط بفكرة المشروع بنسبة تزيد عن 90%...'
+    ];
 
-    onLog('🔍 [AI Ideas] بدء التحليل المتكامل ومحاكاة التسويق الافتراضي لمشروع: ' + project.name);
-    await new Promise(resolve => setTimeout(resolve, 500));
-    setAnalysisStep(1);
-    
-    onLog('📂 قراءة وصف ومخططات وتفاصيل المشروع واستخلاص المعالم الهيكلية والوظيفية...');
-    await new Promise(resolve => setTimeout(resolve, 600));
-    
-    onLog('📊 حساب وتحديد القطاع الاستراتيجي وسلوكيات سوق المنافسين المباشرين...');
-    await new Promise(resolve => setTimeout(resolve, 600));
-    setAnalysisStep(2);
-
-    onLog('👥 تحليل واستنباط شرائح الجمهور المستهدف والعملاء المثاليين ودراسة آليات تحفيزهم...');
-    await new Promise(resolve => setTimeout(resolve, 600));
-    setAnalysisStep(3);
-
-    onLog('✨ صياغة وتوليف مقترح القيمة الفريدة ومميزات التطبيق المتقدمة لـ ' + project.name);
-    await new Promise(resolve => setTimeout(resolve, 600));
-    setAnalysisStep(4);
-
-    onLog('📡 [Gemini API] استدعاء الخادم الذراعي للذكاء الاصطناعي وبدء معالجة وصياغة المحتويات الإعلانية الغنية...');
-    await new Promise(resolve => setTimeout(resolve, 500));
-    setAnalysisStep(5);
+    // Progression of analytical loading screen
+    for (let i = 1; i <= 5; i++) {
+        setAnalysisStep(i);
+        await new Promise(resolve => setTimeout(resolve, 800));
+    }
 
     try {
-      const modelPrompt = `أنت خبير تسويق رقمي ومحلل أعمال ومحرر محتوى إعلاني محترف ومبدع للغاية.
-مهمتك المطلقة والمصيرية هي توليد خطة تسويق كاملة ومحتويات إعلانية ممسوكة ومترابطة بنسبة 100% لفكرة مشروع المستخدم ومبنية بالكامل على بياناته المحددة أدناه. يمنع منعاً باتاً استخدام جمل عامة أو نسخ الإرشادات أو ملء الحقول بنصوص توضيحية من قبيل "عنوان إعلان مناسب" أو "وصف إعلان". يجب أن تكتب الإعلانات والمنشورات ونصوص رسائل البريد الإلكتروني وأوصاف المشاهد الفنية بشكل ناضج وجاهز للنشر فوراً ومتكلم خصيصاً وعيناً عن فكرة المشروع وميزاته وخصائصه الفريدة وتحدي جمهوره الحقيقي!
+      const modelPrompt = `أنت خبير تسويق رقمي ومحلل أعمال محترف. 
+قم بتحليل هذا المشروع البرمجي لتوليد خطة تسويق ومحتوى إعلاني استوديو متكامل باللغة العربية الفصحى بدقة بالغة.
 
-بيانات المشروع للمستخدم الحالية:
+بيانات المشروع:
 - اسم المشروع: ${project.name}
-- وصف فكرة المشروع: ${project.description}
-- نوع التطبيق أو المنصة: ${project.type}
+- وصف المشروع: ${project.description}
+- نوع المشروع: ${project.type}
 
-أنت مطالب بإرجاع الإجابة بصيغة JSON فقط، دون أي نصوص تمهيدية أو ملاحظات خارجية أو علامات كود ماركداون (مثل \`\`\`json).
-يجب أن يطابق الهيكل البنيوي للـ JSON المفاتيح التالية بدقة، ولكن مع استبدال كافة القيم بنصوص حقيقية، غنية، مفصلة واحترافية باللغة العربية الفصحى مخصصة بالكامل لمشروع المستخدم:
+يرجى إرجاع المخرجات بصيغة JSON فقط، دون أي نصوص تمهيدية أو شرح أو علامات كود ماركداون (مثل \`\`\`json).
+يجب أن يحتوي كائن الـ JSON على المفاتيح التالية بدقة كالتالي:
 {
-  "sector": "اكتب هنا تصنيف القطاع الدقيق للمشروع (مثل: منصة أتمتة المطاعم السحابية، تطبيق تعقب اللياقة البدنية والتمارين الذكي، موقع حجز استشارات قانونية، إلخ)",
-  "targetAudience": "اكتب هنا وصفاً دقيقاً ومفصلاً للجمهور المستهدف للمشروع واشتياقاتهم وتحدياتهم وصعوباتهم اليومية المرتبطة بـ ${project.name}",
-  "valueProposition": "اكتب الصياغة الذهبية المحددة الفريدة للقيمة الاستراتيجية والعملية للمشروع التي تجعله يتفوق على منافسيه بشكل مباشر ومقنع للغاية للعملاء",
-  "relevanceScore": 98,
+  "sector": "اسم القطاع (مثل: تطبيق تقني SaaS لتبسيط المهام، متجر تجارة إلكترونية، إلخ)",
+  "targetAudience": "الجمهور المستهدف بالتفصيل وتطلعاتهم الأساسية",
+  "valueProposition": "القيمة الأساسية الفريدة للمشروع (Value Proposition)",
+  "relevanceScore": 96,
   "googleAds": [
-    { 
-      "headline": "عنوان حقيقي ومقنع جداً لجوجل أدس يحتوي على اسم المشروع أو الفائدة الرئيسية (أقل من 30 حرف)", 
-      "description": "وصف تسويقي كامل ومغري لجوجل أدس يعرض ميزة المشروع أو حل مشكلة للجمهور بدقة (أقل من 90 حرف) مستكشف من فكرة المستخدم" 
-    },
-    { 
-      "headline": "عنوان ثانٍ مميز وجديد يعبر مباشرة عن مشروع المستخدم ولا يتعدى 30 حرف", 
-      "description": "وصف ثانٍ مفصل وجذاب لإعلانات جوجل يدعو للتسجيل أو التجربة ومرتبط بمشروع المستخدم (أقل من 90 حرف)" 
-    }
+    { "headline": "الأول: عنوان إعلان Google Ads (أقل من 30 حرف)", "description": "وصف إعلان Google Ads (أقل من 90 حرف) مناسب للقطاع" },
+    { "headline": "الثاني: عنوان إعلان Google Ads (أقل من 30 حرف)", "description": "وصف إعلان Google Ads (أقل من 90 حرف) مناسب للقطاع" }
   ],
   "facebookInstagramAds": [
-    { 
-      "headline": "عنوان تسويقي رائع وحركي لإعلان فيسبوك وإنستقرام يبهر العميل عن مشروع ${project.name}", 
-      "primaryText": "اكتب النص الأساسي الكامل للإعلان على فيسبوك وإنستغرام (من 3 إلى 5 أسطر) يسرد قصة المشكلة الواقعية لـ ${project.name} والحل السحري الذي تقدمه، مع استخدام الرموز التعبيرية الجذابة ودعوة صريحة للتحويل والتسجيل وتحدي الواقع الحالي للعملاء", 
-      "description": "نص الحث الإضافي لعنوان الزر بأقصى جاذبية" 
-    }
+    { "headline": "عنوان الإعلان المباشر لجذب الانتباه", "primaryText": "النص الأساسي للإعلان على فيسبوك وإنستغرام يتحدث عن المشكلة والحل ويبدأ بطلب مباشر وجذاب", "description": "وصف إضافي للإعلان" }
   ],
   "xLinkedInPosts": [
-    { 
-      "platform": "X", 
-      "content": "اكتب تغريدة حقيقية وملهمة جاهزة للنشر من أجل منصة X تبدأ بعبارة تشويقية قوية عن مشروع ${project.name} مع الهاشتاجات المخصصة المرتبطة بصلب وتفاصيل فكرة المشروع" 
-    },
-    { 
-      "platform": "LinkedIn", 
-      "content": "اكتب منشوراً مهنياً واحترافيًا مفصلاً جداً لمنصة LinkedIn يسرد القيمة الاستراتيجية لـ ${project.name}، ودور حلولكم في تنمية قطاع الأعمال والشركات، بلهجة النخبة مع الإحصائيات أو الوعود المهنية الصريحة للمشروع" 
-    }
+    { "platform": "X", "content": "محتوى منشور منصة X (تويتر سابقاً) مع الهاشتاجات المناسبة وإبراز القيمة بسرعة" },
+    { "platform": "LinkedIn", "content": "محتوى منشور LinkedIn بأسلوب مهني واحترافي يبرز كفاءة الحل وأثره على قطاع الأعمال" }
   ],
   "emails": [
-    { 
-      "subject": "عنوان جذاب جداً ومثير للفضول بخصوص أداة ${project.name} لعامة المستخدمين المهتمين", 
-      "body": "اكتب رسالة بريد إلكتروني ترحيبية وتسويقية متكاملة (مفصلة للغاية وتحتوي على فقرات متعددة) تشرح كيف غيرت منصة ${project.name} قواعد اللعبة، وتعدد فيها أهم 3 مزايا مستوحاة ومصممة خصيصاً لـ ${project.name}، مع الحث على الانطلاق وبدء الاستخدام المجاني، وموقعة باسم فريق العمل." 
-    }
+    { "subject": "عنوان البريد الإلكتروني التسويقي الأول (جذاب ومثير للفضول)", "body": "محتوى البريد الإلكتروني التسويقي الأول بكافة التفاصيل ودعوة واضحة لاتخاذ إجراء لشرح فوائد التطبيق" }
   ],
   "pushNotifications": [
-    { 
-      "title": "عنوان إشعار فوري وتذكيري شيق ومثير للاهتمام يحمل اسم المشروع ${project.name}", 
-      "body": "نص الإشعار القصير والمحفز لكي يقوم المستخدم بفتح التطبيق غداً لرؤية التحديثات أو متابعة نشاطه في فكرة المشروع" 
-    }
+    { "title": "عنوان الإشعار القصير", "body": "محتوى الإشعار الصباحي أو التذكيري لحث المستخدمين على العودة والتحويل" }
   ],
   "imagePrompts": [
-    { 
-      "platform": "Instagram (Square 1:1)", 
-      "size": "1080 x 1080", 
-      "prompt": "Sleek professional creative photorealistic marketing visual for user project ${project.name} representing abstract digital solutions, cool colors, elegant modern branding concept design, ultra detailed, depth of field, 3D render, high fidelity" 
-    },
-    { 
-      "platform": "X & LinkedIn (Landscape 16:9)", 
-      "size": "1200 x 675", 
-      "prompt": "A landscape professional business banner for ${project.name} representing high productivity, modern neon light accents, elegant presentation, realistic high resolution, 8k" 
-    },
-    { 
-      "platform": "TikTok & Stories (Portrait 9:16)", 
-      "size": "1080 x 1920", 
-      "prompt": "A modern dynamic visual story screen for mobile app ${project.name} with vibrant layout design, highly responsive elements, gorgeous design style, aesthetic setup" 
-    }
+    { "platform": "Instagram (Square 1:1)", "size": "1080 x 1080", "prompt": "عصف ذهني دقيق جداً لوصف صورة إعلانية بالذكاء الاصطناعي تعبر عن الفكرة مع مراعاة الألوان المريحة وتأثيرات الإضاءة الاحترافية بدون كتابة نصوص" },
+    { "platform": "X & LinkedIn (Landscape 16:9)", "size": "1200 x 675", "prompt": "عصف ذهني دقيق لوصف بنر إعلاني عريض للتويتر ولينكد إن يلائم القيمة الفريدة" },
+    { "platform": "TikTok & Stories (Portrait 9:16)", "size": "1080 x 1920", "prompt": "عصف ذهني دقيق لوصف شاشة تصميم إبداعي عمودي لقصة إنستغرام أو فيديو تيك توك" }
   ],
   "videos": [
     { 
-      "title": "فيديو ترويجي حركي", 
+      "title": "فيديو ترويجي متكامل", 
       "duration": 30,
       "script": [
-        { 
-          "scene": 1, 
-          "visual": "تفاصيل بصرية سينمائية مخصصة للمشهد الأول تبرز التحدي الحقيقي لـ ${project.name} وفقاً لوصف المستخدم من أجل شد الانتباه", 
-          "voiceover": "التعليق الصوتي المسموع بالعربية لربط عين المشاهد بـ ${project.name} ومكابدات الأساليب القديمة", 
-          "duration": 10 
-        },
-        { 
-          "scene": 2, 
-          "visual": "تفاصيل بصرية تبرز واجهة وعمل وبساطة تطبيق ${project.name} مع لمسات مريحة وبراقة ونمو تفاعلي مذهل للمستخدمين", 
-          "voiceover": "التعليق المسموع المثير للحسابات المفتوحة للمشروع والفوائد وسحر الأداة", 
-          "duration": 10 
-        },
-        { 
-          "scene": 3, 
-          "visual": "تفاصيل بصرية نهائية مبهرة تعرض شعار مشروع ${project.name} اللامع بخلفية فاخرة وزر التسجيل والدعوة للإجراء المباشر", 
-          "voiceover": "التعليق والمحفز الصوتي النهائي للتسجيل الفوري مجاناً وبدء الرحلة الموفقة", 
-          "duration": 10 
-        }
+        { "scene": 1, "visual": "تفاصيل بصرية متميزة للمشهد الأول تظهر ألم العميل أو الحاجة", "voiceover": "التعليق الصوتي المقترح للمشهد الأول", "duration": 10 },
+        { "scene": 2, "visual": "عرض فكرة التطبيق وحلها الذكي بشكل مذهل", "voiceover": "التعليق الصوتي المقترح للمشهد الثاني", "duration": 10 },
+        { "scene": 3, "visual": "شعار المشروع ونداء مبهر لاتخاذ إجراء (CTA)", "voiceover": "التعليق الصوتي المقترح للمشهد الثالث", "duration": 10 }
       ]
     }
   ],
   "landingPage": {
-    "heroHeadline": "اكتب عنواناً رئيسياً جذاباً للغاية وقاتلاً من الناحية التسويقية لصفحة هبوط مشروع ${project.name}",
-    "heroDescription": "الوصف الفرعي الأكثر إقناعاً الذي يبسط حل ${project.name} في عبارة واحدة تدفع الزوار مباشرة للرغبة في الاشتراك الفوري وتجربة الخدمة السلسة",
+    "heroHeadline": "العنوان الرئيسي المثير والجذاب لصفحة الهبوط الخاصة بالمشروع",
+    "heroDescription": "الوصف الفرعي لصفحة الهبوط الداعم للعنوان وموجه للجمهور لسرعة الاشتراك",
     "features": [
-      { 
-        "title": "ميزة تفصيلية رئيسية أولى مستقاة من صلب وثنايا مشروع ${project.name}", 
-        "desc": "شرح تسويقي غني لكيفية حل المشكلة وتقديم راحة بالغة وبناء ثقة للعميل بواسطة هذه الميزة" 
-      },
-      { 
-        "title": "ميزة تفصيلية رئيسية ثانية مستلهمة من أفكار ${project.name}", 
-        "desc": "شرح تسويقي مقنع يركز على الكفاءة والسرعة المكتسبة وتوفير المال المكتسب بفضل الميزة الثانية" 
-      },
-      { 
-        "title": "ميزة تفصيلية رئيسية ثالثة للمنتج ترفع الإنتاجية", 
-        "desc": "شرح يسلط الضوء على الأمان الراقي أو الذكاء أو السهولة المطلقة التي تمنحها الميزة الثالثة للعميل" 
-      }
+      { "title": "الميزة الفريدة الأولى للمنتج", "desc": "شرح مبسط كيف تقدم هذه الميزة حلاً سهلاً وعملياً لمشكلة يعاني منها العميل" },
+      { "title": "الميزة الفريدة الثانية للمنتج", "desc": "شرح ومثال حي على تيسير العمل مع هذه الميزة" },
+      { "title": "الميزة الفريدة الثالثة للمنتج", "desc": "القيمة المضافة الثالثة التي تضمن راحة وضمان جودة الأداء" }
     ],
     "faqs": [
-      { 
-        "question": "سؤال شائع حقيقي يدور في عقل أي زائر تثيره فكرة ${project.name} لتبديد مخاوفه", 
-        "answer": "إجابة وافية وناضجة ومطمئنة ترفع الشك وزيادة معدل الثقة لدى الزائر بالدخول الفوري للمشروع والبدء" 
-      },
-      { 
-        "question": "سؤال شائع ذكي آخر يطرحه المهنيون حول تشغيل أو حمايه وسرية معلوماتهم بـ ${project.name}", 
-        "answer": "إجابة داعمة ومحفزة تؤكد جودة الحل وسماحة وسهولة التطبيق بلا تعقيد" 
-      }
+      { "question": "السؤال الشائع الأول المتوقع من المستخدم", "answer": "الإجابة المستفيضة المقنعة المذيلة بعبارة طمأنينة" },
+      { "question": "السؤال الشائع الثاني المتوقع من المستخدم", "answer": "الإجابة المستفيضة المقنعة" }
     ],
     "ctas": [
-      { 
-        "text": "اكتب نصاً رائعاً لزر CTA مثل (ابدأ اليوم مجاناً، سجّل حسابك الآن، إلخ)", 
-        "subtext": "نص فرعي محفز مثل (لمدة محدودة - بدون حاجة لكود اشتراك)" 
-      }
+      { "text": "ابدأ الآن مجاناً جرب روعة الأداء", "subtext": "لا يتطلب بطاقة ائتمان - تفعيل فوري" }
     ]
   },
   "marketingPlan": {
-    "channels": [
-      "اكتب هنا قناة التسويق الأجدر والأكفأ خصيصاً لترويج ${project.name} مع تعليل ذكي وعملي لسبب اختيار هذه القناة ومناسبتها للجمهور", 
-      "اكتب هنا قناة تسويق ثانية مساندة مع توضيح كيف سيساهم تكتيكها في إيصال ${project.name} للفئات المستهدفة"
-    ],
-    "keywords": [
-      "أبرز كلمة مفتاحية مرتبطة بـ ${project.name}", 
-      "كلمة مفتاحية ثانية هامة جداً لجمهوركم", 
-      "كلمة مفتاحية ثالثة مستهدفة بمحركات البحث", 
-      "كلمة مفتاحية رابعة متعلقة بقطاع ومعوقات العمل"
-    ],
-    "launchStrategy": "اكتب خطوات استراتيجية عملية واحترافية متتالية ومفصلة لإطلاق مشروع ${project.name} بنجاح من الصفر وتحقيق والوصول للجمهور الأكبر بطرق مجانية ومدفوعة ممتازة للغاية",
+    "channels": ["قناة التسويق الأولى المقترحة مع مبرر اختيارها", "قناة التسويق الثانية المقترحة وملاءمتها للجمهور"],
+    "keywords": ["الكلمة المفتاحية 1", "الكلمة المفتاحية 2", "الكلمة المفتاحية 3", "الكلمة المفتاحية 4"],
+    "launchStrategy": "خطوات استراتيجية لإطلاق المشروع من الصفر والانتشار المبدئي وتحقيق أولى المبيعات/الموظفين",
     "thirtyDayCalendar": [
-      { 
-        "day": 1, 
-        "topic": "المنشور الافتتاحي التشويقي الخاص بالوعي بمشكلة العميل وحلها ببرمجية ${project.name}", 
-        "caption": "اكتب نص التغريدة أو المنشور الفعلي المناسب كلياً لليوم الأول مع الهاشتاجات الجذابة لشد الانتباه والبدء بالنشر", 
-        "channel": "X / LinkedIn" 
-      },
-      { 
-        "day": 5, 
-        "topic": "منشور يعرض المزايا الاستثنائية والواجهة الأنيقة للتطبيق لغرس الرغبة وتوفير الجهد", 
-        "caption": "اكتب نص منشور شيق وجاهز للنشر يستعرض الميزات التي تحل مشاكلهم بمظهر رائع", 
-        "channel": "Instagram" 
-      },
-      { 
-        "day": 12, 
-        "topic": "منشور تعليمي يثبت ريادتكم وخبرتكم بمجال المشكلة وحلها من النظرة الأولى للثقة", 
-        "caption": "اكتب نص المنشور التثقيفي الفعلي حول كيف يسهل ${project.name} عليهم أداء المهام بالدليل البسيط والعملي", 
-        "channel": "LinkedIn" 
-      },
-      { 
-        "day": 20, 
-        "topic": "منشور يدعو للتسجيل وتدشين حساب مجاني بمشروع ${project.name} والاستزادة", 
-        "caption": "اكتب نص منشور حماسي قاهر يحفز على التسجيل بنقرة واحدة وتجربة مزايا المنصة الاستثنائية", 
-        "channel": "X" 
-      },
-      { 
-        "day": 30, 
-        "topic": "منشور مراجعة تقييم مستخدمين وحصاد نجاح لـ ${project.name} بعد مرور 30 يوماً متواصلة", 
-        "caption": "اكتب نصاً مميزاً يعكس نجاحاً وسعادة العملاء بالمنصة ومدى التحسن المحقق في توفير الوقت والجهد الحركي والاستقرار", 
-        "channel": "All Channels" 
-      }
+      { "day": 1, "topic": "منشور تشويقي أولى لحل المشكلات", "caption": "نص المنشور المقترح مع الهاشتاجات", "channel": "X / LinkedIn" },
+      { "day": 5, "topic": "منشور يعرض المزايا الفريدة", "caption": "نص المنشور", "channel": "Instagram" },
+      { "day": 12, "topic": "منشور تعليمي يهم الفئات المستهدفة", "caption": "نص منشور تثقيفي", "channel": "LinkedIn" },
+      { "day": 20, "topic": "عرض خاص أو عينة مجانية ممتازة", "caption": "نص منشور العرض الاستثنائي", "channel": "X" },
+      { "day": 30, "topic": "حصاد ثقة ومراجعات وتقييم أول شهر من الإطلاق", "caption": "نص احتفالي بمرور شهر ومشاركة التقييمات", "channel": "All Channels" }
     ]
   }
-}
+}`;
 
-تنبيه حاسم لا يقبل النقاش: تخلص تماماً من كافة الأقواس والإرشادات التوضيحية واجعل المخرجات عبارة عن محتوى حقيقي متقن صُمّم خصيصاً للتنفيذ كأنك وكالة تسويق عالمية تشرف على مشروع "${project.name}" الباهر!
-`;
-
-      const aiResponse = await geminiService.generateText(modelPrompt, 'gemini-3.5-flash');
-      onLog('📥 [Gemini API] تم استقبال بيانات خطة التسويق والحملات الذكية حركياً.');
-      await new Promise(resolve => setTimeout(resolve, 400));
-
-      onLog('📝 جاري هيكلة وفحص إعلانات وبطاقات Google Ads...');
-      await new Promise(resolve => setTimeout(resolve, 300));
-
-      onLog('📱 جاري تنسيق محتويات منشورات قنوات التواصل الاجتماعي (فيسبوك، وإنستقرام، وبنرات LinkedIn و X)...');
-      await new Promise(resolve => setTimeout(resolve, 305));
-
-      onLog('💌 صياغة قوالب البريد الإلكتروني التسويقية الطويلة والإشعارات الفورية للمستخدمين...');
-      await new Promise(resolve => setTimeout(resolve, 300));
-
-      onLog('🎨 إنشاء وتوليف مفاهيم الصور واللوحات الإعلانية المرافقة...');
-      await new Promise(resolve => setTimeout(resolve, 300));
-
-      onLog('🎬 تشكيل وتجزئة جدول مشاهد الفيديو الإعلاني الترويجي وسيناريو اللقطات والوصف الصوتي...');
-      await new Promise(resolve => setTimeout(resolve, 400));
-
-      onLog('💻 بناء تصميم صفحة الهبوط الاستراتيجية وأسئلة الدعم وجدول النشر لـ 30 يوماً متواصلة...');
-      await new Promise(resolve => setTimeout(resolve, 400));
-
+      const aiResponse = await geminiService.generateText(modelPrompt, 'gemini-1.5-pro');
+      
       // Clean up markdown block wraps if present
       let cleanedJson = aiResponse.trim();
       if (cleanedJson.startsWith('```json')) {
@@ -1030,11 +588,6 @@ ${campaignData.landingPage?.features ? campaignData.landingPage.features.map((f,
       showToast('🎉 تم تحليل المشروع وبناء استوديو التسويق الذكي بنجاح بنسبة مطابقة فائقة الجودة!');
     } catch (e) {
       console.error("Gemini failed, loading premium tailored campaign fallback...", e);
-      onLog('⚠️ تنبيه: خوادم الخدمة الخارجية مشغولة حالياً بشكل مكثف.');
-      await new Promise(resolve => setTimeout(resolve, 400));
-      onLog('🚀 تفعيل المحرك الإبداعي المحلي لـ AI Ideas واستنباط قوالب ممتازة لمشروعك...');
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
       // Fallback block that incorporates active project details perfectly
       const fallback = DEFAULT_CAMPAIGN(project.name, project.description);
       fallback.sector = `${project.type === ProjectType.WEBSITE ? 'موقِع ويب إلكتروني متكامل' : 'تطبيق رقمي ذكي ومتعدد الخصائص'}`;
@@ -1066,7 +619,7 @@ ${campaignData.landingPage?.features ? campaignData.landingPage.features.map((f,
 القطاع: ${campaignData.sector}
 النوع المطلوب إعادة صياغته: ${type}.
 اكتبه بأسلوب جديد وابتكاري وفريد باللغة العربية الفصحى. أرجع النتيجة كنص نظيف فقط بدون أي أقواس أو وسوم.`;
-      const response = await geminiService.generateText(prompt, 'gemini-3.5-flash');
+      const response = await geminiService.generateText(prompt, 'gemini-1.5-pro');
       
       const updated = { ...campaignData };
       if (type === 'ad' && updated.googleAds.length > 0) {
@@ -1275,135 +828,11 @@ ${campaignData.landingPage?.features ? campaignData.landingPage.features.map((f,
     setRenderedVideoUrl(null);
   };
 
-  const handleEditVideoScene = (index: number, field: 'visual' | 'voiceover' | 'duration', value: any) => {
+  const handleEditVideoScene = (index: number, field: 'visual' | 'voiceover', value: string) => {
     if (!campaignData) return;
     const updated = { ...campaignData };
-    if (field === 'duration') {
-      updated.videoScript[index].duration = Math.max(1, Number(value) || 5);
-    } else {
-      updated.videoScript[index][field] = value;
-    }
+    updated.videoScript[index][field] = value;
     setCampaignData(updated);
-  };
-
-  const handleAddVideoScene = () => {
-    if (!campaignData) return;
-    const updated = { ...campaignData };
-    const nextSceneNum = updated.videoScript.length + 1;
-    updated.videoScript.push({
-      scene: nextSceneNum,
-      visual: '',
-      voiceover: '',
-      duration: 10
-    });
-    setCampaignData(updated);
-    showToast(`➕ تم إضافة المشهد ${nextSceneNum} الجديد! (الآن يمكنك تعبئته أو سيقوم نظام AI Ideas بتلوينه وتلقينه آلياً)`);
-  };
-
-  const handleDeleteVideoScene = (index: number) => {
-    if (!campaignData) return;
-    if (campaignData.videoScript.length <= 1) {
-      showToast('⚠️ لا يمكن حذف آخر مشهد. يجب بقاء مشهد واحد على الأقل لتكوين الفيديو.');
-      return;
-    }
-    const updated = { ...campaignData };
-    updated.videoScript.splice(index, 1);
-    // Re-index scenes
-    updated.videoScript.forEach((sc, idx) => {
-      sc.scene = idx + 1;
-    });
-    setCampaignData(updated);
-    showToast('🗑️ تم حذف المشهد بنجاح وإعادة توازن أرقام المراحل للمخطط.');
-  };
-
-  const handleAutoFillScene = async (index: number) => {
-    if (!campaignData || !selectedProject) return;
-    showToast(`⏳ جاري التوليد التلقائي والذكي لتفاصيل المشهد ${index + 1}...`);
-    
-    const pName = selectedProject.name;
-    const pDesc = selectedProject.description || 'تقديم حلول رقمية ذكية تناسب متطلبات العصر';
-    const cleanDesc = pDesc.trim();
-    const briefDesc = cleanDesc.length > 80 ? cleanDesc.substring(0, 80) + '...' : cleanDesc;
-    const miniDesc = cleanDesc.length > 50 ? cleanDesc.substring(0, 50) + '...' : cleanDesc;
-
-    const sceneNum = index + 1;
-    
-    try {
-      const prompt = `أنت جزء من نظام AI Ideas الرائد. قم بكتابة وتعبئة مشهد واحد فقط لفيديو ترويجي لـ مشروع "${pName}" الذي يهدف إلى: "${pDesc}".
-هذا هو المشهد رقم ${sceneNum} من الفيديو.
-قم بإرجاع إجابة قصيرة ومباشرة بصيغة JSON كالتالي فقط بدون كود ماركداون وبدون أي كلام جانبي:
-{
-  "visual": "الوصف البصري والرسوم المتحركة للمشهد ${sceneNum} باللغة العربية الفصحى الفاخرة",
-  "voiceover": "التعليق الصوتي والخطاب المقترح لهذا المشهد باللغة العربية الفصحى لجذب الجمهور"
-}`;
-      const response = await geminiService.generateText(prompt, 'gemini-3.5-flash');
-      let cleaned = response.trim();
-      if (cleaned.startsWith('```json')) {
-        cleaned = cleaned.replace(/^```json/, '').replace(/```$/, '').trim();
-      } else if (cleaned.startsWith('```')) {
-        cleaned = cleaned.replace(/^```/, '').replace(/```$/, '').trim();
-      }
-      const parsed = JSON.parse(cleaned);
-      const updated = { ...campaignData };
-      updated.videoScript[index].visual = parsed.visual || '';
-      updated.videoScript[index].voiceover = parsed.voiceover || '';
-      setCampaignData(updated);
-      showToast(`✨ تم إثراء المشهد ${sceneNum} بالذكاء الاصطناعي بنجاح!`);
-    } catch (e) {
-      console.warn("Single scene gemini generation failed, using optimized local heuristics...", e);
-      const updated = { ...campaignData };
-      if (sceneNum === 1) {
-        updated.videoScript[index].visual = `لقطة تفاعلية قريبة وحركية متميزة تعرض التحديات التي يعالجها تطبيق ${pName} في حل مشاكل ${miniDesc}.`;
-        updated.videoScript[index].voiceover = `هل تشعر بالثقل والتعقيد المستمر في معاملات ${briefDesc} اليوم؟`;
-      } else if (sceneNum === 2) {
-        updated.videoScript[index].visual = `عرض مبهج من النظرة الأولى للواجهات المتألقة واللوحات الإحصائية الخاصة بـ ${pName} التي تضمن الأتمتة السهلة.`;
-        updated.videoScript[index].voiceover = `تطبيق ${pName} هو الحل المبتكر والذكي المخصص ليمنحك كامل السيطرة والريادة الرقمية لـ ${miniDesc}.`;
-      } else {
-        updated.videoScript[index].visual = `شعار ${pName} الذهبي والنيلي المتأقلم يلمع بخلفية فاخرة مرندرة مع واجهة CTA الحث المباشر المثير للشباب.`;
-        updated.videoScript[index].voiceover = `لا تفوت فرصتك! انطلق اليوم مع ${pName} مجاناً، وعجل بالتسجيل لتستمتع بامتيازات مدهشة!`;
-      }
-      setCampaignData(updated);
-      showToast(`✨ تم توليد مشهد متميز ملائم لهوية مشروعك آلياً!`);
-    }
-  };
-
-  const handleAutoFillAllScenes = () => {
-    if (!campaignData || !selectedProject) return;
-    const updated = { ...campaignData };
-    const pName = selectedProject.name;
-    const pDesc = selectedProject.description || 'تقديم خدمات وحلول ذكية فائقة تناسب متطلبات العصر';
-    const cleanDesc = pDesc.trim();
-    const briefDesc = cleanDesc.length > 80 ? cleanDesc.substring(0, 80) + '...' : cleanDesc;
-    const miniDesc = cleanDesc.length > 50 ? cleanDesc.substring(0, 50) + '...' : cleanDesc;
-
-    updated.videoScript.forEach((sc, index) => {
-      const sceneNum = index + 1;
-      if (!sc.visual || sc.visual.trim() === '') {
-        if (sceneNum === 1) {
-          sc.visual = `لقطة قريبة تبرز الفوضى التقليدية أو الأساليب اليدوية المجهدة السابقة لـ ${miniDesc}.`;
-        } else if (sceneNum === 2) {
-          sc.visual = `عرض رائع وتفاعلي لواجهات تطبيق ${pName} الذكية التي تسهل السيطرة على البيانات وتعد بالنمو المذهل والراحة الحقيقية.`;
-        } else if (sceneNum === 3) {
-          sc.visual = `شعار ${pName} وهوية العلامة الملونة مع واجهة دعوة لاتخاذ إجراء جذابة بنموذج اتصال سريع.`;
-        } else {
-          sc.visual = `لقطة بصرية معبرة عن السهولة والسرعة التي يوفرها تطبيق ${pName} للعملاء في قطاع ${miniDesc}.`;
-        }
-      }
-      if (!sc.voiceover || sc.voiceover.trim() === '') {
-        if (sceneNum === 1) {
-          sc.voiceover = `هل تعاني من التعقيد وصعوبة التحكم في معاملات ${briefDesc} اليدوية؟`;
-        } else if (sceneNum === 2) {
-          sc.voiceover = `تطبيق ${pName} مخصص ليمنحكم التحكم والسيطرة التامة وتبسيط المعالجات بأحدث الخصائص التقنية واللوحات!`;
-        } else if (sceneNum === 3) {
-          sc.voiceover = `سارع بالانضمام إلينا اليوم لتجربة تطبيق ${pName} بالكامل مجاناً وامتلاك الريادة المطلقة!`;
-        } else {
-          sc.voiceover = `مع مشروع ${pName}، نجاحك الاستراتيجي وراحتك الرقمية مضمونة بالكامل.`;
-        }
-      }
-    });
-
-    setCampaignData(updated);
-    showToast('🤖 تم فحص وتعبئة كافة خلايا السيناريو والتعليق الفارغة بواسطة AI Ideas باحترافية تامة!');
   };
 
   const handleRenderVideo = async () => {
@@ -1412,53 +841,9 @@ ${campaignData.landingPage?.features ? campaignData.landingPage.features.map((f,
     setRenderedVideoUrl(null);
     setActiveSceneIndex(0);
 
-    // AI Ideas Optional-Fields Handling:
-    // Automatically auto-fill any empty visual or voiceover fields with project templates on the fly!
-    if (campaignData && campaignData.videoScript && selectedProject) {
-      const pName = selectedProject.name;
-      const pDesc = selectedProject.description || 'تقديم خدمات وحلول ذكية فائقة تناسب متطلبات العصر';
-      const cleanDesc = pDesc.trim();
-      const briefDesc = cleanDesc.length > 80 ? cleanDesc.substring(0, 80) + '...' : cleanDesc;
-      const miniDesc = cleanDesc.length > 50 ? cleanDesc.substring(0, 50) + '...' : cleanDesc;
-
-      let autfilledAny = false;
-      campaignData.videoScript.forEach((sc, idx) => {
-        const sceneNum = idx + 1;
-        if (!sc.visual || sc.visual.trim() === '') {
-          autfilledAny = true;
-          if (sceneNum === 1) {
-            sc.visual = `لقطة قريبة تعبر عن الفوضى أو التحدي والمعاناة في إدارة ${pName} أو الطرق اليدوية لـ ${miniDesc}.`;
-          } else if (sceneNum === 2) {
-            sc.visual = `وميض من الرسوم والواجهات المبتكرة الخاصة بتطبيق ${pName} التي تقدم كفاءة عالية وتدفق مريح لـ ${miniDesc}.`;
-          } else if (sceneNum === 3) {
-            sc.visual = `شعار ${pName} والزر التفاعلي للدعوة إلى الاشتراك الفوري بلمسة واحدة مذهلة.`;
-          } else {
-            sc.visual = `لقطة سينمائية تعزز ثقة المستخدم بنظام ${pName} والسيطرة الكاملة على مهام ${miniDesc}.`;
-          }
-        }
-        if (!sc.voiceover || sc.voiceover.trim() === '') {
-          autfilledAny = true;
-          if (sceneNum === 1) {
-            sc.voiceover = `هل تشعر بالإجهاد والتشعب وصعوبة إدارة شؤون ${briefDesc}؟`;
-          } else if (sceneNum === 2) {
-            sc.voiceover = `تطبيق ${pName} هو الإجابة الشاملة والحل الذكي الهادف لتبسيط أعمالك كلياً بلمسة واحدة!`;
-          } else if (sceneNum === 3) {
-            sc.voiceover = `ابدأ اليوم مجاناً دون قيود واكتشف الفوائد وبهاجة الكفاءة والإنتاجية مع ${pName}!`;
-          } else {
-            sc.voiceover = `مع نظام ${pName}، صممنا لك حلول الكفاءة والارتياح العصري بلمسة مبتكرة تناسبك.`;
-          }
-        }
-      });
-
-      if (autfilledAny) {
-        setCampaignData({ ...campaignData });
-      }
-    }
-
     const logs = [
       '🎬 جاري قراءة وتحليل نصوص المشاهد والسيناريو والوصف البصري والروابط الهندسية...',
-      '🤖 [AI Ideas] فحص خلايا السيناريو البصري وشرح التعليق الصوتي الاختياري وتوليفها آلياً...',
-      '🎙️ توليد التعليก الصوتي التلقائي المتناسق مع مخارج الحروف العربية ومزامنة الترددات...',
+      '🎙️ توليد التعليق الصوتي التلقائي المتناسق مع مخارج الحروف العربية ومزامنة الترددات...',
       '🎨 بناء وتجهيز إطارات الفيديو المتحركة بناءً على البرومبت وهوية المشروع وخطوط الماركة...',
       '📝 تركيب نصوص الشرح والعناوين الفرعية (Subtitles) على إتجاهات رندرة المشاهد وتعديل ألوان الكروما...',
       '⏳ دمج المحتوى المرئي والصوتي بالكامل وبدء المعالجة والضغط الفوري بدقة 1080p عالية الوضوح...',
@@ -1669,25 +1054,11 @@ ${campaignData.landingPage?.features ? campaignData.landingPage.features.map((f,
           <>
             {/* Analytical Pipeline status card */}
             {isAnalyzing ? (
-              <div id="analytical-pipeline-status" className="bg-slate-900/60 border border-slate-800 rounded-3xl p-8 md:p-12 text-center max-w-2xl mx-auto my-12 shadow-2xl backdrop-blur-md animate-fade-in">
+              <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-8 md:p-12 text-center max-w-2xl mx-auto my-12 shadow-2xl backdrop-blur-md">
                 <SpinnerIcon className="w-12 h-12 text-indigo-400 animate-spin mx-auto mb-6" />
                 <h3 className="text-2xl font-black mb-2 tracking-tight">استوديو الذكاء الاصطناعي يباشر إبداعه...</h3>
                 <p className="text-slate-400 text-sm max-w-md mx-auto mb-8">يقوم النظام بتحليل المشروع وتقديم المحتوى التسويقي بناءً على البيانات الدقيقة فقط لتأمين جودة تفوق 90%.</p>
                 
-                {/* Advanced Technical Rolling Terminal Console (VideoToCode style!) */}
-                <div id="marketing-terminal" className="mb-8 w-full bg-slate-950/90 border border-slate-800 rounded-xl p-4 text-right font-mono text-xs h-44 overflow-y-auto space-y-2 shadow-inner">
-                  {marketingLogs.length === 0 ? (
-                    <p className="text-slate-500 animate-pulse">&gt; بانتظار استجابة معالج المحاكاة التسويقية...</p>
-                  ) : (
-                    marketingLogs.map((log, i) => (
-                      <p key={i} className={`animate-fade-in ${log.includes('⚠️') ? 'text-amber-400' : log.includes('[Gemini API]') || log.includes('[AI Ideas]') ? 'text-indigo-400' : 'text-slate-300'}`}>
-                        {log}
-                      </p>
-                    ))
-                  )}
-                  <div ref={logsEndRef} />
-                </div>
-
                 {/* Visual Step-by-Step progress tracker */}
                 <div className="text-right max-w-md mx-auto space-y-4 border-t border-slate-800 pt-6">
                   {[
@@ -1723,22 +1094,6 @@ ${campaignData.landingPage?.features ? campaignData.landingPage.features.map((f,
                 </div>
               </div>
             ) : campaignData ? (
-              <UnifiedMarketingWorkspace
-                campaignData={campaignData}
-                setCampaignData={setCampaignData}
-                selectedProject={selectedProject}
-                showToast={showToast}
-                runMarketingPipeline={runMarketingPipeline}
-                performCampaignAdjustment={performCampaignAdjustment}
-                userEditRequest={userEditRequest}
-                setUserEditRequest={setUserEditRequest}
-                isAnalyzing={isAnalyzing}
-                setIsAnalyzing={setIsAnalyzing}
-                marketingLogs={marketingLogs}
-                setMarketingLogs={setMarketingLogs}
-                setAnalysisStep={setAnalysisStep}
-              />
-            ) : false ? (
               <div className="space-y-6">
                 
                 {/* AI Marketing Showcase Banner (Toggleable) */}
@@ -2373,101 +1728,36 @@ ${campaignData.landingPage?.features ? campaignData.landingPage.features.map((f,
                       
                       {/* Scenes timeline & custom edits */}
                       <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
-                        <div className="flex flex-col sm:flex-row justify-between sm:items-center border-b border-slate-850 pb-3 gap-2">
-                          <div>
-                            <h4 className="font-bold text-sm text-slate-300">سيناريو المشاهد والتعليق الصوتي المعتمد</h4>
-                            <p className="text-[10px] text-slate-500 mt-0.5">يمكنك كتابة مشاهدك الخاصة أو تركها فارغة ليقوم نظام AI Ideas بتعبئتها تلقائياً.</p>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-1.5 self-end sm:self-auto">
-                            <button
-                              onClick={handleAutoFillAllScenes}
-                              className="px-2.5 py-1.5 bg-indigo-505/10 bg-indigo-900/30 hover:bg-indigo-900/50 border border-indigo-500/30 text-indigo-400 rounded-lg text-xs font-bold flex items-center gap-1 transition-all"
-                              title="ملء جميع الأوصاف والتعليقات الصوتية الفارغة دفعة واحدة بالذكاء الاصطناعي"
-                            >
-                              <Sparkles className="w-3 h-3" />
-                              <span>🤖 تعبئة الفراغات تلقائياً</span>
-                            </button>
-                            <button
-                              onClick={handleAddVideoScene}
-                              className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-bold flex items-center gap-1 transition-all"
-                            >
-                              <Plus className="w-3 h-3" />
-                              <span>إضافة مشهد</span>
-                            </button>
-                          </div>
+                        <div className="flex justify-between items-center border-b border-slate-850 pb-3">
+                          <h4 className="font-bold text-sm text-slate-300">سيناريو المشاهد والتعليق الصوتي المعتمد</h4>
+                          <span className="text-[10px] text-indigo-400 font-bold">{campaignData.videoScript.length} مشاهد مخصصة</span>
                         </div>
 
-                        <div className="space-y-4 max-h-[480px] overflow-y-auto pr-1">
+                        <div className="space-y-4 max-h-[450px] overflow-y-auto pr-1">
                           {campaignData.videoScript.map((sc, scIdx) => (
-                            <div key={scIdx} className="bg-slate-950 p-4 rounded-xl border border-slate-850 space-y-4 relative">
-                              
-                              {/* Scene Header Badge & Duration Input */}
-                              <div className="flex flex-wrap items-center justify-between border-b border-slate-900 pb-2.5 gap-2">
-                                <span className="text-xs font-mono text-indigo-400 bg-indigo-500/10 px-2.5 py-1 rounded-lg border border-indigo-500/20 font-bold">
-                                  المشهد {sc.scene}
-                                </span>
-                                
-                                <div className="flex items-center gap-2">
-                                  <span className="text-[10px] text-slate-500">المدة:</span>
-                                  <input 
-                                    type="number" 
-                                    min="1" 
-                                    max="60"
-                                    value={sc.duration} 
-                                    onChange={e => handleEditVideoScene(scIdx, 'duration', e.target.value)}
-                                    className="w-12 bg-slate-900 border border-slate-800 rounded-md px-1.5 py-0.5 text-center text-xs text-white font-mono outline-none focus:border-indigo-550"
-                                    title="مدة عرض هذا المشهد المخصص بالثواني"
-                                  />
-                                  <span className="text-[10px] text-slate-500">ث</span>
-                                </div>
-                              </div>
+                            <div key={scIdx} className="bg-slate-950 p-4 rounded-xl border border-slate-850 space-y-3 relative">
+                              <span className="absolute top-3 left-3 text-xs font-mono text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20">
+                                المشهد {sc.scene} • {sc.duration} ث
+                              </span>
                               
                               <div className="space-y-1">
-                                <label className="text-[10px] text-slate-400 font-bold flex items-center gap-1">
-                                  <span>الوصف البصري والرسومات للمخرج:</span>
-                                  <span className="text-slate-500 text-[9px] font-normal">(اختياري - يموله AI Ideas تلقائياً)</span>
-                                </label>
+                                <label className="text-[10px] text-slate-500 font-bold">الوصف البصري للمشهد والرسوم المتحركة:</label>
                                 <textarea
                                   value={sc.visual}
                                   onChange={e => handleEditVideoScene(scIdx, 'visual', e.target.value)}
                                   rows={2}
-                                  placeholder="(اختياري) اكتب كيف يتخيل المخرج لقطات هذا المشهد، أو اتركه فارغاً لتبنى AI Ideas الصياغة المثالية تلقائياً..."
-                                  className="w-full bg-slate-900 text-slate-200 text-xs p-2.5 border border-slate-850 rounded-lg mt-1 outline-none focus:border-indigo-500 placeholder:text-slate-650"
+                                  className="w-full bg-slate-900 text-slate-200 text-xs p-2 border border-slate-850 rounded mt-1 outline-none focus:border-indigo-500"
                                 />
                               </div>
 
                               <div className="space-y-1">
-                                <label className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
-                                  <span>التعليق المسموع المعتمد (Voiceover narrative):</span>
-                                  <span className="text-slate-500 text-[9px] font-normal">(اختياري - يقوم به المعالج التلقائي)</span>
-                                </label>
+                                <label className="text-[10px] text-green-400 font-bold">سكريبت التعليق الصوتي المقترح (Voiceover narrative):</label>
                                 <textarea
                                   value={sc.voiceover}
                                   onChange={e => handleEditVideoScene(scIdx, 'voiceover', e.target.value)}
                                   rows={2}
-                                  placeholder="(اختياري) اكتب الكلمات أو الحوار الدقيق والملهم لهذا المشهد باللغة العربية الفصحى، أو اتركه فارغاً لتتولاه AI Ideas..."
-                                  className="w-full bg-slate-900 text-emerald-205 text-slate-200 text-xs p-2.5 border border-slate-850 rounded-lg mt-1 outline-none focus:border-indigo-500 font-mono placeholder:text-slate-650"
+                                  className="w-full bg-slate-900 text-slate-205 text-xs p-2 border border-slate-850 rounded mt-1 outline-none focus:border-indigo-500 font-mono"
                                 />
-                              </div>
-
-                              {/* Action Buttons for Scene */}
-                              <div className="flex justify-end gap-2 pt-2 border-t border-slate-900">
-                                <button
-                                  onClick={() => handleAutoFillScene(scIdx)}
-                                  className="px-2 py-1 bg-slate-900 hover:bg-indigo-950/40 hover:text-indigo-400 border border-slate-850 text-[10px] text-slate-400 font-bold rounded-lg flex items-center gap-1 transition-all"
-                                  title="توليد تلقائي بالذكاء الاصطناعي لهذا المشهد المعين"
-                                >
-                                  <Sparkle className="w-3 h-3 text-indigo-400" />
-                                  <span>ولد بالـ AI</span>
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteVideoScene(scIdx)}
-                                  className="px-2 py-1 bg-slate-900 hover:bg-rose-950/40 hover:text-rose-450 text-[10px] text-slate-400 font-bold rounded-lg flex items-center gap-1 border border-slate-850 hover:border-rose-900/40 transition-all text-red-400"
-                                  title="حذف هذا المشهد من سيناريو الفيديو الإعلاني"
-                                >
-                                  <Trash2 className="w-3 h-3 text-rose-400" />
-                                  <span>حذف</span>
-                                </button>
                               </div>
                             </div>
                           ))}

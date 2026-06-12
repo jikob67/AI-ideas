@@ -3389,7 +3389,7 @@ ${codeSnapshot}
                     case 'editor': return project ? (
                         <>
                             {renderEditorView()}
-                            <BuildModal isOpen={isBuildModalOpen} onClose={() => setIsBuildModalOpen(false)} project={{ ...project, files: projectFiles }} platform={buildPlatform} onUpdateProject={updateProjectLocal} />
+                            <BuildModal isOpen={isBuildModalOpen} onClose={() => setIsBuildModalOpen(false)} project={project} platform={buildPlatform} onUpdateProject={updateProjectLocal} />
                             <BuildInstructionsModal isOpen={isBuildInstructionsModalOpen} onClose={() => setIsBuildInstructionsModalOpen(false)} />
                             <QualityAnalysisModal 
                                 isOpen={isAnalysisModalOpen} 
