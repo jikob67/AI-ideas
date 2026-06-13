@@ -1344,7 +1344,7 @@ ${ipProtection ? ipProtectionInstruction : ''}
         - Maintain the response in Arabic.
         - Your output MUST be a valid JSON object with the keys "name", "description", and "suggestedFeatures".`;
     
-        const prompt = `Initial Idea:\nName: ${idea.name}\nType: ${idea.type}\nDescription: ${idea.description}\nFeatures: ${idea.suggestedFeatures.join(', ')}\n\nUser's Refinement Request: "${refinementRequest}"`;
+        const prompt = `Initial Idea:\nName: ${idea.name}\nType: ${idea.type}\nDescription: ${idea.description}\nFeatures: ${(idea.suggestedFeatures || []).join(', ')}\n\nUser's Refinement Request: "${refinementRequest}"`;
     
         const responseSchema = {
             type: Type.OBJECT,
@@ -1381,7 +1381,7 @@ ${ipProtection ? ipProtectionInstruction : ''}
         
         const prompt = `Project Name: ${idea.name}
         Description: ${idea.description}
-        Existing Features: ${idea.suggestedFeatures.join(', ')}`;
+        Existing Features: ${(idea.suggestedFeatures || []).join(', ')}`;
 
         const responseSchema = {
             type: Type.OBJECT,

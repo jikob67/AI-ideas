@@ -1340,7 +1340,7 @@ ${codeSnapshot}
                     المطلوب: إنشاء مشروع متكامل (HTML, CSS, JS) مستوحى من هذا الرابط ولكن بتصميم عصري وفريد.
                 `;
             } else if (mode === 'idea' && selectedIdea) {
-                actualPrompt = `اسم المشروع: ${finalName}. نوع المشروع: ${selectedIdea.type}. وصف المشروع: ${selectedIdea.description}. الميزات المقترحة: ${selectedIdea.suggestedFeatures.join(', ')}.`;
+                actualPrompt = `اسم المشروع: ${finalName}. نوع المشروع: ${selectedIdea.type}. وصف المشروع: ${selectedIdea.description}. الميزات المقترحة: ${(selectedIdea.suggestedFeatures || []).join(', ')}.`;
             } else if (mode === 'recognizer' && recognitionResult) {
                 actualPrompt = recognitionResult.description;
             }
@@ -1781,11 +1781,11 @@ ${codeSnapshot}
             const newFeatures = await geminiService.suggestMoreFeatures(selectedIdea);
             setSelectedIdea(prev => {
                 if (!prev) return null;
-                const existingFeatures = new Set(prev.suggestedFeatures);
+                const existingFeatures = new Set(prev.suggestedFeatures || []);
                 const uniqueNewFeatures = newFeatures.filter(f => !existingFeatures.has(f));
                 return {
                     ...prev,
-                    suggestedFeatures: [...prev.suggestedFeatures, ...uniqueNewFeatures]
+                    suggestedFeatures: [...(prev.suggestedFeatures || []), ...uniqueNewFeatures]
                 };
             });
         } catch (e) {
@@ -2115,7 +2115,7 @@ ${codeSnapshot}
                         <div className="mt-4">
                             <h4 className="text-sm font-semibold text-slate-300 mb-2">الميزات المقترحة:</h4>
                             <div className="flex flex-wrap gap-2">
-                                {selectedIdea.suggestedFeatures.map((feature, i) => <span key={i} className="text-xs bg-slate-700 px-2 py-1 rounded-full">{feature}</span>)}
+                                {(selectedIdea.suggestedFeatures || []).map((feature, i) => <span key={i} className="text-xs bg-slate-700 px-2 py-1 rounded-full">{feature}</span>)}
                             </div>
                         </div>
                     </div>

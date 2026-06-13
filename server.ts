@@ -450,7 +450,8 @@ async function startServer() {
   app.post("/api/netlify-function-mock", async (req, res) => {
     const { prompt } = req.body;
     if (!prompt) return res.status(400).json({ error: "Missing prompt" });
-    const clientKey = (req.headers["x-openrouter-api-key"] || req.headers["authorization"]?.toString().replace(/^Bearer\s+/i, "")) as string;
+    const clientKeyRaw = (req.headers["x-openrouter-api-key"] || req.headers["authorization"]?.toString().replace(/^Bearer\s+/i, "")) as string;
+    const clientKey = (clientKeyRaw && clientKeyRaw.trim()) ? clientKeyRaw.trim() : (process.env.GEMINI_API_KEY || "");
     if (!clientKey) {
       return res.status(401).json({ error: "api_key_required: الرجاء إدخال مفتاح API الخاص بك في صفحة الإعدادات للمتابعة." });
     }
@@ -474,7 +475,7 @@ async function startServer() {
   app.post("/api/gemini/generate", async (req, res) => {
     const { model, contents, config } = req.body;
     const clientKey = (req.headers["x-openrouter-api-key"] || req.headers["authorization"]?.toString().replace(/^Bearer\s+/i, "")) as string;
-    const keyToUse = clientKey ? clientKey.trim() : "";
+    const keyToUse = (clientKey && clientKey.trim()) ? clientKey.trim() : (process.env.GEMINI_API_KEY || "");
 
     if (!keyToUse) {
       return res.status(401).json({ error: "api_key_required: يرجى إدخال مفتاح API الخاص بك (Gemini أو OpenRouter) في الإعدادات لتتمكن من تشغيل الذكاء الاصطناعي." });
@@ -510,7 +511,7 @@ async function startServer() {
   app.post("/api/gemini/stream", async (req, res) => {
     const { model, contents, config } = req.body;
     const clientKey = (req.headers["x-openrouter-api-key"] || req.headers["authorization"]?.toString().replace(/^Bearer\s+/i, "")) as string;
-    const keyToUse = clientKey ? clientKey.trim() : "";
+    const keyToUse = (clientKey && clientKey.trim()) ? clientKey.trim() : (process.env.GEMINI_API_KEY || "");
 
     if (!keyToUse) {
       res.setHeader('Content-Type', 'text/event-stream');
@@ -568,7 +569,8 @@ async function startServer() {
   // Video Generation endpoints
   app.post("/api/gemini/generate-video", async (req, res) => {
     const { model, prompt, image, config } = req.body;
-    const clientKey = (req.headers["x-openrouter-api-key"] || req.headers["authorization"]?.toString().replace(/^Bearer\s+/i, "")) as string;
+    const clientKeyRaw = (req.headers["x-openrouter-api-key"] || req.headers["authorization"]?.toString().replace(/^Bearer\s+/i, "")) as string;
+    const clientKey = (clientKeyRaw && clientKeyRaw.trim()) ? clientKeyRaw.trim() : (process.env.GEMINI_API_KEY || "");
     if (!clientKey || !isGeminiKey(clientKey)) {
       return res.status(400).json({ error: "الرجاء إدخال مفتاح Gemini API صالح (AIzaSy...) في صفحة الإعدادات لتوليد الفيديو." });
     }
@@ -588,7 +590,8 @@ async function startServer() {
 
   app.post("/api/gemini/video-status", async (req, res) => {
     const { operationName } = req.body;
-    const clientKey = (req.headers["x-openrouter-api-key"] || req.headers["authorization"]?.toString().replace(/^Bearer\s+/i, "")) as string;
+    const clientKeyRaw = (req.headers["x-openrouter-api-key"] || req.headers["authorization"]?.toString().replace(/^Bearer\s+/i, "")) as string;
+    const clientKey = (clientKeyRaw && clientKeyRaw.trim()) ? clientKeyRaw.trim() : (process.env.GEMINI_API_KEY || "");
     if (!clientKey || !isGeminiKey(clientKey)) {
       return res.status(400).json({ error: "الرجاء إدخال مفتاح Gemini API صالح (AIzaSy...) في صفحة الإعدادات للتحقق من حالة الفيديو." });
     }
@@ -606,7 +609,8 @@ async function startServer() {
 
   app.get("/api/gemini/video-download", async (req, res) => {
     const { operationName, apiKey } = req.query;
-    const clientKey = (apiKey || req.headers["x-openrouter-api-key"] || req.headers["authorization"]?.toString().replace(/^Bearer\s+/i, "")) as string;
+    const clientKeyRaw = (apiKey || req.headers["x-openrouter-api-key"] || req.headers["authorization"]?.toString().replace(/^Bearer\s+/i, "")) as string;
+    const clientKey = (clientKeyRaw && clientKeyRaw.trim()) ? clientKeyRaw.trim() : (process.env.GEMINI_API_KEY || "");
     if (!clientKey || !isGeminiKey(clientKey)) {
       return res.status(400).json({ error: "الرجاء إدخال مفتاح Gemini API صالح (AIzaSy...) لتحميل الفيديو." });
     }
@@ -643,7 +647,8 @@ async function startServer() {
   // Dedicated reliable Text-to-Speech (Audio) Endpoint
   app.post("/api/gemini/generate-speech", async (req, res) => {
     const { text } = req.body;
-    const clientKey = (req.headers["x-openrouter-api-key"] || req.headers["authorization"]?.toString().replace(/^Bearer\s+/i, "")) as string;
+    const clientKeyRaw = (req.headers["x-openrouter-api-key"] || req.headers["authorization"]?.toString().replace(/^Bearer\s+/i, "")) as string;
+    const clientKey = (clientKeyRaw && clientKeyRaw.trim()) ? clientKeyRaw.trim() : (process.env.GEMINI_API_KEY || "");
     if (!clientKey || !isGeminiKey(clientKey)) {
       return res.status(400).json({ error: "الرجاء إدخال مفتاح Gemini API صالح (AIzaSy...) في صفحة الإعدادات لتوليد الصوت." });
     }
@@ -675,7 +680,8 @@ async function startServer() {
   // Dedicated reliable Imagen Image Generation Endpoint
   app.post("/api/gemini/generate-image", async (req, res) => {
     const { prompt, aspectRatio } = req.body;
-    const clientKey = (req.headers["x-openrouter-api-key"] || req.headers["authorization"]?.toString().replace(/^Bearer\s+/i, "")) as string;
+    const clientKeyRaw = (req.headers["x-openrouter-api-key"] || req.headers["authorization"]?.toString().replace(/^Bearer\s+/i, "")) as string;
+    const clientKey = (clientKeyRaw && clientKeyRaw.trim()) ? clientKeyRaw.trim() : (process.env.GEMINI_API_KEY || "");
     if (!clientKey || !isGeminiKey(clientKey)) {
       return res.status(400).json({ error: "الرجاء إدخال مفتاح Gemini API صالح (AIzaSy...) في صفحة الإعدادات لتوليد صور معبرة للمشروع." });
     }
