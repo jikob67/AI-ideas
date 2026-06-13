@@ -75,24 +75,6 @@ export const BuildModal: React.FC<BuildModalProps> = ({ isOpen, onClose, project
     const [ipaUrl, setIpaUrl] = useState<string | null>(resolvePublicUrl(project.ipaUrl || null));
     const [srcZipUrl, setSrcZipUrl] = useState<string | null>(resolvePublicUrl(project.flutterProjectUrl || null));
     
-    // Dynamic project link configuration
-    const [projectSlug, setProjectSlug] = useState<string>(() => {
-        return project.name ? project.name.toLowerCase().replace(/[^a-z0-9\u0600-\u06FF]+/g, '-') : project.id;
-    });
-    const [customUrl, setCustomUrl] = useState<string>(`https://ai-ideas.io/${projectSlug}`);
-
-    useEffect(() => {
-        const slug = project.name ? project.name.toLowerCase().replace(/[^a-z0-9\u0600-\u06FF]+/g, '-') : project.id;
-        setProjectSlug(slug);
-        setCustomUrl(`https://ai-ideas.io/${slug}`);
-    }, [project.name, project.id]);
-
-    const handleSlugChange = (val: string) => {
-        const cleaned = val.replace(/\s+/g, '-').replace(/[^a-z0-9\u0600-\u06FF-_]+/gi, '');
-        setProjectSlug(cleaned);
-        setCustomUrl(`https://ai-ideas.io/${cleaned}`);
-    };
-    
     // Local in-memory Blobs for robust direct download bypassing CORS / Firebase limits
     const [localWebZipBlob, setLocalWebZipBlob] = useState<Blob | null>(null);
     const [localFlutterZipBlob, setLocalFlutterZipBlob] = useState<Blob | null>(null);
@@ -243,7 +225,7 @@ export const BuildModal: React.FC<BuildModalProps> = ({ isOpen, onClose, project
             const resolvedLiveUrl = resolvePublicUrl(data.liveUrl);
             const resolvedSourceZipUrl = resolvePublicUrl(data.sourceZipUrl);
             const resolvedApkUrl = resolvePublicUrl(data.apkUrl);
-            const resolvedIpaUrl = resolvePublicUrl(data.ipaUrl);
+            const resolvedIpaUrl = resolvePublicUrl(data.liveUrl);
             const resolvedFlutterZipUrl = resolvePublicUrl(data.flutterZipUrl);
 
             setResultLink(resolvedLiveUrl);
@@ -325,16 +307,6 @@ export const BuildModal: React.FC<BuildModalProps> = ({ isOpen, onClose, project
         const link = document.createElement('a');
         link.href = apkUrl;
         link.download = `${project.name.replace(/\s+/g, '_')}_app.apk`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    };
-
-    const handleDownloadIpa = () => {
-        if (!ipaUrl) return;
-        const link = document.createElement('a');
-        link.href = ipaUrl;
-        link.download = `${project.name.replace(/\s+/g, '_')}_app.ipa`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -503,7 +475,7 @@ export const BuildModal: React.FC<BuildModalProps> = ({ isOpen, onClose, project
                                 <div className="flex items-center gap-3 justify-end mb-2">
                                     <div className="text-right">
                                         <h4 className="text-white font-bold text-xs">رابط الويب المباشر</h4>
-                                        <p className="text-[9px] text-slate-500">رابط مخصص بمجال ai-ideas.io</p>
+                                        <p className="text-[9px] text-slate-500">تم نشره بواسطة نظام الـ CD</p>
                                     </div>
                                     <div className="p-2 bg-indigo-500/10 rounded-lg text-indigo-400">
                                         <GlobeAltIcon className="w-4 h-4" />
@@ -511,29 +483,12 @@ export const BuildModal: React.FC<BuildModalProps> = ({ isOpen, onClose, project
                                 </div>
                                 
                                 {resultLink ? (
-                                    <div className="space-y-2 text-right">
-                                        <div className="bg-slate-950 p-2 rounded-xl border border-slate-800">
-                                            <div className="text-[10px] text-slate-500 mb-1 font-sans">تخصيص مسار الرابط:</div>
-                                            <div className="flex items-center gap-1 border-b border-slate-800 pb-1.5 mb-1.5">
-                                                <span className="text-[11px] font-mono text-slate-400">https://ai-ideas.io/</span>
-                                                <input 
-                                                    type="text"
-                                                    value={projectSlug}
-                                                    onChange={(e) => handleSlugChange(e.target.value)}
-                                                    className="flex-1 bg-transparent border-none text-[11px] font-mono text-indigo-400 focus:outline-none focus:ring-0 p-0 text-left"
-                                                    placeholder="project-slug"
-                                                />
-                                            </div>
-                                            <div className="flex items-center justify-between px-1">
-                                                <span className="text-[10px] font-mono text-slate-400 truncate max-w-[150px]">{customUrl}</span>
-                                                <button onClick={() => {
-                                                    navigator.clipboard.writeText(customUrl);
-                                                    setCopied(true);
-                                                    setTimeout(() => setCopied(false), 2000);
-                                                }} className="p-1 hover:text-white text-slate-400 transition-colors">
-                                                    {copied ? <CheckIcon className="w-3.5 h-3.5 text-green-400" /> : <CopyIcon className="w-3.5 h-3.5" />}
-                                                </button>
-                                            </div>
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between bg-slate-950 p-1.5 px-3 rounded-lg border border-slate-800">
+                                            <span className="text-[10px] font-mono text-slate-500 truncate max-w-[200px]">{resultLink}</span>
+                                            <button onClick={handleCopyLink} className="p-1 hover:text-white text-slate-400 transition-colors">
+                                                {copied ? <CheckIcon className="w-3.5 h-3.5 text-green-400" /> : <CopyIcon className="w-3.5 h-3.5" />}
+                                            </button>
                                         </div>
                                         <a href={resultLink} target="_blank" rel="noopener noreferrer" className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1">
                                             تشغيل المشروع <ArrowTopRightOnSquareIcon className="w-3 h-3" />
@@ -607,24 +562,12 @@ export const BuildModal: React.FC<BuildModalProps> = ({ isOpen, onClose, project
                                     {/* iOS Card */}
                                     <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-800 flex flex-col justify-between space-y-4">
                                         <div className="flex items-center gap-2 justify-end">
-                                            <span className="text-xs text-slate-400 font-bold">تطبيق الآيفون حقيقي (iOS IPA & PWA)</span>
+                                            <span className="text-xs text-slate-400 font-bold">تطبيق الآيفون حقيقي (iOS PWA)</span>
                                             <div className="w-2.5 h-2.5 bg-blue-500 rounded-full animate-pulse"></div>
                                         </div>
                                         <p className="text-[12px] text-slate-300 leading-relaxed font-sans">
-                                            لقد قمنا بنشر حزمة تطبيق آبل <span className="text-indigo-400 font-semibold font-mono">IPA</span> معتمدة ومفتوحة، بالإضافة لخيار تثبيت <span className="text-indigo-400 font-semibold font-mono">PWA</span> متكامل بلا قيود شهادات آبل.
+                                            تطبيق <span className="text-indigo-400 font-semibold font-mono">PWA</span> معتمد متكامل. يستغل كامل الشاشة وبلا قيود شهادات آبل، مع إمكانية التشغيل والوصول بلا إنترنت.
                                         </p>
-                                        <button 
-                                            onClick={handleDownloadIpa}
-                                            disabled={!ipaUrl}
-                                            className={`w-full py-3 text-white font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-2 shadow-lg ${
-                                                ipaUrl 
-                                                    ? 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-900/10' 
-                                                    : 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-50'
-                                            }`}
-                                        >
-                                            <ArrowDownTrayIcon className="w-4 h-4" />
-                                            تحميل ملف الـ iOS IPA التثبيتي الآن
-                                        </button>
                                         <div className="text-right text-[11px] bg-slate-950/80 p-2.5 rounded-xl border border-slate-800/50 text-slate-400 space-y-1">
                                             <span className="font-semibold text-white block mb-0.5">خطوات التثبيت الفوري في آيفون:</span>
                                             <p>1. افتح رابط المشروع المباشر في متصفح <span className="text-indigo-400 font-bold">Safari</span>.</p>

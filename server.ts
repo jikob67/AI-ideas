@@ -177,24 +177,243 @@ async function startServer() {
     return errMessage;
   }
 
-  // Initialize Gemini lazily
-  let aiClient: GoogleGenAI | null = null;
-  function getAi(): GoogleGenAI {
-    if (!aiClient) {
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey) {
-        throw new Error("api_key_invalid: مفتاح API للذكاء الاصطناعي (GEMINI_API_KEY) غير معرّف في الخادم. يرجى توفير مفتاح الـ API الخاص بـ Gemini في الإعدادات.");
+  // Initialize Gemini dynamically using the active user's key
+  function getAi(customKey: string): GoogleGenAI {
+    if (!customKey) {
+      throw new Error("api_key_required: الرجاء إدخال مفتاح API الخاص بك في الإعدادات للمتابعة.");
+    }
+    return new GoogleGenAI({ 
+      apiKey: customKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build-custom',
+        }
       }
-      aiClient = new GoogleGenAI({ 
-        apiKey,
-        httpOptions: {
-          headers: {
-            'User-Agent': 'aistudio-build',
+    });
+  }
+
+  // Define OPENROUTER_API_KEY as strictly empty or dynamic to avoid falling back to your developer account keys
+  const OPENROUTER_API_KEY = "";
+
+  function isGeminiKey(key: string): boolean {
+    return typeof key === "string" && key.trim().startsWith("AIzaSy");
+  }
+
+  function mapContentsToOpenRouterMessages(contents: any, systemInstruction?: any): any[] {
+    const messages: any[] = [];
+    
+    // Add system instruction if present
+    if (systemInstruction) {
+      let sysText = "";
+      if (typeof systemInstruction === "string") {
+        sysText = systemInstruction;
+      } else if (systemInstruction.parts && Array.isArray(systemInstruction.parts)) {
+        sysText = systemInstruction.parts.map((p: any) => p.text || "").join("\n");
+      } else if (typeof systemInstruction.text === "string") {
+        sysText = systemInstruction.text;
+      }
+      if (sysText.trim()) {
+        messages.push({ role: "system", content: sysText.trim() });
+      }
+    }
+
+    if (!contents || !Array.isArray(contents)) {
+      return messages;
+    }
+
+    for (const item of contents) {
+      const role = item.role === "model" ? "assistant" : (item.role || "user");
+      let textContent = "";
+      const images: any[] = [];
+
+      if (item.parts && Array.isArray(item.parts)) {
+        for (const part of item.parts) {
+          if (part.text) {
+            textContent += part.text;
+          } else if (part.inlineData) {
+            const mimeType = part.inlineData.mimeType;
+            const base64 = part.inlineData.data;
+            images.push({
+              type: "image_url",
+              image_url: {
+                url: `data:${mimeType};base64,${base64}`
+              }
+            });
           }
         }
-      });
+      } else if (typeof item === "string") {
+        textContent = item;
+      } else if (item.text) {
+        textContent = item.text;
+      }
+
+      if (images.length > 0) {
+        const contentArray: any[] = [];
+        if (textContent.trim()) {
+          contentArray.push({ type: "text", text: textContent });
+        }
+        for (const img of images) {
+          contentArray.push(img);
+        }
+        messages.push({ role, content: contentArray });
+      } else {
+        messages.push({ role, content: textContent });
+      }
     }
-    return aiClient;
+
+    return messages;
+  }
+
+  async function generateWithOpenRouter(contents: any, config?: any, customKey?: string) {
+    const messages = mapContentsToOpenRouterMessages(contents, config?.systemInstruction);
+    const models = [
+      "google/gemini-2.5-pro",
+      "google/gemini-2.5-flash",
+      "anthropic/claude-3.5-sonnet:beta",
+      "deepseek/deepseek-chat"
+    ];
+
+    let lastErr: any = null;
+    const keyToUse = customKey || OPENROUTER_API_KEY;
+    for (const model of models) {
+      try {
+        console.log(`[OpenRouter] Call generateContent with model: ${model}`);
+        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${keyToUse}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://ai.studio/build",
+            "X-Title": "AI Ideas Platform"
+          },
+          body: JSON.stringify({
+            model,
+            messages,
+            temperature: config?.temperature ?? 0.7,
+            response_format: config?.responseMimeType === "application/json" ? { type: "json_object" } : undefined
+          })
+        });
+
+        if (!response.ok) {
+          const errText = await response.text();
+          throw new Error(`OpenRouter model ${model} error ${response.status}: ${errText}`);
+        }
+
+        const data = await response.json();
+        const textResult = data.choices?.[0]?.message?.content || "";
+
+        return {
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: textResult
+                  }
+                ],
+                role: "model"
+              },
+              finishReason: "STOP"
+            }
+          ]
+        };
+      } catch (err: any) {
+        lastErr = err;
+        console.warn(`[OpenRouter Fallback] Model ${model} failed, trying next... error:`, err.message);
+      }
+    }
+    throw lastErr || new Error("All OpenRouter models failed");
+  }
+
+  async function streamWithOpenRouter(contents: any, config?: any, res?: any, customKey?: string) {
+    const messages = mapContentsToOpenRouterMessages(contents, config?.systemInstruction);
+    const models = [
+      "google/gemini-2.5-pro",
+      "google/gemini-2.5-flash",
+      "anthropic/claude-3.5-sonnet:beta",
+      "deepseek/deepseek-chat"
+    ];
+
+    let success = false;
+    let lastErr: any = null;
+    const keyToUse = customKey || OPENROUTER_API_KEY;
+
+    for (const model of models) {
+      if (success) break;
+      try {
+        console.log(`[OpenRouter Client] Stream request with model: ${model}`);
+        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${keyToUse}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://ai.studio/build",
+            "X-Title": "AI Ideas Platform"
+          },
+          body: JSON.stringify({
+            model,
+            messages,
+            temperature: config?.temperature ?? 0.7,
+            stream: true,
+            response_format: config?.responseMimeType === "application/json" ? { type: "json_object" } : undefined
+          })
+        });
+
+        if (!response.ok) {
+          const errText = await response.text();
+          throw new Error(`OpenRouter stream and model ${model} failed with status ${response.status}: ${errText}`);
+        }
+
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+
+        const reader = response.body;
+        if (!reader) {
+          throw new Error("No reader from OpenRouter response stream.");
+        }
+
+        success = true;
+        
+        for await (const chunk of reader as any) {
+             const text = chunk.toString();
+             const lines = text.split("\n");
+             for (const line of lines) {
+                 const trimmed = line.trim();
+                 if (trimmed.startsWith("data: ")) {
+                     const dataChunkStr = trimmed.slice(6).trim();
+                     if (dataChunkStr === "[DONE]") {
+                         continue;
+                     }
+                     try {
+                         const parsed = JSON.parse(dataChunkStr);
+                         const content = parsed.choices?.[0]?.delta?.content || "";
+                         if (content) {
+                             const clientChunk = {
+                                 candidates: [{
+                                     content: {
+                                         parts: [{ text: content }],
+                                         role: "model"
+                                     }
+                                 }]
+                             };
+                             res.write(`data: ${JSON.stringify({ response: clientChunk })}\n\n`);
+                         }
+                     } catch (err) {
+                         // Gracefully skip incomplete chunk parsings
+                     }
+                 }
+             }
+        }
+        res.end();
+        return;
+      } catch (err: any) {
+        lastErr = err;
+        console.warn(`[OpenRouter Stream Fallback] Model ${model} failed:`, err.message);
+      }
+    }
+    
+    throw lastErr || new Error("All OpenRouter models failed to stream");
   }
 
   app.disable("x-powered-by");
@@ -231,10 +450,14 @@ async function startServer() {
   app.post("/api/netlify-function-mock", async (req, res) => {
     const { prompt } = req.body;
     if (!prompt) return res.status(400).json({ error: "Missing prompt" });
+    const clientKey = (req.headers["x-openrouter-api-key"] || req.headers["authorization"]?.toString().replace(/^Bearer\s+/i, "")) as string;
+    if (!clientKey) {
+      return res.status(401).json({ error: "api_key_required: الرجاء إدخال مفتاح API الخاص بك في صفحة الإعدادات للمتابعة." });
+    }
 
     try {
       console.log("Mock Netlify Function triggered with prompt:", prompt);
-      const response = await getAi().models.generateContent({
+      const response = await getAi(clientKey).models.generateContent({
         model: "gemini-flash-latest",
         contents: [{ role: "user", parts: [{ text: prompt }] }]
       });
@@ -248,108 +471,61 @@ async function startServer() {
     }
   });
 
-  function normalizeModelName(model: string): string {
-    const m = (model || "").toLowerCase();
-    // Keep image, video, live, translation, music, audio, embedding, or tts models as-is
-    if (m.includes("image") || m.includes("veo") || m.includes("live") || m.includes("translate") || m.includes("lyria") || m.includes("tts") || m.includes("audio") || m.includes("embedding")) {
-      return model;
-    }
-    if (m.includes("pro") || m.includes("3.1-pro")) {
-      return "gemini-3.1-pro-preview";
-    }
-    return "gemini-3.5-flash";
-  }
-
   app.post("/api/gemini/generate", async (req, res) => {
     const { model, contents, config } = req.body;
-    const maxRetries = 3;
-    let attempt = 0;
-    
-    const requestedModel = normalizeModelName(model);
-    const modelQueue = [requestedModel];
-    
-    if (requestedModel.includes("pro")) {
-      modelQueue.push("gemini-3.1-pro-preview");
-      modelQueue.push("gemini-3.5-flash");
-    } else {
-      modelQueue.push("gemini-3.5-flash");
-      modelQueue.push("gemini-3.1-pro-preview");
+    const clientKey = (req.headers["x-openrouter-api-key"] || req.headers["authorization"]?.toString().replace(/^Bearer\s+/i, "")) as string;
+    const keyToUse = clientKey ? clientKey.trim() : "";
+
+    if (!keyToUse) {
+      return res.status(401).json({ error: "api_key_required: يرجى إدخال مفتاح API الخاص بك (Gemini أو OpenRouter) في الإعدادات لتتمكن من تشغيل الذكاء الاصطناعي." });
     }
 
-    const uniqueModelQueue = Array.from(new Set(modelQueue));
-    let modelIndex = 0;
-
-    while (modelIndex < uniqueModelQueue.length) {
-      const currentModel = uniqueModelQueue[modelIndex];
+    if (isGeminiKey(keyToUse)) {
       try {
-        const response = await getAi().models.generateContent({
-          model: currentModel,
+        console.log("[api/gemini/generate] Attempting generation with user-provided Gemini API key natively...");
+        const customAi = getAi(keyToUse);
+        const requestedModel = model || "gemini-flash-latest";
+        const response = await customAi.models.generateContent({
+          model: requestedModel,
           contents,
           config
         });
         return res.json({ response });
-      } catch (error: any) {
-        attempt++;
-        const errorMessage = error.message || "";
-        const errorStatus = error.status || 0;
-        
-        console.warn(`[Gemini Generate] Error on model ${currentModel}: ${errorMessage} (Status: ${errorStatus})`);
-
-        // Check if there's a fallback model available inside our queue
-        if (modelIndex < uniqueModelQueue.length - 1) {
-          modelIndex++;
-          attempt = 0; // Reset attempts for the next model
-          console.warn(`[Client/Server Fallback] Error occurred for model ${currentModel}. Falling back to model ${uniqueModelQueue[modelIndex]}...`);
-          await new Promise(resolve => setTimeout(resolve, 300));
-          continue;
-        }
-
-        const isQuotaExceeded = errorStatus === 429 || 
-                                errorMessage.includes("429") || 
-                                errorMessage.includes("quota") || 
-                                errorMessage.includes("RESOURCE_EXHAUSTED");
-        const isRetryable = isQuotaExceeded || errorStatus === 503 ||
-                            errorMessage.includes("503") ||
-                            errorMessage.includes("UNAVAILABLE");
-
-        if (isRetryable && attempt <= maxRetries) {
-          const waitTime = attempt * 2000 + Math.random() * 1000;
-          console.warn(`[Server Retry ${attempt}/${maxRetries}] Gemini API busy/rate-limit for ${currentModel}. Retrying in ${Math.round(waitTime)}ms... Error: ${errorMessage}`);
-          await new Promise(resolve => setTimeout(resolve, waitTime));
-          continue;
-        }
-        
-        console.error(`Gemini Generate Error on model ${currentModel} after all attempts:`, errorMessage);
-        let status = errorStatus || 500;
-        if (!error.status) {
-          if (errorMessage.includes('429')) status = 429;
-          else if (errorMessage.includes('503')) status = 503;
-        }
-        return res.status(status).json({ error: getFriendlyErrorMessage(errorMessage) });
+      } catch (gemErr: any) {
+        console.error("[Custom Gemini Key Error]", gemErr.message);
+        return res.status(500).json({ error: gemErr.message });
+      }
+    } else {
+      try {
+        console.log("[api/gemini/generate] Attempting generation with user OpenRouter API key...");
+        const response = await generateWithOpenRouter(contents, config, keyToUse);
+        return res.json({ response });
+      } catch (orErr: any) {
+        console.error("[OpenRouter Error]", orErr.message);
+        return res.status(500).json({ error: orErr.message });
       }
     }
   });
 
   app.post("/api/gemini/stream", async (req, res) => {
     const { model, contents, config } = req.body;
-    
-    const requestedModel = normalizeModelName(model || "gemini-flash-latest");
-    const modelQueue = [requestedModel];
-    if (requestedModel.includes("pro")) {
-      modelQueue.push("gemini-3.1-pro-preview");
-      modelQueue.push("gemini-3.5-flash");
-    } else {
-      modelQueue.push("gemini-3.5-flash");
-      modelQueue.push("gemini-3.1-pro-preview");
+    const clientKey = (req.headers["x-openrouter-api-key"] || req.headers["authorization"]?.toString().replace(/^Bearer\s+/i, "")) as string;
+    const keyToUse = clientKey ? clientKey.trim() : "";
+
+    if (!keyToUse) {
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.write(`data: ${JSON.stringify({ error: "api_key_required: يرجى إدخال مفتاح API الخاص بك (Gemini أو OpenRouter) في الإعدادات لتتمكن من تشغيل الذكاء الاصطناعي." })}\n\n`);
+      res.end();
+      return;
     }
 
-    const uniqueModelQueue = Array.from(new Set(modelQueue));
-    let modelIndex = 0;
-    while (modelIndex < uniqueModelQueue.length) {
-      const currentModel = uniqueModelQueue[modelIndex];
+    if (isGeminiKey(keyToUse)) {
       try {
-        const response = await getAi().models.generateContentStream({
-          model: currentModel,
+        console.log("[api/gemini/stream] Attempting streaming with user-provided Gemini API key natively...");
+        const customAi = getAi(keyToUse);
+        const requestedModel = model || "gemini-flash-latest";
+        const responseStream = await customAi.models.generateContentStream({
+          model: requestedModel,
           contents,
           config
         });
@@ -358,35 +534,32 @@ async function startServer() {
         res.setHeader('Cache-Control', 'no-cache');
         res.setHeader('Connection', 'keep-alive');
 
-        for await (const chunk of response) {
+        for await (const chunk of responseStream) {
           res.write(`data: ${JSON.stringify({ response: chunk })}\n\n`);
         }
         res.end();
-        return; // Successful streaming completion!
-      } catch (error: any) {
-        const errorMessage = error.message || "";
-        const errorStatus = error.status || 0;
-        
-        console.warn(`[Gemini Stream] Error on model ${currentModel}: ${errorMessage} (Status: ${errorStatus})`);
-
-        // Check if there's a fallback model available inside our queue
-        if (modelIndex < uniqueModelQueue.length - 1) {
-          modelIndex++;
-          console.warn(`[Client/Server Stream Fallback] Error occurred for model ${currentModel}. Falling back to model ${uniqueModelQueue[modelIndex]}...`);
-          await new Promise(resolve => setTimeout(resolve, 300));
-          continue;
+        return;
+      } catch (gemErr: any) {
+        console.error("[Custom Gemini Stream Key Error]", gemErr.message);
+        if (!res.headersSent) {
+          res.setHeader('Content-Type', 'text/event-stream');
         }
-
-        console.error(`Gemini Stream Error on model ${currentModel}:`, errorMessage);
-        try {
-          if (!res.headersSent) {
-            res.setHeader('Content-Type', 'text/event-stream');
-          }
-          res.write(`data: ${JSON.stringify({ error: getFriendlyErrorMessage(errorMessage) })}\n\n`);
-          res.end();
-        } catch (writeErr) {
-          console.error("Failed to write stream error response:", writeErr);
+        res.write(`data: ${JSON.stringify({ error: gemErr.message })}\n\n`);
+        res.end();
+        return;
+      }
+    } else {
+      try {
+        console.log("[api/gemini/stream] Attempting streaming with premium OpenRouter API...");
+        await streamWithOpenRouter(contents, config, res, keyToUse);
+        return;
+      } catch (orErr: any) {
+        console.error("[OpenRouter Stream Error]", orErr.message);
+        if (!res.headersSent) {
+          res.setHeader('Content-Type', 'text/event-stream');
         }
+        res.write(`data: ${JSON.stringify({ error: orErr.message })}\n\n`);
+        res.end();
         return;
       }
     }
@@ -395,9 +568,13 @@ async function startServer() {
   // Video Generation endpoints
   app.post("/api/gemini/generate-video", async (req, res) => {
     const { model, prompt, image, config } = req.body;
+    const clientKey = (req.headers["x-openrouter-api-key"] || req.headers["authorization"]?.toString().replace(/^Bearer\s+/i, "")) as string;
+    if (!clientKey || !isGeminiKey(clientKey)) {
+      return res.status(400).json({ error: "الرجاء إدخال مفتاح Gemini API صالح (AIzaSy...) في صفحة الإعدادات لتوليد الفيديو." });
+    }
     try {
-      const operation = await getAi().models.generateVideos({
-        model: model || 'veo-3.0-generate-preview',
+      const operation = await getAi(clientKey).models.generateVideos({
+        model: model || 'veo-3.1-lite-generate-preview',
         prompt,
         ...(image && { image: { imageBytes: image.base64, mimeType: image.mimeType } }),
         config
@@ -411,11 +588,15 @@ async function startServer() {
 
   app.post("/api/gemini/video-status", async (req, res) => {
     const { operationName } = req.body;
+    const clientKey = (req.headers["x-openrouter-api-key"] || req.headers["authorization"]?.toString().replace(/^Bearer\s+/i, "")) as string;
+    if (!clientKey || !isGeminiKey(clientKey)) {
+      return res.status(400).json({ error: "الرجاء إدخال مفتاح Gemini API صالح (AIzaSy...) في صفحة الإعدادات للتحقق من حالة الفيديو." });
+    }
     try {
       const { GenerateVideosOperation } = await import('@google/genai');
       const op = new GenerateVideosOperation();
       op.name = operationName;
-      const updated = await getAi().operations.getVideosOperation({ operation: op });
+      const updated = await getAi(clientKey).operations.getVideosOperation({ operation: op });
       res.json(updated);
     } catch (error: any) {
       console.error("Gemini Video Status Error:", error.message);
@@ -424,22 +605,23 @@ async function startServer() {
   });
 
   app.get("/api/gemini/video-download", async (req, res) => {
-    const { operationName } = req.query;
+    const { operationName, apiKey } = req.query;
+    const clientKey = (apiKey || req.headers["x-openrouter-api-key"] || req.headers["authorization"]?.toString().replace(/^Bearer\s+/i, "")) as string;
+    if (!clientKey || !isGeminiKey(clientKey)) {
+      return res.status(400).json({ error: "الرجاء إدخال مفتاح Gemini API صالح (AIzaSy...) لتحميل الفيديو." });
+    }
     if (typeof operationName !== 'string') return res.status(400).json({ error: "operationName is required" });
     try {
       const { GenerateVideosOperation } = await import('@google/genai');
       const op = new GenerateVideosOperation();
       op.name = operationName;
-      const updated = await getAi().operations.getVideosOperation({ operation: op });
+      const updated = await getAi(clientKey).operations.getVideosOperation({ operation: op });
       const uri = updated.response?.generatedVideos?.[0]?.video?.uri;
       
       if (!uri) return res.status(404).json({ error: "Video not found or not ready" });
 
-      const key = process.env.GEMINI_API_KEY;
-      if (!key) throw new Error("GEMINI_API_KEY is required");
-
       const videoRes = await fetch(uri, {
-        headers: { 'x-goog-api-key': key },
+        headers: { 'x-goog-api-key': clientKey },
       });
 
       res.setHeader('Content-Type', 'video/mp4');
@@ -461,12 +643,16 @@ async function startServer() {
   // Dedicated reliable Text-to-Speech (Audio) Endpoint
   app.post("/api/gemini/generate-speech", async (req, res) => {
     const { text } = req.body;
+    const clientKey = (req.headers["x-openrouter-api-key"] || req.headers["authorization"]?.toString().replace(/^Bearer\s+/i, "")) as string;
+    if (!clientKey || !isGeminiKey(clientKey)) {
+      return res.status(400).json({ error: "الرجاء إدخال مفتاح Gemini API صالح (AIzaSy...) في صفحة الإعدادات لتوليد الصوت." });
+    }
     try {
       if (!text) {
         return res.status(400).json({ error: "الرجاء إدخال نص لتوليد الصوت." });
       }
       
-      const response = await getAi().models.generateContent({
+      const response = await getAi(clientKey).models.generateContent({
         model: 'gemini-2.0-flash', // Fully released gemini-2.0-flash with native tts
         contents: [{ role: 'user', parts: [{ text }] }],
         config: {
@@ -489,14 +675,16 @@ async function startServer() {
   // Dedicated reliable Imagen Image Generation Endpoint
   app.post("/api/gemini/generate-image", async (req, res) => {
     const { prompt, aspectRatio } = req.body;
+    const clientKey = (req.headers["x-openrouter-api-key"] || req.headers["authorization"]?.toString().replace(/^Bearer\s+/i, "")) as string;
+    if (!clientKey || !isGeminiKey(clientKey)) {
+      return res.status(400).json({ error: "الرجاء إدخال مفتاح Gemini API صالح (AIzaSy...) في صفحة الإعدادات لتوليد صور معبرة للمشروع." });
+    }
     try {
       if (!prompt) {
         return res.status(400).json({ error: "الرجاء إدخال وصف لتوليد الصورة." });
       }
 
       const modelQueue = [
-        { model: 'imagen-3.0-generate-002', type: 'image' },
-        { model: 'imagen-3.0-generate-001', type: 'image' },
         { model: 'gemini-2.5-flash-image', type: 'content' },
         { model: 'gemini-3.1-flash-image', type: 'content' },
         { model: 'imagen-4.0-generate-001', type: 'image' }
@@ -506,7 +694,7 @@ async function startServer() {
       for (const item of modelQueue) {
         try {
           if (item.type === 'content') {
-            const response = await getAi().models.generateContent({
+            const response = await getAi(clientKey).models.generateContent({
               model: item.model,
               contents: [{ role: 'user', parts: [{ text: prompt }] }],
               config: {
@@ -526,7 +714,7 @@ async function startServer() {
               }
             }
           } else {
-            const response = await getAi().models.generateImages({
+            const response = await getAi(clientKey).models.generateImages({
               model: item.model,
               prompt,
               config: {
@@ -543,12 +731,11 @@ async function startServer() {
           }
         } catch (err: any) {
           lastError = err;
-          // Silently log info instead of warnings to avoid triggering test regex matching on "failed" or "[Server] ... failed"
-          console.log(`[Image Generation Option] Model ${item.model} status: ${err.status || 'not_available_or_rate_limited'}`);
+          console.warn(`[Server] Image generation with ${item.model} failed:`, err.message);
         }
       }
       
-      console.log(`[Image Generation Option] Transitioning to procedural image generation framework.`);
+      console.warn(`[Server] Image models failed/rate-limited. Seamlessly falling back to custom high-quality procedural PNG card styled for prompt.`);
       // Generate custom prompt-matched vector PNG fallback to prevent any quota, rate-limit, or tier blocker from breaking user flow
       const fallbackBase64 = generateProceduralPng(prompt);
       return res.json({ base64: fallbackBase64 });
@@ -991,33 +1178,6 @@ This complete Flutter project runs your web app natively on Android and iOS.
           fs.copyFileSync(localApkPath, destApkPath);
         }
       }
-
-      // 8. Establish real iOS IPA on disk
-      const localIpaPath = path.join(BINARIES_DIR, "ai_ideas_webview_launcher.ipa");
-      const destIpaPath = path.join(buildProjectDir, "app.ipa");
-
-      if (fs.existsSync(localIpaPath)) {
-        fs.copyFileSync(localIpaPath, destIpaPath);
-      } else {
-        addLog("⬇️ الحزمة غير مخزنة مؤقتاً بالخادم. بدء جلب نواة IPA التأسيسية الموقعة...");
-        try {
-          const ipaResponse = await axios({
-            method: "get",
-            url: "https://github.com/ShibinCo/Webview/releases/download/v1.0/app-release.apk",
-            responseType: "arraybuffer",
-            timeout: 8000
-          });
-          if (ipaResponse.data && ipaResponse.data.byteLength > 1000) {
-            fs.writeFileSync(localIpaPath, Buffer.from(ipaResponse.data));
-            fs.copyFileSync(localIpaPath, destIpaPath);
-          }
-        } catch (e: any) {
-          addLog("⚠️ لم يتوفر اتصال خارجي للجيت، جاري توليد وتجهيز حزمة IPA مخصصة للنظام...");
-          const dummyIpa = await webZip.generateAsync({ type: 'nodebuffer' });
-          fs.writeFileSync(localIpaPath, dummyIpa);
-          fs.copyFileSync(localIpaPath, destIpaPath);
-        }
-      }
     };
 
     try {
@@ -1073,15 +1233,6 @@ This complete Flutter project runs your web app natively on Android and iOS.
           addLog(`✅ فحص صلاحية حزمة الأندرويد app.apk: الملف موجود ومطابق لمعايير الحجم الآمن المضمون لحزمة التشغيل (${(fs.statSync(apkFile).size / 1024 / 1024).toFixed(2)} MB ويبلغ حجمه الفعلي أكثر من 5KB).`);
         } catch (e: any) {
           errors.push(`ملف التطبيق التثبيتي app.apk مفقود أو معطوب أو فارغ (أقل من 5KB): ${e.message}`);
-        }
-
-        // Check 2.5: IPA validity
-        const ipaFile = path.join(buildProjectDir, "app.ipa");
-        try {
-          verifyArtifact(ipaFile);
-          addLog(`✅ فحص صلاحية حزمة الآيفون app.ipa: الملف موجود ومطابق لمعايير الحجم الآمن المضمون لحزمة التشغيل (${(fs.statSync(ipaFile).size / 1024 / 1024).toFixed(2)} MB ويبلغ حجمه الفعلي أكثر من 5KB).`);
-        } catch (e: any) {
-          errors.push(`ملف التطبيق التثبيتي app.ipa مفقود أو معطوب أو فارغ (أقل من 5KB): ${e.message}`);
         }
 
         // Check 3: PWA iOS Validation
@@ -1144,7 +1295,6 @@ This complete Flutter project runs your web app natively on Android and iOS.
         sourceZipUrl: `${protocol}://${hostUrl}/builds/${projectId}/source.zip`,
         flutterZipUrl: `${protocol}://${hostUrl}/builds/${projectId}/flutter_source.zip`,
         apkUrl: `${protocol}://${hostUrl}/builds/${projectId}/app.apk`,
-        ipaUrl: `${protocol}://${hostUrl}/builds/${projectId}/app.ipa`,
         logs: logs
       };
 
@@ -1272,36 +1422,91 @@ self.addEventListener('fetch', event => {
     }
   });
 
-  // Serve the published files
-  app.get(["/published/:projectId", "/published/:projectId/:filename"], (req, res) => {
-    const projectId = req.params.projectId as string;
-    const filename = (req.params as any).filename || "index.html";
+  // Middleware to dynamically serve all assets for published projects, supporting nested subdirectories and both direct "/:projectId" and "/published/:projectId" URLs
+  app.use((req, res, next) => {
+    // Treat paths carefully, decode segments to support ar/en names
+    let decodePath = "";
+    try {
+      decodePath = decodeURIComponent(req.path);
+    } catch {
+      decodePath = req.path;
+    }
 
-    const safeFilename = path.basename(filename);
-    const filePath = path.join(PUBLISHED_DIR, projectId, safeFilename);
+    const segments = decodePath.split("/").filter(Boolean);
+    if (segments.length === 0) {
+      return next();
+    }
 
-    if (fs.existsSync(filePath)) {
-      if (safeFilename.endsWith(".html")) {
-        res.setHeader("Content-Type", "text/html; charset=UTF-8");
-      } else if (safeFilename.endsWith(".css")) {
-        res.setHeader("Content-Type", "text/css; charset=UTF-8");
-      } else if (safeFilename.endsWith(".js")) {
-        res.setHeader("Content-Type", "application/javascript; charset=UTF-8");
-      } else if (safeFilename.endsWith(".json")) {
-        res.setHeader("Content-Type", "application/json; charset=UTF-8");
-      }
-      // Production Cache-control for faster asset loading and reduced server load
-      res.setHeader("Cache-Control", "public, max-age=3600, must-revalidate");
-      return res.sendFile(filePath);
+    let projectId = "";
+    let relativeSegments: string[] = [];
+    const firstSegment = segments[0];
+    const isExplicitPublishedRoute = firstSegment.toLowerCase() === "published";
+
+    if (isExplicitPublishedRoute) {
+      if (segments.length < 2) return next();
+      projectId = segments[1];
+      relativeSegments = segments.slice(2);
     } else {
+      const excludedRoutes = ["api", "published", "builds", "binaries", "assets", "favicon.ico", "sw.js", "manifest.json", "index.html", "vite"];
+      if (excludedRoutes.includes(firstSegment.toLowerCase())) {
+        return next();
+      }
+      projectId = firstSegment;
+      relativeSegments = segments.slice(1);
+    }
+
+    const projectDir = path.join(PUBLISHED_DIR, projectId);
+    if (fs.existsSync(projectDir) && fs.statSync(projectDir).isDirectory()) {
+      // Redirect to ensure trailing slash if they only requested the project root (e.g., /needs or /published/needs)
+      const expectedPrefix = isExplicitPublishedRoute ? `/published/${projectId}` : `/${projectId}`;
+      if (req.path === expectedPrefix) {
+        return res.redirect(301, expectedPrefix + "/");
+      }
+
+      const relativePath = relativeSegments.join("/");
+      const targetFilePath = path.join(projectDir, relativePath || "index.html");
+
+      if (fs.existsSync(targetFilePath) && !fs.statSync(targetFilePath).isDirectory()) {
+        const safeFilename = path.basename(targetFilePath);
+        if (safeFilename.endsWith(".html")) {
+          res.setHeader("Content-Type", "text/html; charset=UTF-8");
+        } else if (safeFilename.endsWith(".css")) {
+          res.setHeader("Content-Type", "text/css; charset=UTF-8");
+        } else if (safeFilename.endsWith(".js")) {
+          res.setHeader("Content-Type", "application/javascript; charset=UTF-8");
+        } else if (safeFilename.endsWith(".json")) {
+          res.setHeader("Content-Type", "application/json; charset=UTF-8");
+        } else if (safeFilename.endsWith(".png")) {
+          res.setHeader("Content-Type", "image/png");
+        } else if (safeFilename.endsWith(".jpg") || safeFilename.endsWith(".jpeg")) {
+          res.setHeader("Content-Type", "image/jpeg");
+        } else if (safeFilename.endsWith(".svg")) {
+          res.setHeader("Content-Type", "image/svg+xml");
+        }
+        res.setHeader("Cache-Control", "public, max-age=3600, must-revalidate");
+        return res.sendFile(targetFilePath);
+      } else if (isExplicitPublishedRoute) {
+        // If they specifically navigated to /published/needs/... and it's not found, show 404
+        return res.status(404).send(`
+          <div style="font-family: system-ui, sans-serif; text-align: center; padding: 55px 15px; background: #0f172a; color: #f8fafc; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+            <h1 style="color: #ef4444; font-size: 32px; margin-bottom: 8px;">الصفحة غير موجودة | Not Found</h1>
+            <p style="color: #94a3b8; font-size: 16px;">لم يتم النشر أو العثور على الملف المطلوب للمشروع (${projectId})</p>
+            <a href="/" style="margin-top: 24px; padding: 12px 24px; background: #6366f1; color: white; border-radius: 12px; text-decoration: none; font-weight: bold; font-size: 14px;">العودة للمنصة</a>
+          </div>
+        `);
+      }
+    } else if (isExplicitPublishedRoute) {
+      // Explicit /published/... endpoint not found in filesystem
       return res.status(404).send(`
         <div style="font-family: system-ui, sans-serif; text-align: center; padding: 55px 15px; background: #0f172a; color: #f8fafc; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center;">
-          <h1 style="color: #ef4444; font-size: 32px; margin-bottom: 8px;">الصفحة غير موجودة | Not Found</h1>
-          <p style="color: #94a3b8; font-size: 16px;">لم يتم النشر أو العثور على الملف المطلوب للمشروع (${projectId})</p>
+          <h1 style="color: #ef4444; font-size: 32px; margin-bottom: 8px;">المشروع غير موجود | Project Not Found</h1>
+          <p style="color: #94a3b8; font-size: 16px;">لم يتم العثور على المشروع (${projectId}) في خوادمنا الحالية.</p>
           <a href="/" style="margin-top: 24px; padding: 12px 24px; background: #6366f1; color: white; border-radius: 12px; text-decoration: none; font-weight: bold; font-size: 14px;">العودة للمنصة</a>
         </div>
       `);
     }
+    
+    next();
   });
 
   // API to stream/serve real pre-compiled WebView launcher Android `.apk`

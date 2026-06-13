@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { CRYPTO_WALLETS } from '../constants';
 import { Wallet, PlanId } from '../types';
@@ -41,6 +42,7 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose }) => {
   const [subscription, setSubscription] = useState<SubscriptionRecord | null>(null);
   const [txHash, setTxHash] = useState('');
   const [verificationError, setVerificationError] = useState('');
+
 
   if (!isOpen) return null;
 
@@ -97,7 +99,7 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose }) => {
         setVerificationError('حدث خطأ غير متوقع أثناء التحقق. يرجى المحاولة مرة أخرى.');
         setStep('failure');
     }
-  };
+};
   
   const handleCopyAddress = () => {
     if(!selectedWallet) return;
@@ -144,7 +146,7 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose }) => {
             <p className="text-slate-400 mt-2">مرحبًا بك! لديك الآن وصول غير محدود.</p>
             <button
               onClick={handleClose}
-              className="mt-6 bg-indigo-600 hover:bg-indigo-505 text-white font-bold py-2 px-8 rounded-lg"
+              className="mt-6 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-8 rounded-lg"
             >
               رائع!
             </button>
@@ -213,7 +215,7 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose }) => {
                 <h2 className="text-2xl font-bold text-white mb-2">التحقق من المعاملة</h2>
                 <p className="text-slate-400">الرجاء لصق معرّف المعاملة (Transaction Hash/ID) في الحقل أدناه لإكمال عملية الترقية.</p>
             </div>
-            <div className="space-y-4">
+            <div className="space-y-2">
                  <label htmlFor="txHashInput" className="block text-sm font-medium text-slate-300">معرّف المعاملة (TxID / TxHash)</label>
                  <input 
                     type="text" 
@@ -224,16 +226,18 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose }) => {
                     className={`w-full bg-slate-900 border rounded-lg p-3 text-white font-mono text-sm text-left focus:outline-none focus:ring-2 transition-colors ${verificationError ? 'border-red-500 focus:ring-red-500' : 'border-slate-700 focus:ring-indigo-500'}`}
                  />
                  {verificationError && (
-                    <p className={`text-sm text-center mt-1 ${verificationError.startsWith('✅') ? 'text-green-400' : 'text-red-400'}`}>{verificationError}</p>
+                    <p className={`text-sm text-center mt-1 ${verificationError.startsWith('✅') ? 'text-green-400' : 'text-red-400'}`}>
+                       {verificationError}
+                    </p>
                  )}
-            </div>
-            <div className="border-t border-slate-700 mt-6 pt-4 flex justify-between items-center">
-                <button onClick={() => setStep('payment')} className="text-sm text-slate-400 hover:text-white">العودة</button>
-                <button onClick={handleVerify} className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-6 rounded-lg">التحقق الآن</button>
-            </div>
-          </div>
-        );
-      case 'cryptoWallets':
+             </div>
+             <div className="border-t border-slate-700 mt-6 pt-4 flex justify-between items-center">
+                 <button onClick={() => setStep('payment')} className="text-sm text-slate-400 hover:text-white">العودة</button>
+                 <button onClick={handleVerify} className="bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-6 rounded-lg">التحقق من المعاملة</button>
+             </div>
+           </div>
+         );
+       case 'cryptoWallets':
         return (
           <>
             <div className="text-center">
@@ -286,7 +290,7 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose }) => {
             </div>
             <div className="border-t border-slate-700 mt-6 pt-4 flex justify-between items-center">
                 <button onClick={() => setStep('options')} className="text-sm text-slate-400 hover:text-white">العودة للخطط</button>
-                <button onClick={handleWalletVerification} className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-6 rounded-lg">المتابعة للدفع</button>
+                <button onClick={handleWalletVerification} className="bg-indigo-600 hover:bg-indigo-505 text-white font-bold py-2 px-6 rounded-lg">المتابعة للدفع</button>
             </div>
           </div>
         );
@@ -303,7 +307,7 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose }) => {
 
             <div className="grid grid-cols-1 md:grid-cols-12 gap-6 animate-in fade-in duration-300">
               {/* Right/Main Panel: Active Plan & Scarcity urgency */}
-              <div className="md:col-span-7 bg-slate-700/40 border border-slate-600 rounded-2xl p-5 relative overflow-hidden flex flex-col justify-between shadow-xl">
+              <div className="md:col-span-7 bg-slate-700/40 border border-slate-605 rounded-2xl p-5 relative overflow-hidden flex flex-col justify-between shadow-xl">
                 <div>
                   <div className="absolute top-0 left-0 bg-indigo-500 text-white text-[9px] px-3 py-1 font-bold rounded-br-xl uppercase tracking-widest animate-pulse">
                     خصم محدود
@@ -318,7 +322,7 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose }) => {
                     <span className="px-2 py-0.5 bg-green-500/10 text-green-400 text-[9px] font-bold rounded border border-green-500/20">وفر 70%</span>
                   </div>
 
-                  {/* Scarcity / Urgency warning */}
+                  {/* Scarcity / Urgency warning requested by user */}
                   <div className="bg-red-500/10 border border-rose-500/20 rounded-xl p-3 text-right space-y-1.5 mb-3">
                     <div className="flex items-center justify-between text-[11px] font-bold text-red-400">
                       <span className="flex items-center gap-1">
@@ -361,7 +365,7 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose }) => {
                       <span>استخدام مفتوح لأدوات التسويق وتوليد المحتوى</span>
                       <CheckIcon className="w-3.5 h-3.5 text-green-400 shrink-0" />
                     </li>
-                    <li className="flex items-center gap-1.5 justify-end">
+                    <li className="flex items-center gap-2 justify-end">
                       <span>استضافة سحابية دائمية وروابط مباشرة لمشاريعك</span>
                       <CheckIcon className="w-3.5 h-3.5 text-green-400 shrink-0" />
                     </li>
@@ -385,7 +389,7 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose }) => {
                 </div>
               </div>
 
-              {/* Left Panel: Pricing expansion Strategy Roadmap */}
+              {/* Left Panel: Pricing expansion Strategy Roadmap (Requested by User) */}
               <div className="md:col-span-5 bg-slate-900/60 border border-slate-750 rounded-2xl p-5 flex flex-col justify-between text-right space-y-3">
                 <div>
                   <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-2.5">

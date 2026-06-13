@@ -499,6 +499,34 @@ ${summaryFiles}
       setDeployLogs(prev => [...prev, logsList[i]]);
       await new Promise(r => setTimeout(r, 900));
     }
+
+    try {
+      // Execute the real deployment behind the scenes using our backend API
+      const publishRes = await fetch(`/api/publish/${subdomain || project.id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          files: projectFiles,
+          projectName: project.name
+        })
+      });
+      const publishData = await publishRes.json();
+      if (publishData.success) {
+        setLogs(prev => [
+          { type: 'success', text: `تم النشر السحابي الحقيقي بنجاح! الرابط الفعال: ${publishData.liveUrl}`, time: new Date().toTimeString().split(' ')[0] },
+          ...prev
+        ]);
+      }
+    } catch (e: any) {
+      console.error("Real publishing API call failed:", e);
+      setLogs(prev => [
+        { type: 'warn', text: `تنبيه: فشل إتمام النشر الفعلي بسبب مشكلة اتصال بالخادم، ولكن تمت محاكاة العرض بنجاح.`, time: new Date().toTimeString().split(' ')[0] },
+        ...prev
+      ]);
+    }
+
     setDeployingSim(false);
     setLogs(prev => [
       { type: 'success', text: `تم تحديث النسخة السحابية لـ ${project.name} وتثبيت رابط المعاينة السريع!`, time: new Date().toTimeString().split(' ')[0] },
@@ -654,7 +682,7 @@ ${summaryFiles}
                     <span className="text-[11px] text-emerald-400 font-bold uppercase tracking-tight">https</span>
                     <span className="text-slate-600">:</span>
                     <span className="text-xs text-slate-400 font-mono overflow-ellipsis overflow-hidden whitespace-nowrap">
-                      demo-sandbox.ais-app.io/{subdomain}/index.html
+                      {window.location.host}/{subdomain}/
                     </span>
                     <button 
                       onClick={() => {
@@ -1220,14 +1248,14 @@ ${summaryFiles}
                       {/* Domain prefix modifier */}
                       <div className="flex gap-2 items-center">
                         <div className="flex items-center bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 flex-1 select-text">
+                          <span className="text-[11px] text-slate-500 font-mono mr-1">/</span>
                           <input 
                             type="text" 
                             value={subdomain}
                             onChange={e => setSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
                             className="bg-transparent border-none text-xs text-white focus:outline-none w-full font-mono text-left"
-                            placeholder="اسم النطاق"
+                            placeholder="رمز الرابط المباشر (مثال: needs)"
                           />
-                          <span className="text-[11px] text-slate-500 font-mono">.ais-app.io</span>
                         </div>
                       </div>
                     </div>
@@ -1331,25 +1359,32 @@ ${summaryFiles}
                       <div className="w-36 h-36 bg-white p-2.5 rounded-2xl flex items-center justify-center relative overflow-hidden group">
                         {/* Dynamic representation of QR with customized layout */}
                         <QrCode className="w-full h-full text-slate-950" />
-                        <div className="absolute inset-0 bg-indigo-600/95 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer">
+                        <a 
+                          href={`${window.location.origin}/${subdomain}/`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="absolute inset-0 bg-indigo-600/95 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+                        >
                           <ExternalLink className="w-6 h-6 text-white mb-2" />
                           <span className="text-[10px] text-white font-bold leading-none">معاينة الرابط</span>
-                        </div>
+                        </a>
                       </div>
 
-                      <span className="text-[11px] text-slate-500 font-bold mt-3 block">{subdomain}.ais-app.io</span>
+                      <span className="text-[11px] text-slate-500 font-bold mt-3 block overflow-hidden text-ellipsis whitespace-nowrap max-w-full" dir="ltr">
+                        {window.location.host}/{subdomain}
+                      </span>
                       
                       <button 
                         onClick={() => {
-                          const urlShare = `https://demo-sandbox.ais-app.io/${subdomain}`;
+                          const urlShare = `${window.location.origin}/${subdomain}/`;
                           navigator.clipboard.writeText(urlShare);
-                          setLogs(prev => [{ type: 'success', text: 'تم نسخ رابط المعاينة السحابية لصفحة الحافظة بنجاح.', time: new Date().toTimeString().split(' ')[0] }, ...prev]);
-                          alert('تم نسخ رابط المعاينة السحابية الحالي!');
+                          setLogs(prev => [{ type: 'success', text: `تم نسخ رابط المعاينة السحابية الفعلي لصفحة الحافظة: ${urlShare}`, time: new Date().toTimeString().split(' ')[0] }, ...prev]);
+                          alert('تم نسخ رابط المعاينة السحابية الفعلي للمشروع!');
                         }}
                         className="mt-3 text-[11px] text-indigo-400 hover:text-indigo-300 font-bold flex items-center gap-1.5 transition"
                       >
                         <Copy className="w-3 h-3" />
-                        <span>نسخ رابط النشر السريع</span>
+                        <span>نسخ رابط النشر الفعلي</span>
                       </button>
                     </div>
 

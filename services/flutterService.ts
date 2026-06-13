@@ -1,9 +1,6 @@
 
-import { GoogleGenAI } from "@google/genai";
 import { Project } from "../types";
 import JSZip from 'jszip';
-
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
 export const generateFlutterCode = async (project: any): Promise<string> => {
   const prompt = `
@@ -21,9 +18,15 @@ export const generateFlutterCode = async (project: any): Promise<string> => {
   `;
 
   try {
+    const userOpenRouterKey = typeof window !== 'undefined' ? (localStorage.getItem('OPENROUTER_API_KEY') || '') : '';
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (userOpenRouterKey) {
+      headers['X-OpenRouter-API-Key'] = userOpenRouterKey;
+    }
+
     const response = await fetch('/api/gemini/generate', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({
         model: "gemini-flash-latest",
         contents: [{ role: 'user', parts: [{ text: prompt }] }]

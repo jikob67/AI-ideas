@@ -22,11 +22,20 @@ export class GeminiService {
         return base64.split(',')[1] || base64;
     }
 
+    private getHeaders(): Record<string, string> {
+        const userOpenRouterKey = typeof window !== 'undefined' ? (localStorage.getItem('OPENROUTER_API_KEY') || '') : '';
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (userOpenRouterKey) {
+            headers['X-OpenRouter-API-Key'] = userOpenRouterKey;
+        }
+        return headers;
+    }
+
     private async callGenerate(model: string, contents: any, config?: any, retries: number = 3) {
         try {
             const response = await fetch('/api/gemini/generate', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: this.getHeaders(),
                 body: JSON.stringify({ model, contents, config })
             });
 
@@ -112,7 +121,7 @@ export class GeminiService {
     private async *callStream(model: string, contents: any, config?: any) {
         const response = await fetch('/api/gemini/stream', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: this.getHeaders(),
             body: JSON.stringify({ model, contents, config })
         });
 
@@ -246,7 +255,7 @@ export class GeminiService {
         try {
             const response = await fetch('/api/gemini/generate-image', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: this.getHeaders(),
                 body: JSON.stringify({ prompt, aspectRatio: '1:1' })
             });
             if (!response.ok) {
@@ -274,7 +283,7 @@ export class GeminiService {
         try {
             const response = await fetch('/api/gemini/generate-image', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: this.getHeaders(),
                 body: JSON.stringify({ prompt, aspectRatio })
             });
             if (!response.ok) {
@@ -431,7 +440,7 @@ export class GeminiService {
         onProgress('Starting video generation request...');
         const startRes = await fetch('/api/gemini/generate-video', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: this.getHeaders(),
             body: JSON.stringify({ prompt, image, config: { resolution, aspectRatio } })
         });
         const { operationName } = await startRes.json();
@@ -442,7 +451,7 @@ export class GeminiService {
             await new Promise(resolve => setTimeout(resolve, 10000));
             const statusRes = await fetch('/api/gemini/video-status', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: this.getHeaders(),
                 body: JSON.stringify({ operationName })
             });
             const status = await statusRes.json();
@@ -477,7 +486,7 @@ export class GeminiService {
         try {
             const response = await fetch('/api/gemini/generate-speech', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: this.getHeaders(),
                 body: JSON.stringify({ text })
             });
             if (!response.ok) {

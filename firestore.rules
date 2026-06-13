@@ -76,32 +76,30 @@ service cloud.firestore {
       allow get: if isSignedIn();
       allow list: if false;
 
-      allow create: if isOwner(userId) && isValidUser(incoming());
-      allow update: if isOwner(userId) && isValidUser(incoming()) && (
-        // Action: General Info Update
-        (incoming().diff(existing()).affectedKeys().hasOnly(['name', 'username', 'profilePictureUrl', 'walletAddress', 'selectedWalletType', 'uniqueLoginCode', 'timestamp', 'email'])) ||
-        // Action: New User Onboarding Completion
-        (incoming().diff(existing()).affectedKeys().hasOnly(['isNewUser']) && existing().isNewUser == true) ||
-        // Action: Point Awarding (Harden this: only increments, max 100 at a time)
-        (incoming().diff(existing()).affectedKeys().hasOnly(['points']) && incoming().points > existing().points && (incoming().points - existing().points) <= 100) ||
-        // Action: Plan Upgrade
-        (incoming().diff(existing()).affectedKeys().hasOnly(['plan']))
+      allow create: if isOwner(userId) && 
+                    (incoming().get('email', '') is string) &&
+                    (incoming().get('isBanned', false) == false) &&
+                    (incoming().get('plan', 'free') in ['free', 'premium', 'pro']);
+
+      allow update: if isOwner(userId) && (
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'name', 'username', 'profilePictureUrl', 'walletAddress', 
+          'selectedWalletType', 'uniqueLoginCode', 'timestamp', 
+          'email', 'isNewUser', 'points', 'plan'
+        ])
       ) && (
-        // Immutable & System Fields Safety
-        !incoming().diff(existing()).affectedKeys().hasAny(['isBanned', 'warnings', 'referralCodeUsed', 'freeMarketingContentUsed', 'referralCode'])
+        !incoming().diff(existing()).affectedKeys().hasAny([
+          'isBanned', 'warnings', 'referralCodeUsed', 'freeMarketingContentUsed', 'referralCode'
+        ])
+      ) && (
+        (!incoming().diff(existing()).affectedKeys().hasAny(['plan']) || (incoming().get('plan', 'free') in ['free', 'premium', 'pro']))
+      ) && (
+        (!incoming().diff(existing()).affectedKeys().hasAny(['points']) || (incoming().get('points', 0) is number))
       );
     }
 
     function isProjectOwner(projectId) {
       return isSignedIn() && get(/databases/$(database)/documents/projects/$(projectId)).data.ownerUid == request.auth.uid;
-    }
-
-    function canReadProject(projectId) {
-      let projectDoc = get(/databases/$(database)/documents/projects/$(projectId));
-      return isOwner(projectDoc.data.ownerUid) || 
-             (projectDoc.data.get('isShared', false) == true) || 
-             (projectDoc.data.get('publicShareId', '') != '') ||
-             (projectDoc.data.get('isPublished', false) == true);
     }
 
     match /projects/{projectId} {
@@ -118,18 +116,20 @@ service cloud.firestore {
       allow delete: if isOwner(existing().ownerUid);
 
       match /files/{fileId} {
-        allow read: if canReadProject(projectId);
+        allow read: if isOwner(get(/databases/$(database)/documents/projects/$(projectId)).data.ownerUid) || 
+                     (get(/databases/$(database)/documents/projects/$(projectId)).data.get('isShared', false) == true) || 
+                     (get(/databases/$(database)/documents/projects/$(projectId)).data.get('publicShareId', '') != '') ||
+                     (get(/databases/$(database)/documents/projects/$(projectId)).data.get('isPublished', false) == true);
         allow write: if isProjectOwner(projectId) && isValidFile(incoming());
       }
 
       match /messages/{messageId} {
-        allow read: if canReadProject(projectId);
+        allow read: if isProjectOwner(projectId);
         allow write: if isProjectOwner(projectId) && isValidMessage(incoming());
       }
 
       match /snapshots/{snapshotId} {
-        allow read: if canReadProject(projectId);
-        allow write: if isProjectOwner(projectId);
+        allow read, write: if isProjectOwner(projectId);
       }
     }
   }

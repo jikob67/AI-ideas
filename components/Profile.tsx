@@ -170,6 +170,22 @@ const Profile: React.FC = () => {
   
   // State
   const [walletAddress, setWalletAddress] = useState('');
+
+  // AI Settings State
+  const [openRouterKey, setOpenRouterKey] = useState(() => {
+    return typeof window !== 'undefined' ? (localStorage.getItem("OPENROUTER_API_KEY") || "") : "";
+  });
+
+  const handleSaveAIKey = () => {
+    localStorage.setItem("OPENROUTER_API_KEY", openRouterKey);
+    setToast({ msg: "تم حفظ مفتاح ذكاء اصطناعي بنجاح", type: "success" });
+  };
+
+  const handleClearAIKey = () => {
+    localStorage.removeItem("OPENROUTER_API_KEY");
+    setOpenRouterKey("");
+    setToast({ msg: "تم إزالة مفتاح ذكاء اصطناعي بنجاح", type: "success" });
+  };
   
   // Notifications
   const [toast, setToast] = useState<{msg: string, type: 'success'|'error'} | null>(null);
@@ -470,6 +486,51 @@ const Profile: React.FC = () => {
                 
                 <div className="mt-4 text-xs text-slate-500 bg-slate-900/30 p-3 rounded-lg border border-slate-800">
                     <p>يتم استخدام المحفظة للتحقق من ملكية المشاريع ولإتمام عمليات الدفع بالعملات الرقمية.</p>
+                </div>
+            </div>
+
+            {/* AI Settings Section */}
+            <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                        <SparklesIcon className="w-5 h-5 text-amber-400"/> 
+                        إعدادات الذكاء الاصطناعي
+                    </h3>
+                </div>
+                
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-1.5">مفتاح API الخاص بك (Gemini أو OpenRouter)</label>
+                        <input 
+                            type="password" 
+                            placeholder="أدخل مفتاح Gemini (AIzaSy...) أو OpenRouter (sk-or-...)" 
+                            value={openRouterKey} 
+                            onChange={(e) => setOpenRouterKey(e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white text-xs font-mono focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all text-right"
+                            dir="ltr"
+                        />
+                        <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">
+                            يدعم التطبيق الآن كلاً من مفاتيح <strong>Gemini API</strong> الرسمية (التي تبدأ بـ AIzaSy) ومفاتيح <strong>OpenRouter API</strong>. عند إدخال مفتاحك الشخصي، سيتم توجيه طلبات الذكاء الاصطناعي وبناء المشاريع تلقائياً باستخدام مفتاحك بشكل آمن وخاص ومباشر لضمان أفضل تجربة مع الحفاظ على خصوصية بياناتك.
+                        </p>
+                    </div>
+
+                    <div className="flex gap-2">
+                        <button 
+                            onClick={handleSaveAIKey} 
+                            className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-4 rounded-lg text-sm transition-colors"
+                        >
+                            حفظ المفتاح
+                        </button>
+                        {openRouterKey && (
+                            <button 
+                                onClick={handleClearAIKey} 
+                                className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 px-3 rounded-lg text-sm transition-colors flex items-center justify-center gap-1"
+                                title="مسح المفتاح"
+                            >
+                                <TrashIcon className="w-4 h-4"/>
+                            </button>
+                        )}
+                    </div>
                 </div>
             </div>
 
